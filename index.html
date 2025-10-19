@@ -916,8 +916,9 @@ How to use:
       const vid = el('preview');
       el('scannerModal').classList.add('active');
       try{
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const deviceId = devices?.[0]?.deviceId;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const deviceId = videoDevices?.[0]?.deviceId;
         currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId, facingMode: { ideal: 'environment' } } });
         vid.srcObject = currentStream; await vid.play();
         codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
@@ -967,8 +968,9 @@ How to use:
       const vid = el('preview');
       el('scannerModal').classList.add('active');
       try{
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const deviceId = devices?.[0]?.deviceId;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const deviceId = videoDevices?.[0]?.deviceId;
         currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId, facingMode: { ideal: 'environment' } } });
         vid.srcObject = currentStream; await vid.play();
         codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
