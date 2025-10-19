@@ -66,6 +66,19 @@ How to use:
         .detail-value{font-weight:600}
 
         .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+
+        /* Star rating */
+        .star-rating{display:flex;gap:4px;align-items:center}
+        .star{font-size:28px;cursor:pointer;color:#374151;transition:color 0.2s;user-select:none}
+        .star.filled{color:#fbbf24}
+        .star.half{position:relative;color:#374151}
+        .star.half::before{content:'★';position:absolute;left:0;top:0;color:#fbbf24;overflow:hidden;width:50%}
+        .star-rating-display{display:flex;gap:2px;align-items:center}
+        .star-rating-display .star{font-size:20px;cursor:default}
+
+        /* Dynamic fields */
+        .field-group{margin-bottom:12px}
+        .field-group label{display:block;margin-bottom:4px}
     </style>
 </head>
 <body>
@@ -108,12 +121,8 @@ How to use:
                 <h2 id="editorTitle">Add Item</h2>
                 <button class="close-btn" id="closeEditorBtn">×</button>
             </div>
-            <div class="grid">
-                <div><label>Type</label><select id="type"><option value="food">Food</option><option value="drink">Drink</option></select></div>
-                <div><label>Name *</label><input id="name" placeholder="e.g., Margherita Pizza or Cabernet Sauvignon"/></div>
-                <div><label>Barcode (optional)</label><input id="barcode" placeholder="e.g., 5991234567890"/></div>
-                <div><label>Rating (0–5) *</label><input id="rating" type="number" min="0" max="5" step="0.5" value="0"/></div>
-                <div style="grid-column:1/-1"><label>Notes</label><textarea id="notes" rows="4" placeholder="Tasting notes, where you had it, etc."></textarea></div>
+            <div id="editorFields">
+                <!-- Dynamic fields will be generated here -->
             </div>
             <div class="row" style="margin-top:16px">
                 <button class="btn primary" id="saveBtn">Save</button>
@@ -132,6 +141,9 @@ How to use:
 
 <!-- ZXing barcode scanner via ESM build -->
 <script type="module">
+    // ====== Load item types configuration ======
+    let ITEM_TYPES_CONFIG = {};
+
     // ====== Simple IndexedDB wrapper (no external deps) ======
     const DB_NAME = 'gourmetapp-db';
     const STORE = 'items';
@@ -173,13 +185,106 @@ How to use:
       return all.filter(it => (it.name||'').toLowerCase().includes(q) || (it.notes||'').toLowerCase().includes(q) || (it.barcode||'').includes(q));
     }
 
+    // ====== Star Rating Helper ======
+    function renderStars(rating, interactive = false) {
+      const stars = [];
+      const fullStars = Math.floor(rating);
+      const hasHalf = rating % 1 >= 0.5;
+
+      for (let i = 1; i <= 5; i++) {
+        if (i <= fullStars) {
+          stars.push(`<span class="star filled" data-value="${i}">★</span>`);
+        } else if (i === fullStars + 1 && hasHalf) {
+          stars.push(`<span class="star half" data-value="${i - 0.5}">★</span>`);
+        } else {
+          stars.push(`<span class="star" data-value="${i}">★</span>`);
+        }
+      }
+
+      const className = interactive ? 'star-rating' : 'star-rating-display';
+      return `<div class="${className}">${stars.join('')}</div>`;
+    }
+
+    function setupStarRating(container, initialValue = 0) {
+      let currentRating = initialValue;
+      const stars = container.querySelectorAll('.star');
+
+      stars.forEach((star, index) => {
+        // Click on left half = half star, click on right half = full star
+        star.addEventListener('click', (e) => {
+          const rect = star.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const starWidth = rect.width;
+          const isLeftHalf = clickX < starWidth / 2;
+
+          let value;
+          if (isLeftHalf) {
+            value = index + 0.5;
+          } else {
+            value = index + 1;
+          }
+
+          currentRating = value;
+          updateStars(value);
+        });
+
+        star.addEventListener('mousemove', (e) => {
+          const rect = star.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const starWidth = rect.width;
+          const isLeftHalf = clickX < starWidth / 2;
+
+          let value;
+          if (isLeftHalf) {
+            value = index + 0.5;
+          } else {
+            value = index + 1;
+          }
+          updateStars(value);
+        });
+      });
+
+      container.addEventListener('mouseleave', () => {
+        updateStars(currentRating);
+      });
+
+      function updateStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalf = rating % 1 >= 0.5;
+
+        stars.forEach((star, idx) => {
+          star.classList.remove('filled', 'half');
+          if (idx < fullStars) {
+            star.classList.add('filled');
+          } else if (idx === fullStars && hasHalf) {
+            star.classList.add('half');
+          }
+        });
+      }
+
+      updateStars(currentRating);
+
+      return {
+        getValue: () => currentRating,
+        setValue: (value) => {
+          currentRating = value;
+          updateStars(value);
+        }
+      };
+    }
+
     // ====== UI helpers ======
     const el = id => document.getElementById(id);
     const resultsEl = el('results');
     let currentEditingId = null;
+    let starRatingController = null;
 
     function sortByRating(items){
       return items.sort((a, b) => (Number(b.rating)||0) - (Number(a.rating)||0));
+    }
+
+    function getTypeInfo(typeKey) {
+      return ITEM_TYPES_CONFIG[typeKey] || { label: typeKey, icon: '📦', fields: [] };
     }
 
     function renderList(items){
@@ -188,15 +293,19 @@ How to use:
         resultsEl.innerHTML = '<div class="empty-state">No items found. Tap the + button to add your first item!</div>';
         return;
       }
-      resultsEl.innerHTML = sorted.map(it => `
+      resultsEl.innerHTML = sorted.map(it => {
+        const typeInfo = getTypeInfo(it.type);
+        return `
         <div class="item" data-id="${it.id}">
           <div class="row" style="justify-content:space-between;align-items:center">
             <div style="flex:1">
-              <div style="font-weight:700;font-size:16px">${escapeHtml(it.name||'Unnamed')}</div>
+              <div style="font-weight:700;font-size:16px">${typeInfo.icon} ${escapeHtml(it.name||'Unnamed')}</div>
+              <div class="muted" style="font-size:12px;margin-top:4px">${typeInfo.label}</div>
             </div>
-            <div><span class="badge">⭐ ${Number(it.rating||0).toFixed(1)}</span></div>
+            <div>${renderStars(Number(it.rating)||0, false)}</div>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
 
       // Bind click events to show details
       resultsEl.querySelectorAll('.item').forEach(itemEl => {
@@ -211,34 +320,53 @@ How to use:
       const item = await getItem(id);
       if(!item) return;
 
+      const typeInfo = getTypeInfo(item.type);
       const detailsContent = el('detailsContent');
-      detailsContent.innerHTML = `
-        <div class="detail-section">
-          <div class="detail-row">
-            <div class="detail-label">Name</div>
-            <div class="detail-value">${escapeHtml(item.name||'Unnamed')}</div>
-          </div>
-          <div class="detail-row">
-            <div class="detail-label">Type</div>
-            <div class="detail-value">${escapeHtml(item.type||'unknown')}</div>
-          </div>
-          <div class="detail-row">
-            <div class="detail-label">Rating</div>
-            <div class="detail-value"><span class="badge">⭐ ${Number(item.rating||0).toFixed(1)}</span></div>
-          </div>
-          ${item.barcode ? `<div class="detail-row">
-            <div class="detail-label">Barcode</div>
-            <div class="detail-value">${escapeHtml(item.barcode)}</div>
-          </div>` : ''}
-          ${item.notes ? `<div class="detail-row">
-            <div class="detail-label">Notes</div>
-            <div class="detail-value">${escapeHtml(item.notes)}</div>
-          </div>` : ''}
-          <div class="detail-row">
-            <div class="detail-label">Last Updated</div>
-            <div class="detail-value">${new Date(item.updatedAt||Date.now()).toLocaleString()}</div>
-          </div>
+
+      let fieldsHTML = `
+        <div class="detail-row">
+          <div class="detail-label">Name</div>
+          <div class="detail-value">${escapeHtml(item.name||'Unnamed')}</div>
         </div>
+        <div class="detail-row">
+          <div class="detail-label">Type</div>
+          <div class="detail-value">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Rating</div>
+          <div class="detail-value">${renderStars(Number(item.rating)||0, false)}</div>
+        </div>
+        ${item.barcode ? `<div class="detail-row">
+          <div class="detail-label">Barcode</div>
+          <div class="detail-value">${escapeHtml(item.barcode)}</div>
+        </div>` : ''}
+      `;
+
+      // Add dynamic fields
+      typeInfo.fields.forEach(field => {
+        if (item[field.name]) {
+          fieldsHTML += `
+            <div class="detail-row">
+              <div class="detail-label">${escapeHtml(field.label)}</div>
+              <div class="detail-value">${escapeHtml(String(item[field.name]))}</div>
+            </div>
+          `;
+        }
+      });
+
+      fieldsHTML += `
+        ${item.notes ? `<div class="detail-row">
+          <div class="detail-label">Notes</div>
+          <div class="detail-value">${escapeHtml(item.notes)}</div>
+        </div>` : ''}
+        <div class="detail-row">
+          <div class="detail-label">Last Updated</div>
+          <div class="detail-value">${new Date(item.updatedAt||Date.now()).toLocaleString()}</div>
+        </div>
+      `;
+
+      detailsContent.innerHTML = `
+        <div class="detail-section">${fieldsHTML}</div>
         <div class="row" style="margin-top:16px">
           <button class="btn primary" id="editDetailsBtn">Edit</button>
           <button class="btn" id="deleteDetailsBtn">Delete</button>
@@ -264,23 +392,108 @@ How to use:
       };
     }
 
+    function renderEditorFields(selectedType, itemData = {}) {
+      const typeInfo = getTypeInfo(selectedType);
+      const editorFields = el('editorFields');
+
+      console.log('Rendering editor for type:', selectedType);
+      console.log('Type info:', typeInfo);
+      console.log('Fields count:', typeInfo.fields.length);
+
+      let html = '<div class="grid">';
+
+      // Type selector
+      html += '<div class="field-group"><label>Type *</label><select id="typeSelect">';
+      Object.keys(ITEM_TYPES_CONFIG).forEach(key => {
+        const cfg = ITEM_TYPES_CONFIG[key];
+        html += `<option value="${key}" ${key === selectedType ? 'selected' : ''}>${cfg.icon} ${cfg.label}</option>`;
+      });
+      html += '</select></div>';
+
+      // Name (always)
+      html += `<div class="field-group"><label>Name *</label><input id="nameInput" placeholder="e.g., Cabernet Sauvignon" value="${escapeHtml(itemData.name||'')}"/></div>`;
+
+      // Barcode (always)
+      html += `<div class="field-group"><label>Barcode (optional)</label><input id="barcodeInput" placeholder="e.g., 5991234567890" value="${escapeHtml(itemData.barcode||'')}"/></div>`;
+
+      // Rating (always) - full width
+      html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating)||0, true)}</div></div>`;
+
+      // Dynamic fields based on type
+      console.log('Adding dynamic fields...');
+      typeInfo.fields.forEach(field => {
+        console.log('Adding field:', field.name, field.label, field.type);
+        html += '<div class="field-group">';
+        html += `<label>${escapeHtml(field.label)}</label>`;
+
+        if (field.type === 'enum') {
+          html += `<select id="field_${field.name}">`;
+          html += '<option value="">-- Select --</option>';
+          field.options.forEach(opt => {
+            const selected = itemData[field.name] === opt ? 'selected' : '';
+            html += `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
+          });
+          html += '</select>';
+        } else if (field.type === 'number') {
+          html += `<input type="number" id="field_${field.name}" value="${itemData[field.name]||''}" placeholder="e.g., 2015"/>`;
+        } else {
+          html += `<input type="text" id="field_${field.name}" value="${escapeHtml(itemData[field.name]||'')}" placeholder="Enter ${field.label.toLowerCase()}"/>`;
+        }
+
+        html += '</div>';
+      });
+
+      // Notes (always) - full width
+      html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes||'')}</textarea></div>`;
+
+      html += '</div>';
+
+      console.log('Generated HTML length:', html.length);
+      editorFields.innerHTML = html;
+
+      // Setup star rating
+      const ratingContainer = el('ratingContainer');
+      starRatingController = setupStarRating(ratingContainer, Number(itemData.rating)||0);
+
+      // Handle type change
+      el('typeSelect').onchange = (e) => {
+        const currentData = collectFormData();
+        renderEditorFields(e.target.value, currentData);
+      };
+    }
+
+    function collectFormData() {
+      const selectedType = el('typeSelect')?.value || Object.keys(ITEM_TYPES_CONFIG)[0];
+      const typeInfo = getTypeInfo(selectedType);
+
+      const data = {
+        type: selectedType,
+        name: el('nameInput')?.value?.trim() || '',
+        barcode: el('barcodeInput')?.value?.trim() || '',
+        rating: starRatingController?.getValue() || 0,
+        notes: el('notesInput')?.value?.trim() || ''
+      };
+
+      // Collect dynamic fields
+      typeInfo.fields.forEach(field => {
+        const fieldEl = el(`field_${field.name}`);
+        if (fieldEl && fieldEl.value) {
+          data[field.name] = field.type === 'number' ? Number(fieldEl.value) : fieldEl.value;
+        }
+      });
+
+      return data;
+    }
+
     function openEditor(item = null){
       if(item){
         el('editorTitle').textContent = 'Edit Item';
-        el('type').value = item.type||'food';
-        el('name').value = item.name||'';
-        el('barcode').value = item.barcode||'';
-        el('rating').value = item.rating||0;
-        el('notes').value = item.notes||'';
         currentEditingId = item.id;
+        renderEditorFields(item.type || Object.keys(ITEM_TYPES_CONFIG)[0], item);
       } else {
         el('editorTitle').textContent = 'Add Item';
-        el('type').value = 'food';
-        el('name').value = '';
-        el('barcode').value = '';
-        el('rating').value = 0;
-        el('notes').value = '';
         currentEditingId = null;
+        renderEditorFields(Object.keys(ITEM_TYPES_CONFIG)[0], {});
       }
       el('editorModal').classList.add('active');
       setStatus('');
@@ -289,6 +502,7 @@ How to use:
     function closeEditor(){
       el('editorModal').classList.remove('active');
       currentEditingId = null;
+      starRatingController = null;
     }
 
     async function refreshList(){
@@ -309,7 +523,7 @@ How to use:
           const p = j.product||{};
           return {
             name: p.product_name || p.generic_name || 'Unknown product',
-            type: 'food',
+            type: Object.keys(ITEM_TYPES_CONFIG)[0] || 'wine',
             barcode: code,
             rating: 0,
             notes: p.brands ? `Brand: ${p.brands}` : ''
@@ -352,15 +566,10 @@ How to use:
               // Try to fetch from Open Food Facts
               const fetched = await lookupByBarcodeOFF(code);
               if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
-                el('barcode').value = code;
-                el('name').value = fetched.name;
-                el('type').value = fetched.type;
-                el('notes').value = fetched.notes||'';
-                openEditor();
+                openEditor({...fetched, barcode: code});
               } else if(!fetched) {
                 if(confirm('Barcode not found. Add new item?')){
-                  el('barcode').value = code;
-                  openEditor();
+                  openEditor({barcode: code});
                 }
               }
             }
@@ -381,6 +590,21 @@ How to use:
 
     // ====== App Initialization ======
     async function initApp(){
+      // Load item types configuration
+      try{
+        const response = await fetch('./item-types-config.json');
+        ITEM_TYPES_CONFIG = await response.json();
+        console.log('Loaded item types:', Object.keys(ITEM_TYPES_CONFIG));
+      }catch(e){
+        console.error('Could not load item types config:', e.message);
+        // Fallback to default types
+        ITEM_TYPES_CONFIG = {
+          wine: { label: 'Wine', icon: '🍷', fields: [] },
+          cheese: { label: 'Cheese', icon: '🧀', fields: [] },
+          olives: { label: 'Olives', icon: '🫒', fields: [] }
+        };
+      }
+
       // ====== Event wiring ======
 
       // Search functionality
@@ -407,13 +631,7 @@ How to use:
       el('cancelEditorBtn').onclick = closeEditor;
 
       el('saveBtn').onclick = async ()=>{
-        const payload = {
-          type: el('type').value||'food',
-          name: el('name').value.trim(),
-          barcode: el('barcode').value.trim(),
-          rating: Number(el('rating').value||0),
-          notes: el('notes').value.trim()
-        };
+        const payload = collectFormData();
 
         if(!payload.name){
           setStatus('Please enter a name.');

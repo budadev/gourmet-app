@@ -1,0 +1,74 @@
+{
+  "wine": {
+    "label": "Wine",
+    "icon": "🍷",
+    "fields": [
+      {
+        "name": "color",
+        "label": "Color",
+        "type": "enum",
+        "options": ["Red", "White", "Rosé", "Sparkling", "Dessert"]
+      },
+      {
+        "name": "country",
+        "label": "Country",
+        "type": "string"
+      },
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "string"
+      },
+      {
+        "name": "year",
+        "label": "Year",
+        "type": "number"
+      }
+    ]
+  },
+  "cheese": {
+    "label": "Cheese",
+    "icon": "🧀",
+    "fields": [
+      {
+        "name": "cheeseType",
+        "label": "Type",
+        "type": "enum",
+        "options": ["Hard", "Soft", "Semi-soft", "Blue", "Fresh", "Aged"]
+      },
+      {
+        "name": "country",
+        "label": "Country",
+        "type": "string"
+      },
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "string"
+      }
+    ]
+  },
+  "olives": {
+    "label": "Olives",
+    "icon": "🫒",
+    "fields": [
+      {
+        "name": "color",
+        "label": "Color",
+        "type": "enum",
+        "options": ["Green", "Black", "Purple", "Mixed"]
+      },
+      {
+        "name": "country",
+        "label": "Country",
+        "type": "string"
+      },
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "string"
+      }
+    ]
+  }
+}
+
