@@ -18,63 +18,117 @@ How to use:
     <style>
         :root{--bg:#0b1220;--card:#111827;--muted:#9ca3af;--text:#e5e7eb;--acc:#34d399}
         *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto}
-        header{position:sticky;top:0;background:linear-gradient(180deg,#0b1220,#0b1220cc);backdrop-filter:blur(8px);padding:12px 16px;border-bottom:1px solid #1f2937}
-        h1{margin:0;font-size:18px;letter-spacing:.5px}
-        main{max-width:860px;margin:0 auto;padding:16px}
+        header{position:sticky;top:0;background:linear-gradient(180deg,#0b1220,#0b1220cc);backdrop-filter:blur(8px);padding:12px 16px;border-bottom:1px solid #1f2937;z-index:100}
+        h1{margin:0 0 12px 0;font-size:18px;letter-spacing:.5px}
+        main{max-width:860px;margin:0 auto;padding:16px;padding-bottom:80px}
         .row{display:flex;gap:8px;flex-wrap:wrap}
-        .btn{appearance:none;border:1px solid #374151;background:#111827;color:#e5e7eb;border-radius:12px;padding:10px 14px;font-weight:600}
+        .btn{appearance:none;border:1px solid #374151;background:#111827;color:#e5e7eb;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
         .btn.primary{background:#10b981;border-color:#10b981;color:#06281f}
-        .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:14px}
+        .btn:disabled{opacity:0.5;cursor:not-allowed}
+        .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:14px;margin-bottom:12px}
         input,select,textarea{width:100%;background:#0b1220;border:1px solid #374151;border-radius:10px;color:#e5e7eb;padding:10px}
-        label{font-size:12px;color:var(--muted)}
+        label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
         .grid{display:grid;grid-template-columns:1fr;gap:12px}
         @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
-        .list{display:grid;gap:10px;margin-top:12px}
-        .item{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:12px}
-        .muted{color:var(--muted)}
+        .list{display:grid;gap:10px}
+        .item{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:12px;cursor:pointer;transition:all 0.2s}
+        .item:hover{border-color:#374151;background:#1a1f2e}
+        .item.selected{border-color:#10b981;background:#0d3d2e}
+        .muted{color:var(--muted);font-size:14px}
         video{width:100%;border-radius:16px;background:#000}
-        .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#0b3c2f;color:#a7f3d0;border:1px solid #065f46;font-size:12px}
+        .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#0b3c2f;color:#a7f3d0;border:1px solid #065f46;font-size:14px;font-weight:600}
+
+        /* Search bar with barcode icon */
+        .search-wrapper{position:relative;width:100%}
+        .search-wrapper input{padding-right:50px}
+        .search-wrapper .barcode-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--acc);font-size:24px;cursor:pointer;padding:8px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+        .search-wrapper .barcode-btn:hover{background:#1f2937}
+
+        /* Floating add button */
+        .fab{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#10b981;border:none;color:#06281f;font-size:32px;box-shadow:0 4px 12px rgba(16,185,129,0.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1000;transition:transform 0.2s}
+        .fab:hover{transform:scale(1.1)}
+        .fab:active{transform:scale(0.95)}
+
+        /* Modal/overlay styles */
+        .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:2000;display:none;overflow-y:auto;padding:16px}
+        .modal.active{display:flex;align-items:flex-start;justify-content:center}
+        .modal-content{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:20px;max-width:600px;width:100%;margin-top:20px}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .modal-header h2{margin:0;font-size:20px}
+        .close-btn{background:transparent;border:none;color:var(--muted);font-size:28px;cursor:pointer;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px}
+        .close-btn:hover{background:#1f2937;color:var(--text)}
+
+        /* Item details */
+        .detail-section{margin-top:16px}
+        .detail-row{display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #1f2937}
+        .detail-row:last-child{border-bottom:none}
+        .detail-label{color:var(--muted);font-size:13px}
+        .detail-value{font-weight:600}
+
+        .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
     </style>
 </head>
 <body>
-<header><h1>🥘 GourmetApp</h1></header>
+<header>
+    <h1>🥘 GourmetApp</h1>
+    <div class="search-wrapper">
+        <input id="searchInput" type="text" placeholder="Search by name, notes, or barcode…"/>
+        <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">📷</button>
+    </div>
+</header>
+
 <main>
-    <div class="row" style="margin-bottom:12px">
-        <button class="btn" id="scanBtn">Scan Barcode</button>
-        <button class="btn" id="stopScanBtn" disabled>Stop Scan</button>
-        <button class="btn" id="addManualBtn">Add Item</button>
-        <input id="searchInput" placeholder="Search by text or barcode…"/>
-        <button class="btn" id="searchBtn">Search</button>
-        <button class="btn" id="showAllBtn">Show All</button>
+    <!-- Scanner section (shown in modal) -->
+    <div id="scannerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Scan Barcode</h2>
+                <button class="close-btn" id="closeScannerBtn">×</button>
+            </div>
+            <video id="preview" playsinline></video>
+            <div class="muted" style="margin-top:8px;text-align:center" id="scanHint">Point your camera at a barcode (EAN/UPC/Code128).</div>
+        </div>
     </div>
 
-    <section id="scanner" class="card" style="display:none">
-        <label>Camera preview</label>
-        <video id="preview" playsinline></video>
-        <div class="muted" id="scanHint">Point your camera at a barcode (EAN/UPC/Code128).</div>
-    </section>
-
-    <section class="card">
-        <h3 style="margin:0 0 10px">Item Editor</h3>
-        <div class="grid">
-            <div><label>Type</label><select id="type"><option value="food">Food</option><option value="drink">Drink</option></select></div>
-            <div><label>Name</label><input id="name" placeholder="e.g., Margherita Pizza or Cabernet Sauvignon"/></div>
-            <div><label>Barcode (optional)</label><input id="barcode" placeholder="e.g., 5991234567890"/></div>
-            <div><label>Rating (0–5)</label><input id="rating" type="number" min="0" max="5" step="0.5"/></div>
-            <div style="grid-column:1/-1"><label>Notes</label><textarea id="notes" rows="3" placeholder="Tasting notes, where you had it, etc."></textarea></div>
+    <!-- Item details modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Item Details</h2>
+                <button class="close-btn" id="closeDetailsBtn">×</button>
+            </div>
+            <div id="detailsContent"></div>
         </div>
-        <div class="row" style="margin-top:10px">
-            <button class="btn primary" id="saveBtn">Save</button>
-            <button class="btn" id="clearBtn">Clear</button>
-        </div>
-        <div class="muted" id="status"></div>
-    </section>
+    </div>
 
-    <section class="card">
-        <h3 style="margin:0 0 10px">Results</h3>
-        <div id="results" class="list"></div>
-    </section>
+    <!-- Editor modal -->
+    <div id="editorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="editorTitle">Add Item</h2>
+                <button class="close-btn" id="closeEditorBtn">×</button>
+            </div>
+            <div class="grid">
+                <div><label>Type</label><select id="type"><option value="food">Food</option><option value="drink">Drink</option></select></div>
+                <div><label>Name *</label><input id="name" placeholder="e.g., Margherita Pizza or Cabernet Sauvignon"/></div>
+                <div><label>Barcode (optional)</label><input id="barcode" placeholder="e.g., 5991234567890"/></div>
+                <div><label>Rating (0–5) *</label><input id="rating" type="number" min="0" max="5" step="0.5" value="0"/></div>
+                <div style="grid-column:1/-1"><label>Notes</label><textarea id="notes" rows="4" placeholder="Tasting notes, where you had it, etc."></textarea></div>
+            </div>
+            <div class="row" style="margin-top:16px">
+                <button class="btn primary" id="saveBtn">Save</button>
+                <button class="btn" id="cancelEditorBtn">Cancel</button>
+            </div>
+            <div class="muted" style="margin-top:8px" id="status"></div>
+        </div>
+    </div>
+
+    <!-- Items list -->
+    <div id="results" class="list"></div>
 </main>
+
+<!-- Floating add button -->
+<button class="fab" id="fabBtn" title="Add new item">+</button>
 
 <!-- ZXing barcode scanner via ESM build -->
 <script type="module">
@@ -99,49 +153,150 @@ How to use:
     }
     async function addItem(item){ const store = await tx('readwrite'); return new Promise((res,rej)=>{ const r=store.add({...item, createdAt: Date.now(), updatedAt: Date.now()}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
     async function updateItem(id, patch){ const store = await tx('readwrite'); const get=store.get(id); return new Promise((res,rej)=>{ get.onsuccess=()=>{ const cur=get.result; if(!cur) return rej(new Error('Not found')); const put=store.put({...cur, ...patch, updatedAt: Date.now()}); put.onsuccess=()=>res(put.result); put.onerror=()=>rej(put.error); }; get.onerror=()=>rej(get.error); }); }
-    async function listAll(){ const store = await tx('readonly'); return new Promise((res)=>{ const out=[]; const c=store.openCursor(); c.onsuccess=()=>{ const cur=c.result; if(cur){ out.push(cur.value); cur.continue(); } else res(out); }; }); }
-    async function findByBarcode(code){ const store = await tx('readonly'); return new Promise((res)=>{ const idx=store.index('by_barcode'); const r=idx.getAll(code); r.onsuccess=()=>res(r.result||[]); }); }
-    async function searchByText(q){ q=(q||'').toLowerCase(); if(!q) return listAll(); const all=await listAll(); return all.filter(it => (it.name||'').toLowerCase().includes(q) || (it.notes||'').toLowerCase().includes(q) || (it.barcode||'').includes(q)); }
+    async function deleteItem(id){ const store = await tx('readwrite'); return new Promise((res,rej)=>{ const r=store.delete(id); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
+    async function getItem(id){
+      const store = await tx('readonly');
+      return new Promise((res,rej)=>{ const r=store.get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+    }
+    async function listAll(){
+      const store = await tx('readonly');
+      return new Promise((res)=>{ const out=[]; const c=store.openCursor(); c.onsuccess=()=>{ const cur=c.result; if(cur){ out.push(cur.value); cur.continue(); } else res(out); }; });
+    }
+    async function findByBarcode(code){
+      const store = await tx('readonly');
+      return new Promise((res)=>{ const idx=store.index('by_barcode'); const r=idx.getAll(code); r.onsuccess=()=>res(r.result||[]); });
+    }
+    async function searchByText(q){
+      q=(q||'').toLowerCase();
+      const all = await listAll();
+      if(!q) return all;
+      return all.filter(it => (it.name||'').toLowerCase().includes(q) || (it.notes||'').toLowerCase().includes(q) || (it.barcode||'').includes(q));
+    }
 
     // ====== UI helpers ======
     const el = id => document.getElementById(id);
     const resultsEl = el('results');
+    let currentEditingId = null;
+
+    function sortByRating(items){
+      return items.sort((a, b) => (Number(b.rating)||0) - (Number(a.rating)||0));
+    }
+
     function renderList(items){
-      resultsEl.innerHTML = items.map(it => `
-        <div class="item">
+      const sorted = sortByRating([...items]);
+      if(sorted.length === 0){
+        resultsEl.innerHTML = '<div class="empty-state">No items found. Tap the + button to add your first item!</div>';
+        return;
+      }
+      resultsEl.innerHTML = sorted.map(it => `
+        <div class="item" data-id="${it.id}">
           <div class="row" style="justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-weight:700">${escapeHtml(it.name||'Unnamed')}</div>
-              <div class="muted">${it.type||'unknown'}${it.barcode?` · ${it.barcode}`:''}</div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:16px">${escapeHtml(it.name||'Unnamed')}</div>
             </div>
             <div><span class="badge">⭐ ${Number(it.rating||0).toFixed(1)}</span></div>
           </div>
-          ${it.notes?`<div style="margin-top:8px">${escapeHtml(it.notes)}</div>`:''}
-          <div class="muted" style="margin-top:6px">Updated: ${new Date(it.updatedAt||Date.now()).toLocaleString()}</div>
-          <div class="row" style="margin-top:8px">
-            <button class="btn" data-edit="${it.id}">Edit</button>
-            <button class="btn" data-delete="${it.id}">Delete</button>
-          </div>
         </div>`).join('');
-      // bind edit/delete
-      resultsEl.querySelectorAll('[data-edit]').forEach(b=> b.onclick = async ()=>{
-        const id = Number(b.getAttribute('data-edit'));
-        const all = await listAll();
-        const item = all.find(x=>x.id===id); if(!item) return;
+
+      // Bind click events to show details
+      resultsEl.querySelectorAll('.item').forEach(itemEl => {
+        itemEl.onclick = () => {
+          const id = Number(itemEl.getAttribute('data-id'));
+          showItemDetails(id);
+        };
+      });
+    }
+
+    async function showItemDetails(id){
+      const item = await getItem(id);
+      if(!item) return;
+
+      const detailsContent = el('detailsContent');
+      detailsContent.innerHTML = `
+        <div class="detail-section">
+          <div class="detail-row">
+            <div class="detail-label">Name</div>
+            <div class="detail-value">${escapeHtml(item.name||'Unnamed')}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Type</div>
+            <div class="detail-value">${escapeHtml(item.type||'unknown')}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Rating</div>
+            <div class="detail-value"><span class="badge">⭐ ${Number(item.rating||0).toFixed(1)}</span></div>
+          </div>
+          ${item.barcode ? `<div class="detail-row">
+            <div class="detail-label">Barcode</div>
+            <div class="detail-value">${escapeHtml(item.barcode)}</div>
+          </div>` : ''}
+          ${item.notes ? `<div class="detail-row">
+            <div class="detail-label">Notes</div>
+            <div class="detail-value">${escapeHtml(item.notes)}</div>
+          </div>` : ''}
+          <div class="detail-row">
+            <div class="detail-label">Last Updated</div>
+            <div class="detail-value">${new Date(item.updatedAt||Date.now()).toLocaleString()}</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn primary" id="editDetailsBtn">Edit</button>
+          <button class="btn" id="deleteDetailsBtn">Delete</button>
+        </div>
+      `;
+
+      el('detailsModal').classList.add('active');
+
+      // Bind edit button
+      el('editDetailsBtn').onclick = () => {
+        el('detailsModal').classList.remove('active');
+        openEditor(item);
+      };
+
+      // Bind delete button
+      el('deleteDetailsBtn').onclick = async () => {
+        if(confirm(`Delete "${item.name}"?`)){
+          await deleteItem(id);
+          el('detailsModal').classList.remove('active');
+          await refreshList();
+          setStatus('Item deleted.');
+        }
+      };
+    }
+
+    function openEditor(item = null){
+      if(item){
+        el('editorTitle').textContent = 'Edit Item';
         el('type').value = item.type||'food';
         el('name').value = item.name||'';
         el('barcode').value = item.barcode||'';
-        el('rating').value = item.rating||'';
+        el('rating').value = item.rating||0;
         el('notes').value = item.notes||'';
-        el('saveBtn').dataset.editing = String(id);
-        setStatus(`Editing #${id}…`);
-      });
-      resultsEl.querySelectorAll('[data-delete]').forEach(b=> b.onclick = async ()=>{
-        const id = Number(b.getAttribute('data-delete'));
-        const store = await tx('readwrite');
-        store.delete(id).onsuccess = async ()=>{ setStatus('Deleted.'); renderList(await listAll()); };
-      });
+        currentEditingId = item.id;
+      } else {
+        el('editorTitle').textContent = 'Add Item';
+        el('type').value = 'food';
+        el('name').value = '';
+        el('barcode').value = '';
+        el('rating').value = 0;
+        el('notes').value = '';
+        currentEditingId = null;
+      }
+      el('editorModal').classList.add('active');
+      setStatus('');
     }
+
+    function closeEditor(){
+      el('editorModal').classList.remove('active');
+      currentEditingId = null;
+    }
+
+    async function refreshList(){
+      const query = el('searchInput').value.trim();
+      const items = await searchByText(query);
+      renderList(items);
+    }
+
     function setStatus(msg){ el('status').textContent = msg; }
     function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
@@ -156,7 +311,7 @@ How to use:
             name: p.product_name || p.generic_name || 'Unknown product',
             type: 'food',
             barcode: code,
-            rating: '',
+            rating: 0,
             notes: p.brands ? `Brand: ${p.brands}` : ''
           };
         }
@@ -171,8 +326,7 @@ How to use:
 
     async function startScan(){
       const vid = el('preview');
-      el('scanner').style.display = '';
-      el('scanBtn').disabled = true; el('stopScanBtn').disabled = false;
+      el('scannerModal').classList.add('active');
       try{
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
         const deviceId = devices?.[0]?.deviceId;
@@ -181,60 +335,129 @@ How to use:
         codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
           if(res){
             const code = res.getText();
-            el('barcode').value = code;
-            setStatus(`Scanned: ${code}`);
-            // pre-fill from local or external
-            const local = await findByBarcode(code);
-            if(local?.length){
-              const it = local[0];
-              el('name').value = it.name||''; el('type').value = it.type||'food'; el('rating').value = it.rating||''; el('notes').value = it.notes||'';
-            }else{
+            el('scanHint').textContent = `Scanned: ${code}`;
+            stopScan();
+
+            // Search for items with this barcode
+            const items = await findByBarcode(code);
+            if(items && items.length > 0){
+              // Show results
+              el('searchInput').value = code;
+              renderList(items);
+            } else {
+              // No match found - offer to add new item
+              el('searchInput').value = code;
+              renderList([]);
+
+              // Try to fetch from Open Food Facts
               const fetched = await lookupByBarcodeOFF(code);
-              if(fetched){
-                el('name').value = fetched.name; el('type').value = fetched.type; el('notes').value = fetched.notes||'';
+              if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
+                el('barcode').value = code;
+                el('name').value = fetched.name;
+                el('type').value = fetched.type;
+                el('notes').value = fetched.notes||'';
+                openEditor();
+              } else if(!fetched) {
+                if(confirm('Barcode not found. Add new item?')){
+                  el('barcode').value = code;
+                  openEditor();
+                }
               }
             }
           }
         });
-      }catch(e){ setStatus('Camera error: '+ e.message); }
+      }catch(e){
+        el('scanHint').textContent = 'Camera error: '+ e.message;
+        setTimeout(stopScan, 3000);
+      }
     }
+
     function stopScan(){
       try{ codeReader.reset(); }catch(_){}
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
-      el('scanBtn').disabled = false; el('stopScanBtn').disabled = true; el('scanner').style.display = 'none';
+      el('scannerModal').classList.remove('active');
+      el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
     }
 
-    // ====== Event wiring ======
-    el('scanBtn').onclick = startScan;
-    el('stopScanBtn').onclick = stopScan;
-    el('addManualBtn').onclick = ()=>{ el('name').value=''; el('barcode').value=''; el('rating').value=''; el('notes').value=''; delete el('saveBtn').dataset.editing; setStatus('Ready to add.'); };
-    el('clearBtn').onclick = ()=>{ el('name').value=''; el('barcode').value=''; el('rating').value=''; el('notes').value=''; delete el('saveBtn').dataset.editing; setStatus('Cleared.'); };
-    el('saveBtn').onclick = async ()=>{
-      const payload = {
-        type: el('type').value||'food',
-        name: el('name').value.trim(),
-        barcode: el('barcode').value.trim(),
-        rating: Number(el('rating').value||0),
-        notes: el('notes').value.trim()
+    // ====== App Initialization ======
+    async function initApp(){
+      // ====== Event wiring ======
+
+      // Search functionality
+      el('searchInput').oninput = async () => {
+        await refreshList();
       };
-      const editing = el('saveBtn').dataset.editing;
-      if(editing){
-        await updateItem(Number(editing), payload); setStatus('Updated.'); delete el('saveBtn').dataset.editing;
-      }else{
-        await addItem(payload); setStatus('Saved.');
+
+      // Barcode scan button
+      el('barcodeScanBtn').onclick = startScan;
+      el('closeScannerBtn').onclick = stopScan;
+
+      // Close details modal
+      el('closeDetailsBtn').onclick = () => {
+        el('detailsModal').classList.remove('active');
+      };
+
+      // FAB - open add item form
+      el('fabBtn').onclick = () => {
+        openEditor();
+      };
+
+      // Editor controls
+      el('closeEditorBtn').onclick = closeEditor;
+      el('cancelEditorBtn').onclick = closeEditor;
+
+      el('saveBtn').onclick = async ()=>{
+        const payload = {
+          type: el('type').value||'food',
+          name: el('name').value.trim(),
+          barcode: el('barcode').value.trim(),
+          rating: Number(el('rating').value||0),
+          notes: el('notes').value.trim()
+        };
+
+        if(!payload.name){
+          setStatus('Please enter a name.');
+          return;
+        }
+
+        try{
+          if(currentEditingId){
+            await updateItem(currentEditingId, payload);
+            setStatus('Item updated!');
+          }else{
+            await addItem(payload);
+            setStatus('Item added!');
+          }
+          setTimeout(() => {
+            closeEditor();
+            refreshList();
+          }, 800);
+        }catch(e){
+          setStatus('Error: ' + e.message);
+        }
+      };
+
+      // Close modals on background click
+      [el('scannerModal'), el('detailsModal'), el('editorModal')].forEach(modal => {
+        modal.onclick = (e) => {
+          if(e.target === modal){
+            modal.classList.remove('active');
+            if(modal === el('scannerModal')) stopScan();
+          }
+        };
+      });
+
+      // Initial load
+      await refreshList();
+
+      // PWA Service Worker
+      if('serviceWorker' in navigator){
+        window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js'));
       }
-      renderList(await listAll());
-    };
-    el('searchBtn').onclick = async ()=>{ renderList(await searchByText(el('searchInput').value)); };
-    el('showAllBtn').onclick = async ()=>{ renderList(await listAll()); };
-
-    // Initial load
-    renderList(await listAll());
-
-    // PWA Service Worker
-    if('serviceWorker' in navigator){
-      window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js'));
     }
+
+    // Start the app
+    initApp();
 </script>
 </body>
 </html>
