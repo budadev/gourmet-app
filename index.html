@@ -41,8 +41,16 @@ How to use:
         /* Search bar with barcode icon */
         .search-wrapper{position:relative;width:100%}
         .search-wrapper input{padding-right:50px}
-        .search-wrapper .barcode-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--acc);font-size:24px;cursor:pointer;padding:8px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+        .search-wrapper .barcode-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;padding:8px;border-radius:8px;display:flex;align-items:center;justify-content:center;width:40px;height:40px}
         .search-wrapper .barcode-btn:hover{background:#1f2937}
+        .search-wrapper .barcode-btn svg{width:24px;height:24px}
+
+        /* Input field with barcode icon */
+        .input-with-barcode{position:relative}
+        .input-with-barcode input{padding-right:50px}
+        .input-with-barcode .barcode-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;padding:8px;border-radius:8px;display:flex;align-items:center;justify-content:center;width:40px;height:40px}
+        .input-with-barcode .barcode-btn:hover{background:#1f2937}
+        .input-with-barcode .barcode-btn svg{width:24px;height:24px}
 
         /* Floating add button */
         .fab{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#10b981;border:none;color:#06281f;font-size:32px;box-shadow:0 4px 12px rgba(16,185,129,0.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1000;transition:transform 0.2s}
@@ -57,6 +65,9 @@ How to use:
         .modal-header h2{margin:0;font-size:20px}
         .close-btn{background:transparent;border:none;color:var(--muted);font-size:28px;cursor:pointer;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px}
         .close-btn:hover{background:#1f2937;color:var(--text)}
+
+        /* Scanner modal needs higher z-index to appear above editor */
+        #scannerModal{z-index:3000}
 
         /* Item details */
         .detail-section{margin-top:16px}
@@ -86,7 +97,17 @@ How to use:
     <h1>🥘 GourmetApp</h1>
     <div class="search-wrapper">
         <input id="searchInput" type="text" placeholder="Search by name, notes, or barcode…"/>
-        <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">📷</button>
+        <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="6" width="2" height="12" fill="currentColor"/>
+                <rect x="6" y="6" width="1" height="12" fill="currentColor"/>
+                <rect x="9" y="6" width="2" height="12" fill="currentColor"/>
+                <rect x="13" y="6" width="1" height="12" fill="currentColor"/>
+                <rect x="16" y="6" width="1" height="12" fill="currentColor"/>
+                <rect x="19" y="6" width="2" height="12" fill="currentColor"/>
+                <circle cx="20" cy="4" r="2" fill="#ef4444"/>
+            </svg>
+        </button>
     </div>
 </header>
 
@@ -413,8 +434,23 @@ How to use:
       // Name (always)
       html += `<div class="field-group"><label>Name *</label><input id="nameInput" placeholder="e.g., Cabernet Sauvignon" value="${escapeHtml(itemData.name||'')}"/></div>`;
 
-      // Barcode (always)
-      html += `<div class="field-group"><label>Barcode (optional)</label><input id="barcodeInput" placeholder="e.g., 5991234567890" value="${escapeHtml(itemData.barcode||'')}"/></div>`;
+      // Barcode (always) with scan button
+      html += `<div class="field-group"><label>Barcode (optional)</label>
+        <div class="input-with-barcode">
+          <input id="barcodeInput" placeholder="e.g., 5991234567890" value="${escapeHtml(itemData.barcode||'')}"/>
+          <button class="barcode-btn" id="barcodeInputScanBtn" type="button" title="Scan barcode">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="6" width="2" height="12" fill="currentColor"/>
+              <rect x="6" y="6" width="1" height="12" fill="currentColor"/>
+              <rect x="9" y="6" width="2" height="12" fill="currentColor"/>
+              <rect x="13" y="6" width="1" height="12" fill="currentColor"/>
+              <rect x="16" y="6" width="1" height="12" fill="currentColor"/>
+              <rect x="19" y="6" width="2" height="12" fill="currentColor"/>
+              <circle cx="20" cy="4" r="2" fill="#ef4444"/>
+            </svg>
+          </button>
+        </div>
+      </div>`;
 
       // Rating (always) - full width
       html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating)||0, true)}</div></div>`;
@@ -454,6 +490,12 @@ How to use:
       // Setup star rating
       const ratingContainer = el('ratingContainer');
       starRatingController = setupStarRating(ratingContainer, Number(itemData.rating)||0);
+
+      // Setup barcode input scan button
+      const barcodeInputScanBtn = el('barcodeInputScanBtn');
+      if (barcodeInputScanBtn) {
+        barcodeInputScanBtn.onclick = () => startScanForInput();
+      }
 
       // Handle type change
       el('typeSelect').onchange = (e) => {
@@ -586,6 +628,34 @@ How to use:
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
       el('scannerModal').classList.remove('active');
       el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
+    }
+
+    // Scan barcode for input field (when adding/editing item)
+    async function startScanForInput(){
+      const vid = el('preview');
+      el('scannerModal').classList.add('active');
+      try{
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        const deviceId = devices?.[0]?.deviceId;
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId, facingMode: { ideal: 'environment' } } });
+        vid.srcObject = currentStream; await vid.play();
+        codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
+          if(res){
+            const code = res.getText();
+            el('scanHint').textContent = `Scanned: ${code}`;
+            stopScan();
+
+            // Set the barcode value in the input field
+            const barcodeInput = el('barcodeInput');
+            if(barcodeInput){
+              barcodeInput.value = code;
+            }
+          }
+        });
+      }catch(e){
+        el('scanHint').textContent = 'Camera error: '+ e.message;
+        setTimeout(stopScan, 3000);
+      }
     }
 
     // ====== App Initialization ======
