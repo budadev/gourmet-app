@@ -831,10 +831,13 @@ How to use:
         barcodeInputScanBtn.onclick = () => startScanForInput();
       }
 
-      // Handle type change
-      el('typeSelect').onchange = (e) => {
-        const currentData = collectFormData();
-        renderEditorFields(e.target.value, currentData);
+      // Handle type change - use setTimeout to avoid double-click issue on iOS
+      const typeSelect = el('typeSelect');
+      typeSelect.onchange = (e) => {
+        setTimeout(() => {
+          const currentData = collectFormData();
+          renderEditorFields(e.target.value, currentData);
+        }, 0);
       };
     }
 
