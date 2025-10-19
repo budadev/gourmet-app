@@ -936,17 +936,10 @@ How to use:
     // Start camera with specific device
     async function startCamera(onScanComplete) {
       const vid = el('preview');
-      const switchBtn = el('switchCameraBtn');
 
       try{
         availableCameras = await getAvailableCameras();
 
-        // Show switch button only if multiple cameras available
-        if (availableCameras.length > 1) {
-          switchBtn.style.display = 'block';
-        } else {
-          switchBtn.style.display = 'none';
-        }
 
         const deviceId = availableCameras[currentCameraIndex]?.deviceId;
 
@@ -1015,7 +1008,6 @@ How to use:
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
       el('scannerModal').classList.remove('active');
       el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
-      el('switchCameraBtn').style.display = 'none';
     }
 
     // Scan barcode for input field (when adding/editing item)
