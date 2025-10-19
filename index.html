@@ -447,14 +447,22 @@ How to use:
         .photo-upload-buttons{
             display:flex;
             gap:10px;
-            margin-bottom:16px;
+            margin-top:16px;
+            flex-wrap:wrap;
         }
         .photo-upload-buttons .btn{
             flex:1;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            gap:8px;
+            min-width:0;
+            font-size:14px;
+            padding:10px 16px;
+        }
+        @media(max-width:700px){
+            .photo-upload-buttons{
+                flex-direction:column;
+            }
+            .photo-upload-buttons .btn{
+                width:100%;
+            }
         }
         .photo-preview-grid{
             display:grid;
@@ -1054,12 +1062,8 @@ How to use:
         <label>Photos (optional)</label>
         <div id="photoPreviewContainer" class="photo-preview-grid"></div>
         <div class="photo-upload-buttons">
-          <button class="btn primary" id="capturePhotoBtn" type="button">
-            <img src="icons/camera.png" alt="Capture photo" /> Capture Photo
-          </button>
-          <button class="btn" id="selectPhotoBtn" type="button">
-            <img src="icons/gallery.png" alt="Select from gallery" /> Select Photo
-          </button>
+          <button class="btn primary" id="capturePhotoBtn" type="button">📷 Take Photo</button>
+          <button class="btn" id="selectPhotoBtn" type="button">🖼️ Choose Photo</button>
         </div>
       </div>`;
 
