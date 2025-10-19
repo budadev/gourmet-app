@@ -437,6 +437,110 @@ How to use:
             white-space:nowrap;
             border:0;
         }
+
+        /* Photo attachment styles */
+        .photo-upload-section{
+            margin-top:20px;
+            padding-top:20px;
+            border-top:2px solid var(--border-light);
+        }
+        .photo-upload-buttons{
+            display:flex;
+            gap:10px;
+            margin-bottom:16px;
+        }
+        .photo-upload-buttons .btn{
+            flex:1;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+        }
+        .photo-preview-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));
+            gap:12px;
+        }
+        .photo-preview-item{
+            position:relative;
+            aspect-ratio:1;
+            border-radius:12px;
+            overflow:hidden;
+            border:2px solid var(--border);
+            box-shadow:var(--shadow);
+        }
+        .photo-preview-item img{
+            width:100%;
+            height:100%;
+            object-fit:cover;
+        }
+        .photo-preview-item .remove-photo{
+            position:absolute;
+            top:4px;
+            right:4px;
+            background:rgba(239, 68, 68, 0.95);
+            color:#ffffff;
+            border:none;
+            border-radius:50%;
+            width:28px;
+            height:28px;
+            font-size:18px;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            transition:all 0.2s ease;
+            font-weight:300;
+        }
+        .photo-preview-item .remove-photo:hover{
+            background:#dc2626;
+            transform:scale(1.1);
+        }
+        .photo-gallery{
+            display:grid;
+            grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));
+            gap:8px;
+            margin-top:12px;
+        }
+        .photo-gallery img{
+            width:100%;
+            aspect-ratio:1;
+            object-fit:cover;
+            border-radius:10px;
+            border:2px solid var(--border);
+            cursor:pointer;
+            transition:all 0.2s ease;
+        }
+        .photo-gallery img:hover{
+            transform:scale(1.05);
+            box-shadow:var(--shadow-md);
+        }
+        /* Photo modal */
+        .photo-modal{
+            position:fixed;
+            top:0;
+            left:0;
+            right:0;
+            bottom:0;
+            background:rgba(0, 0, 0, 0.9);
+            z-index:4000;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            padding:20px;
+        }
+        .photo-modal.active{display:flex}
+        .photo-modal img{
+            max-width:100%;
+            max-height:90vh;
+            border-radius:12px;
+            box-shadow:var(--shadow-xl);
+        }
+        .photo-modal .close-btn{
+            position:absolute;
+            top:20px;
+            right:20px;
+        }
     </style>
 </head>
 <body>
@@ -501,6 +605,12 @@ How to use:
 
 <!-- Floating add button -->
 <button class="fab" id="fabBtn" title="Add new item">+</button>
+
+<!-- Photo viewer modal -->
+<div id="photoModal" class="photo-modal">
+    <button class="close-btn" id="closePhotoBtn">×</button>
+    <img id="photoModalImg" src="" alt="Full size photo" />
+</div>
 
 <!-- ZXing barcode scanner via ESM build -->
 <script type="module">
@@ -641,6 +751,105 @@ How to use:
     const resultsEl = el('results');
     let currentEditingId = null;
     let starRatingController = null;
+    let currentPhotos = []; // Store photos for current item being edited
+
+    // ====== Photo Management ======
+    // Convert file to base64 data URL
+    async function fileToDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Capture photo using camera
+    async function capturePhoto() {
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment'; // Use back camera on mobile
+
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            try {
+              const dataURL = await fileToDataURL(file);
+              resolve(dataURL);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        };
+
+        input.click();
+      });
+    }
+
+    // Select photo from device
+    async function selectPhoto() {
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = false;
+
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            try {
+              const dataURL = await fileToDataURL(file);
+              resolve(dataURL);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        };
+
+        input.click();
+      });
+    }
+
+    // Render photo preview grid in editor
+    function renderPhotoPreview() {
+      const container = document.getElementById('photoPreviewContainer');
+      if (!container) return;
+
+      if (currentPhotos.length === 0) {
+        container.innerHTML = '<div class="muted" style="text-align:center;padding:20px">No photos attached</div>';
+        return;
+      }
+
+      container.innerHTML = currentPhotos.map((photo, index) => `
+        <div class="photo-preview-item">
+          <img src="${photo}" alt="Photo ${index + 1}" />
+          <button class="remove-photo" data-index="${index}" type="button">×</button>
+        </div>
+      `).join('');
+
+      // Bind remove buttons
+      container.querySelectorAll('.remove-photo').forEach(btn => {
+        btn.onclick = () => {
+          const index = parseInt(btn.getAttribute('data-index'));
+          currentPhotos.splice(index, 1);
+          renderPhotoPreview();
+        };
+      });
+    }
+
+    // Show photo in full screen modal
+    function showPhotoModal(photoDataURL) {
+      const modal = el('photoModal');
+      const img = el('photoModalImg');
+      img.src = photoDataURL;
+      modal.classList.add('active');
+    }
+
+    function closePhotoModal() {
+      el('photoModal').classList.remove('active');
+    }
 
     function sortByRating(items){
       return items.sort((a, b) => (Number(b.rating)||0) - (Number(a.rating)||0));
@@ -728,8 +937,24 @@ How to use:
         </div>
       `;
 
+      // Add photos if available
+      let photosHTML = '';
+      if (item.photos && Array.isArray(item.photos) && item.photos.length > 0) {
+        photosHTML = `
+          <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border-light)">
+            <label>Photos</label>
+            <div class="photo-gallery">
+              ${item.photos.map((photo, index) => `
+                <img src="${photo}" alt="Photo ${index + 1}" data-photo-url="${photo}" class="photo-thumbnail" />
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
       detailsContent.innerHTML = `
         <div class="detail-section">${fieldsHTML}</div>
+        ${photosHTML}
         <div class="row" style="margin-top:16px">
           <button class="btn primary" id="editDetailsBtn">Edit</button>
           <button class="btn" id="deleteDetailsBtn">Delete</button>
@@ -737,6 +962,14 @@ How to use:
       `;
 
       el('detailsModal').classList.add('active');
+
+      // Bind photo thumbnails to show full screen
+      detailsContent.querySelectorAll('.photo-thumbnail').forEach(img => {
+        img.onclick = () => {
+          const photoUrl = img.getAttribute('data-photo-url');
+          showPhotoModal(photoUrl);
+        };
+      });
 
       // Bind edit button
       el('editDetailsBtn').onclick = () => {
@@ -816,6 +1049,20 @@ How to use:
       // Notes (always) - full width
       html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes||'')}</textarea></div>`;
 
+      // Photos (optional) - full width
+      html += `<div class="field-group" style="grid-column:1/-1">
+        <label>Photos (optional)</label>
+        <div id="photoPreviewContainer" class="photo-preview-grid"></div>
+        <div class="photo-upload-buttons">
+          <button class="btn primary" id="capturePhotoBtn" type="button">
+            <img src="icons/camera.png" alt="Capture photo" /> Capture Photo
+          </button>
+          <button class="btn" id="selectPhotoBtn" type="button">
+            <img src="icons/gallery.png" alt="Select from gallery" /> Select Photo
+          </button>
+        </div>
+      </div>`;
+
       html += '</div>';
 
       console.log('Generated HTML length:', html.length);
@@ -839,6 +1086,29 @@ How to use:
           renderEditorFields(e.target.value, currentData);
         }, 0);
       };
+
+      // Setup photo capture and selection
+      el('capturePhotoBtn').onclick = async () => {
+        const dataURL = await capturePhoto();
+        if (dataURL) {
+          currentPhotos.push(dataURL);
+          renderPhotoPreview();
+        }
+      };
+
+      el('selectPhotoBtn').onclick = async () => {
+        const dataURL = await selectPhoto();
+        if (dataURL) {
+          currentPhotos.push(dataURL);
+          renderPhotoPreview();
+        }
+      };
+
+      // Initial render of photos
+      if (itemData.photos && Array.isArray(itemData.photos)) {
+        currentPhotos = itemData.photos;
+        renderPhotoPreview();
+      }
     }
 
     function collectFormData() {
@@ -861,6 +1131,9 @@ How to use:
         }
       });
 
+      // Add photos to data
+      data.photos = currentPhotos;
+
       return data;
     }
 
@@ -882,6 +1155,7 @@ How to use:
       el('editorModal').classList.remove('active');
       currentEditingId = null;
       starRatingController = null;
+      currentPhotos = []; // Reset photos array
     }
 
     async function refreshList(){
@@ -1102,6 +1376,14 @@ How to use:
           }
         };
       });
+
+      // Close photo modal
+      el('closePhotoBtn').onclick = closePhotoModal;
+      el('photoModal').onclick = (e) => {
+        if(e.target === el('photoModal') || e.target === el('closePhotoBtn')){
+          closePhotoModal();
+        }
+      };
 
       // Initial load
       await refreshList();
