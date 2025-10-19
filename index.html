@@ -1085,10 +1085,8 @@ How to use:
       // Handle type change - use setTimeout to avoid double-click issue on iOS
       const typeSelect = el('typeSelect');
       typeSelect.onchange = (e) => {
-        setTimeout(() => {
-          const currentData = collectFormData();
-          renderEditorFields(e.target.value, currentData);
-        }, 0);
+        const currentData = collectFormData();
+        renderEditorFields(e.target.value, currentData);
       };
 
       // Setup photo capture and selection
