@@ -459,7 +459,12 @@ How to use:
                 <h2>Scan Barcode</h2>
                 <button class="close-btn" id="closeScannerBtn">×</button>
             </div>
-            <video id="preview" playsinline></video>
+            <div style="position:relative">
+                <video id="preview" playsinline></video>
+                <button class="btn" id="switchCameraBtn" style="position:absolute;bottom:16px;right:16px;padding:10px;display:none;z-index:10;background:rgba(255,255,255,0.9)">
+                    🔄 Switch Camera
+                </button>
+            </div>
             <div class="muted" style="margin-top:8px;text-align:center" id="scanHint">Point your camera at a barcode (EAN/UPC/Code128).</div>
         </div>
     </div>
@@ -911,42 +916,66 @@ How to use:
     import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
     const codeReader = new BrowserMultiFormatReader();
     let currentStream = null;
+    let availableCameras = [];
+    let currentCameraIndex = 0;
 
-    async function startScan(){
+    // Get available cameras and prioritize back camera
+    async function getAvailableCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      // Sort cameras to prioritize back camera (environment facing)
+      videoDevices.sort((a, b) => {
+        const aIsBack = a.label.toLowerCase().includes('back') || a.label.toLowerCase().includes('rear') || a.label.toLowerCase().includes('environment');
+        const bIsBack = b.label.toLowerCase().includes('back') || b.label.toLowerCase().includes('rear') || b.label.toLowerCase().includes('environment');
+        if (aIsBack && !bIsBack) return -1;
+        if (!aIsBack && bIsBack) return 1;
+        return 0;
+      });
+
+      return videoDevices;
+    }
+
+    // Start camera with specific device
+    async function startCamera(onScanComplete) {
       const vid = el('preview');
-      el('scannerModal').classList.add('active');
+      const switchBtn = el('switchCameraBtn');
+
       try{
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const deviceId = videoDevices?.[0]?.deviceId;
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId, facingMode: { ideal: 'environment' } } });
-        vid.srcObject = currentStream; await vid.play();
+        availableCameras = await getAvailableCameras();
+
+        // Show switch button only if multiple cameras available
+        if (availableCameras.length > 1) {
+          switchBtn.style.display = 'block';
+        } else {
+          switchBtn.style.display = 'none';
+        }
+
+        const deviceId = availableCameras[currentCameraIndex]?.deviceId;
+
+        // Stop any existing stream
+        if(currentStream) {
+          currentStream.getTracks().forEach(t=>t.stop());
+        }
+
+        // Request camera with back camera preference
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            facingMode: deviceId ? undefined : { ideal: 'environment' }
+          }
+        });
+
+        vid.srcObject = currentStream;
+        await vid.play();
+
         codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
           if(res){
             const code = res.getText();
             el('scanHint').textContent = `Scanned: ${code}`;
             stopScan();
-
-            // Search for items with this barcode
-            const items = await findByBarcode(code);
-            if(items && items.length > 0){
-              // Show results
-              el('searchInput').value = code;
-              renderList(items);
-            } else {
-              // No match found - offer to add new item
-              el('searchInput').value = code;
-              renderList([]);
-
-              // Try to fetch from Open Food Facts
-              const fetched = await lookupByBarcodeOFF(code);
-              if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
-                openEditor({...fetched, barcode: code});
-              } else if(!fetched) {
-                if(confirm('Barcode not found. Add new item?')){
-                  openEditor({barcode: code});
-                }
-              }
+            if(onScanComplete) {
+              await onScanComplete(code);
             }
           }
         });
@@ -954,6 +983,70 @@ How to use:
         el('scanHint').textContent = 'Camera error: '+ e.message;
         setTimeout(stopScan, 3000);
       }
+    }
+
+    // Switch to next available camera
+    async function switchCamera() {
+      if (availableCameras.length <= 1) return;
+
+      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+
+      // Determine which scan function we're in by checking if barcodeInput exists
+      const barcodeInput = el('barcodeInput');
+      if (barcodeInput && document.body.contains(barcodeInput)) {
+        // We're in input scan mode
+        await startCamera(async (code) => {
+          barcodeInput.value = code;
+        });
+      } else {
+        // We're in search scan mode
+        await startCamera(async (code) => {
+          const items = await findByBarcode(code);
+          if(items && items.length > 0){
+            el('searchInput').value = code;
+            renderList(items);
+          } else {
+            el('searchInput').value = code;
+            renderList([]);
+            const fetched = await lookupByBarcodeOFF(code);
+            if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
+              openEditor({...fetched, barcode: code});
+            } else if(!fetched) {
+              if(confirm('Barcode not found. Add new item?')){
+                openEditor({barcode: code});
+              }
+            }
+          }
+        });
+      }
+    }
+
+    async function startScan(){
+      el('scannerModal').classList.add('active');
+      currentCameraIndex = 0; // Reset to back camera
+      await startCamera(async (code) => {
+        // Search for items with this barcode
+        const items = await findByBarcode(code);
+        if(items && items.length > 0){
+          // Show results
+          el('searchInput').value = code;
+          renderList(items);
+        } else {
+          // No match found - offer to add new item
+          el('searchInput').value = code;
+          renderList([]);
+
+          // Try to fetch from Open Food Facts
+          const fetched = await lookupByBarcodeOFF(code);
+          if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
+            openEditor({...fetched, barcode: code});
+          } else if(!fetched) {
+            if(confirm('Barcode not found. Add new item?')){
+              openEditor({barcode: code});
+            }
+          }
+        }
+      });
     }
 
     function stopScan(){
@@ -961,35 +1054,20 @@ How to use:
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
       el('scannerModal').classList.remove('active');
       el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
+      el('switchCameraBtn').style.display = 'none';
     }
 
     // Scan barcode for input field (when adding/editing item)
     async function startScanForInput(){
-      const vid = el('preview');
       el('scannerModal').classList.add('active');
-      try{
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const deviceId = videoDevices?.[0]?.deviceId;
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId, facingMode: { ideal: 'environment' } } });
-        vid.srcObject = currentStream; await vid.play();
-        codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
-          if(res){
-            const code = res.getText();
-            el('scanHint').textContent = `Scanned: ${code}`;
-            stopScan();
-
-            // Set the barcode value in the input field
-            const barcodeInput = el('barcodeInput');
-            if(barcodeInput){
-              barcodeInput.value = code;
-            }
-          }
-        });
-      }catch(e){
-        el('scanHint').textContent = 'Camera error: '+ e.message;
-        setTimeout(stopScan, 3000);
-      }
+      currentCameraIndex = 0; // Reset to back camera
+      await startCamera(async (code) => {
+        // Set the barcode value in the input field
+        const barcodeInput = el('barcodeInput');
+        if(barcodeInput){
+          barcodeInput.value = code;
+        }
+      });
     }
 
     // ====== App Initialization ======
@@ -1019,6 +1097,7 @@ How to use:
       // Barcode scan button
       el('barcodeScanBtn').onclick = startScan;
       el('closeScannerBtn').onclick = stopScan;
+      el('switchCameraBtn').onclick = switchCamera;
 
       // Close details modal
       el('closeDetailsBtn').onclick = () => {
