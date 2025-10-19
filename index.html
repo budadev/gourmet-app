@@ -424,12 +424,26 @@ How to use:
         ::-webkit-scrollbar-track{background:var(--bg-secondary)}
         ::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px}
         ::-webkit-scrollbar-thumb:hover{background:var(--primary-light)}
+
+        /* Visually hidden but accessible to screen readers */
+        .visually-hidden{
+            position:absolute;
+            width:1px;
+            height:1px;
+            padding:0;
+            margin:-1px;
+            overflow:hidden;
+            clip:rect(0,0,0,0);
+            white-space:nowrap;
+            border:0;
+        }
     </style>
 </head>
 <body>
 <header>
-    <h1>🥘 GourmetApp</h1>
+    <h1>GourmetApp</h1>
     <div class="search-wrapper">
+        <label for="searchInput" class="visually-hidden">Search items</label>
         <input id="searchInput" type="text" placeholder="Search by name, notes, or barcode…"/>
         <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">
             <img src="icons/barcode.png" alt="Scan barcode" />
