@@ -305,13 +305,19 @@ How to use:
             width:100%;
             margin-top:40px;
             box-shadow:var(--shadow-xl);
-            animation:modalSlideIn 0.3s ease-out;
+            /* Replaced slide/transform animation (causes iOS double-tap bug on selects) with fade-only */
+            animation:modalFadeIn 0.25s ease-out;
         }
 
-        @keyframes modalSlideIn{
-            from{opacity:0;transform:translateY(-20px)}
-            to{opacity:1;transform:translateY(0)}
+        @keyframes modalFadeIn{
+            from{opacity:0;}
+            to{opacity:1;}
         }
+        /* Removed old modalSlideIn definition usage above */
+        /* Add touch-action optimization for interactive form elements to reduce iOS 300ms ghost tap */
+        input,select,textarea{touch-action:manipulation;}
+        /* Improve select tap highlight removal */
+        select{-webkit-tap-highlight-color:transparent;}
 
         .modal-header{
             display:flex;
@@ -624,6 +630,26 @@ How to use:
 <script type="module">
     // ====== Load item types configuration ======
     let ITEM_TYPES_CONFIG = {};
+
+    // iOS Safari select double-tap mitigation: ensure programmatic focus on first touch
+    function enhanceSelectInteractivity(root=document){
+      // Only run on iOS devices (simple heuristic)
+      const ua = navigator.userAgent || '';
+      const isiOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+      if(!isiOS) return; // Avoid altering behavior on non-iOS
+      root.querySelectorAll('select').forEach(sel => {
+        if(sel.__enhanced) return; sel.__enhanced = true;
+        const focusIfNeeded = () => {
+          if(document.activeElement !== sel){ sel.focus(); }
+        };
+        sel.addEventListener('touchstart', focusIfNeeded, { passive:true });
+        sel.addEventListener('pointerdown', focusIfNeeded, { passive:true });
+        sel.addEventListener('touchend', () => {
+          // Sometimes first tap focuses but doesn't open; a quick second programmatic focus helps.
+          setTimeout(focusIfNeeded, 30);
+        }, { passive:true });
+      });
+    }
 
     // ====== Simple IndexedDB wrapper (no external deps) ======
     const DB_NAME = 'gourmetapp-db';
@@ -1030,29 +1056,8 @@ How to use:
       // Rating (always) - full width
       html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating)||0, true)}</div></div>`;
 
-      // Dynamic fields based on type
-      console.log('Adding dynamic fields...');
-      typeInfo.fields.forEach(field => {
-        console.log('Adding field:', field.name, field.label, field.type);
-        html += '<div class="field-group">';
-        html += `<label>${escapeHtml(field.label)}</label>`;
-
-        if (field.type === 'enum') {
-          html += `<select id="field_${field.name}">`;
-          html += '<option value="">-- Select --</option>';
-          field.options.forEach(opt => {
-            const selected = itemData[field.name] === opt ? 'selected' : '';
-            html += `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
-          });
-          html += '</select>';
-        } else if (field.type === 'number') {
-          html += `<input type="number" id="field_${field.name}" value="${itemData[field.name]||''}" placeholder="e.g., 2015"/>`;
-        } else {
-          html += `<input type="text" id="field_${field.name}" value="${escapeHtml(itemData[field.name]||'')}" placeholder="Enter ${field.label.toLowerCase()}"/>`;
-        }
-
-        html += '</div>';
-      });
+      // Dynamic fields container (will be populated separately)
+      html += `<div id="dynamicFieldsContainer" style="grid-column:1/-1"></div>`;
 
       // Notes (always) - full width
       html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes||'')}</textarea></div>`;
@@ -1072,6 +1077,12 @@ How to use:
       console.log('Generated HTML length:', html.length);
       editorFields.innerHTML = html;
 
+      // Populate dynamic fields
+      updateDynamicFields(selectedType, itemData);
+
+      // Apply iOS select interaction enhancement after DOM insertion
+      enhanceSelectInteractivity(editorFields);
+
       // Setup star rating
       const ratingContainer = el('ratingContainer');
       starRatingController = setupStarRating(ratingContainer, Number(itemData.rating)||0);
@@ -1082,18 +1093,14 @@ How to use:
         barcodeInputScanBtn.onclick = () => startScanForInput();
       }
 
-      // Handle type change - use setTimeout to avoid double-click issue on iOS
+      // Handle type change - update only dynamic fields instead of full re-render
       const typeSelect = el('typeSelect');
       typeSelect.onchange = (e) => {
         const newType = e.target.value;
-        // Use requestAnimationFrame to defer re-rendering until after iOS Safari
-        // completes its native dropdown interaction, preventing double-tap issues
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const currentData = collectFormData();
-            renderEditorFields(newType, currentData);
-          });
-        });
+        setTimeout(() => {
+          const baseData = collectFormData();
+          updateDynamicFields(newType, baseData);
+        }, 120); // Slightly longer delay to let iOS close picker cleanly
       };
 
       // Setup photo capture and selection
@@ -1120,10 +1127,39 @@ How to use:
       }
     }
 
+    // Update only dynamic fields section to avoid full form rebuild (improves iOS picker reliability)
+    function updateDynamicFields(selectedType, itemData={}) {
+      const container = document.getElementById('dynamicFieldsContainer');
+      if(!container) return;
+      const typeInfo = getTypeInfo(selectedType);
+      let html = '<div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">';
+      typeInfo.fields.forEach(field => {
+        html += '<div class="field-group">';
+        html += `<label>${escapeHtml(field.label)}</label>`;
+        if (field.type === 'enum') {
+          html += `<select id="field_${field.name}">`;
+          html += '<option value="">-- Select --</option>';
+          field.options.forEach(opt => {
+            const selected = itemData[field.name] === opt ? 'selected' : '';
+            html += `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
+          });
+          html += '</select>';
+        } else if (field.type === 'number') {
+          html += `<input type="number" id="field_${field.name}" value="${itemData[field.name]||''}" placeholder="e.g., 2015"/>`;
+        } else {
+          html += `<input type="text" id="field_${field.name}" value="${escapeHtml(itemData[field.name]||'')}" placeholder="Enter ${field.label.toLowerCase()}"/>`;
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+      enhanceSelectInteractivity(container);
+    }
+
+    // ====== Collect form data (formerly present, restored) ======
     function collectFormData() {
       const selectedType = el('typeSelect')?.value || Object.keys(ITEM_TYPES_CONFIG)[0];
       const typeInfo = getTypeInfo(selectedType);
-
       const data = {
         type: selectedType,
         name: el('nameInput')?.value?.trim() || '',
@@ -1131,21 +1167,17 @@ How to use:
         rating: starRatingController?.getValue() || 0,
         notes: el('notesInput')?.value?.trim() || ''
       };
-
-      // Collect dynamic fields
       typeInfo.fields.forEach(field => {
         const fieldEl = el(`field_${field.name}`);
         if (fieldEl && fieldEl.value) {
           data[field.name] = field.type === 'number' ? Number(fieldEl.value) : fieldEl.value;
         }
       });
-
-      // Add photos to data
       data.photos = currentPhotos;
-
       return data;
     }
 
+    // ====== Open / Close editor (restored) ======
     function openEditor(item = null){
       if(item){
         el('editorTitle').textContent = 'Edit Item';
@@ -1157,253 +1189,158 @@ How to use:
         renderEditorFields(Object.keys(ITEM_TYPES_CONFIG)[0], {});
       }
       el('editorModal').classList.add('active');
+      enhanceSelectInteractivity(el('editorModal'));
       setStatus('');
     }
-
     function closeEditor(){
       el('editorModal').classList.remove('active');
       currentEditingId = null;
       starRatingController = null;
-      currentPhotos = []; // Reset photos array
+      currentPhotos = [];
     }
 
+    // ====== Refresh list & status helpers (restored) ======
     async function refreshList(){
       const query = el('searchInput').value.trim();
       const items = await searchByText(query);
       renderList(items);
     }
-
     function setStatus(msg){ el('status').textContent = msg; }
-    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
+    function escapeHtml(s){
+      return (s||'').replace(/[&<>"']/g, m => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      }[m]));
+    }
 
-    // ====== External lookup (Open Food Facts) ======
+    // ====== External lookup (Open Food Facts) (restored) ======
     async function lookupByBarcodeOFF(code){
       try{
         const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`);
         const j = await r.json();
         if(j && j.status === 1){
           const p = j.product||{};
-          return {
-            name: p.product_name || p.generic_name || 'Unknown product',
-            type: Object.keys(ITEM_TYPES_CONFIG)[0] || 'wine',
-            barcode: code,
-            rating: 0,
-            notes: p.brands ? `Brand: ${p.brands}` : ''
-          };
+            return {
+              name: p.product_name || p.generic_name || 'Unknown product',
+              type: Object.keys(ITEM_TYPES_CONFIG)[0] || 'wine',
+              barcode: code,
+              rating: 0,
+              notes: p.brands ? `Brand: ${p.brands}` : ''
+            };
         }
       }catch(e){/* ignore */}
       return null;
     }
 
-    // ====== Barcode scanner ======
+    // ====== Barcode scanner logic (restored) ======
     import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
     const codeReader = new BrowserMultiFormatReader();
     let currentStream = null;
     let availableCameras = [];
     let currentCameraIndex = 0;
 
-    // Get available cameras and prioritize back camera
     async function getAvailableCameras() {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-      // Sort cameras to prioritize back camera (environment facing)
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
       videoDevices.sort((a, b) => {
-        const aIsBack = a.label.toLowerCase().includes('back') || a.label.toLowerCase().includes('rear') || a.label.toLowerCase().includes('environment');
-        const bIsBack = b.label.toLowerCase().includes('back') || b.label.toLowerCase().includes('rear') || b.label.toLowerCase().includes('environment');
-        if (aIsBack && !bIsBack) return -1;
-        if (!aIsBack && bIsBack) return 1;
+        const aBack = /back|rear|environment/i.test(a.label);
+        const bBack = /back|rear|environment/i.test(b.label);
+        if (aBack && !bBack) return -1;
+        if (!aBack && bBack) return 1;
         return 0;
       });
-
       return videoDevices;
     }
-
-    // Start camera with specific device
-    async function startCamera(onScanComplete) {
+    async function startCamera(onScanComplete){
       const vid = el('preview');
-
       try{
         availableCameras = await getAvailableCameras();
-
-
         const deviceId = availableCameras[currentCameraIndex]?.deviceId;
-
-        // Stop any existing stream
-        if(currentStream) {
-          currentStream.getTracks().forEach(t=>t.stop());
-        }
-
-        // Request camera with back camera preference
+        if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); }
         currentStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            facingMode: deviceId ? undefined : { ideal: 'environment' }
-          }
+          video:{ deviceId: deviceId ? { exact: deviceId } : undefined, facingMode: deviceId ? undefined : { ideal:'environment' } }
         });
-
-        vid.srcObject = currentStream;
-        await vid.play();
-
+        vid.srcObject = currentStream; await vid.play();
         codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
           if(res){
             const code = res.getText();
             el('scanHint').textContent = `Scanned: ${code}`;
             stopScan();
-            if(onScanComplete) {
-              await onScanComplete(code);
-            }
+            if(onScanComplete) await onScanComplete(code);
           }
         });
       }catch(e){
-        el('scanHint').textContent = 'Camera error: '+ e.message;
+        el('scanHint').textContent = 'Camera error: ' + e.message;
         setTimeout(stopScan, 3000);
       }
     }
-
     async function startScan(){
       el('scannerModal').classList.add('active');
-      currentCameraIndex = 0; // Reset to back camera
+      currentCameraIndex = 0;
       await startCamera(async (code) => {
-        // Search for items with this barcode
         const items = await findByBarcode(code);
-        if(items && items.length > 0){
-          // Show results
-          el('searchInput').value = code;
-          renderList(items);
+        if(items && items.length){
+          el('searchInput').value = code; renderList(items);
         } else {
-          // No match found - offer to add new item
-          el('searchInput').value = code;
-          renderList([]);
-
-          // Try to fetch from Open Food Facts
+          el('searchInput').value = code; renderList([]);
           const fetched = await lookupByBarcodeOFF(code);
-          if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
+          if(fetched && confirm(`Barcode not found. Found "${fetched.name}" in Open Food Facts. Add it?`)){
             openEditor({...fetched, barcode: code});
-          } else if(!fetched) {
-            if(confirm('Barcode not found. Add new item?')){
-              openEditor({barcode: code});
-            }
+          } else if(!fetched){
+            if(confirm('Barcode not found. Add new item?')) openEditor({barcode: code});
           }
         }
       });
     }
-
     function stopScan(){
-      try{ codeReader.reset(); }catch(_){}
+      try{ codeReader.reset(); }catch(_){ }
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
       el('scannerModal').classList.remove('active');
       el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
     }
-
-    // Scan barcode for input field (when adding/editing item)
     async function startScanForInput(){
-      el('scannerModal').classList.add('active');
-      currentCameraIndex = 0; // Reset to back camera
-      await startCamera(async (code) => {
-        // Set the barcode value in the input field
-        const barcodeInput = el('barcodeInput');
-        if(barcodeInput){
-          barcodeInput.value = code;
-        }
-      });
+      el('scannerModal').classList.add('active'); currentCameraIndex = 0;
+      await startCamera(async (code) => { const barcodeInput = el('barcodeInput'); if(barcodeInput){ barcodeInput.value = code; } });
     }
 
-    // ====== App Initialization ======
+    // ====== App Initialization (restored) ======
     async function initApp(){
-      // Load item types configuration
       try{
         const response = await fetch('./item-types-config.json');
         ITEM_TYPES_CONFIG = await response.json();
         console.log('Loaded item types:', Object.keys(ITEM_TYPES_CONFIG));
       }catch(e){
         console.error('Could not load item types config:', e.message);
-        // Fallback to default types
-        ITEM_TYPES_CONFIG = {
-          wine: { label: 'Wine', icon: '🍷', fields: [] },
-          cheese: { label: 'Cheese', icon: '🧀', fields: [] },
-          olives: { label: 'Olives', icon: '🫒', fields: [] }
-        };
+        ITEM_TYPES_CONFIG = { wine:{label:'Wine',icon:'🍷',fields:[]}, cheese:{label:'Cheese',icon:'🧀',fields:[]}, olives:{label:'Olives',icon:'🫒',fields:[]} };
       }
-
-      // ====== Event wiring ======
-
-      // Search functionality
-      el('searchInput').oninput = async () => {
-        await refreshList();
-      };
-
-      // Barcode scan button
+      el('searchInput').oninput = refreshList;
       el('barcodeScanBtn').onclick = startScan;
-      el('closeScannerBtn').onclick = stopScan;
-
-      // Close details modal
-      el('closeDetailsBtn').onclick = () => {
-        el('detailsModal').classList.remove('active');
-      };
-
-      // FAB - open add item form
-      el('fabBtn').onclick = () => {
-        openEditor();
-      };
-
-      // Editor controls
+      el('closeScannerBtn')?.addEventListener('click', stopScan);
+      el('closeDetailsBtn').onclick = () => el('detailsModal').classList.remove('active');
+      el('fabBtn').onclick = () => openEditor();
       el('closeEditorBtn').onclick = closeEditor;
       el('cancelEditorBtn').onclick = closeEditor;
-
-      el('saveBtn').onclick = async ()=>{
+      el('saveBtn').onclick = async () => {
         const payload = collectFormData();
-
-        if(!payload.name){
-          setStatus('Please enter a name.');
-          return;
-        }
-
+        if(!payload.name){ setStatus('Please enter a name.'); return; }
         try{
-          if(currentEditingId){
-            await updateItem(currentEditingId, payload);
-            setStatus('Item updated!');
-          }else{
-            await addItem(payload);
-            setStatus('Item added!');
-          }
-          setTimeout(() => {
-            closeEditor();
-            refreshList();
-          }, 800);
-        }catch(e){
-          setStatus('Error: ' + e.message);
-        }
+          if(currentEditingId){ await updateItem(currentEditingId, payload); setStatus('Item updated!'); }
+          else { await addItem(payload); setStatus('Item added!'); }
+          setTimeout(() => { closeEditor(); refreshList(); }, 800);
+        }catch(e){ setStatus('Error: ' + e.message); }
       };
-
-      // Close modals on background click
       [el('scannerModal'), el('detailsModal'), el('editorModal')].forEach(modal => {
-        modal.onclick = (e) => {
-          if(e.target === modal){
-            modal.classList.remove('active');
-            if(modal === el('scannerModal')) stopScan();
-          }
-        };
+        modal.onclick = (e) => { if(e.target === modal){ modal.classList.remove('active'); if(modal === el('scannerModal')) stopScan(); } };
       });
-
-      // Close photo modal
-      el('closePhotoBtn').onclick = closePhotoModal;
-      el('photoModal').onclick = (e) => {
-        if(e.target === el('photoModal') || e.target === el('closePhotoBtn')){
-          closePhotoModal();
-        }
-      };
-
-      // Initial load
+      el('closePhotoBtn').onclick = () => el('photoModal').classList.remove('active');
+      el('photoModal').onclick = (e) => { if(e.target === el('photoModal') || e.target === el('closePhotoBtn')) el('photoModal').classList.remove('active'); };
       await refreshList();
-
-      // PWA Service Worker
-      if('serviceWorker' in navigator){
-        window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js'));
-      }
+      enhanceSelectInteractivity(document);
+      if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js')); }
     }
-
-    // Start the app
     initApp();
 </script>
 </body>
