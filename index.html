@@ -461,9 +461,6 @@ How to use:
             </div>
             <div style="position:relative">
                 <video id="preview" playsinline></video>
-                <button class="btn" id="switchCameraBtn" style="position:absolute;bottom:16px;right:16px;padding:10px;display:none;z-index:10;background:rgba(255,255,255,0.9)">
-                    🔄 Switch Camera
-                </button>
             </div>
             <div class="muted" style="margin-top:8px;text-align:center" id="scanHint">Point your camera at a barcode (EAN/UPC/Code128).</div>
         </div>
@@ -985,42 +982,6 @@ How to use:
       }
     }
 
-    // Switch to next available camera
-    async function switchCamera() {
-      if (availableCameras.length <= 1) return;
-
-      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-
-      // Determine which scan function we're in by checking if barcodeInput exists
-      const barcodeInput = el('barcodeInput');
-      if (barcodeInput && document.body.contains(barcodeInput)) {
-        // We're in input scan mode
-        await startCamera(async (code) => {
-          barcodeInput.value = code;
-        });
-      } else {
-        // We're in search scan mode
-        await startCamera(async (code) => {
-          const items = await findByBarcode(code);
-          if(items && items.length > 0){
-            el('searchInput').value = code;
-            renderList(items);
-          } else {
-            el('searchInput').value = code;
-            renderList([]);
-            const fetched = await lookupByBarcodeOFF(code);
-            if(fetched && confirm(`Barcode not found in your collection. Found "${fetched.name}" in Open Food Facts. Add it?`)){
-              openEditor({...fetched, barcode: code});
-            } else if(!fetched) {
-              if(confirm('Barcode not found. Add new item?')){
-                openEditor({barcode: code});
-              }
-            }
-          }
-        });
-      }
-    }
-
     async function startScan(){
       el('scannerModal').classList.add('active');
       currentCameraIndex = 0; // Reset to back camera
@@ -1097,7 +1058,6 @@ How to use:
       // Barcode scan button
       el('barcodeScanBtn').onclick = startScan;
       el('closeScannerBtn').onclick = stopScan;
-      el('switchCameraBtn').onclick = switchCamera;
 
       // Close details modal
       el('closeDetailsBtn').onclick = () => {
