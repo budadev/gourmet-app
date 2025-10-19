@@ -1085,8 +1085,15 @@ How to use:
       // Handle type change - use setTimeout to avoid double-click issue on iOS
       const typeSelect = el('typeSelect');
       typeSelect.onchange = (e) => {
-        const currentData = collectFormData();
-        renderEditorFields(e.target.value, currentData);
+        const newType = e.target.value;
+        // Use requestAnimationFrame to defer re-rendering until after iOS Safari
+        // completes its native dropdown interaction, preventing double-tap issues
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const currentData = collectFormData();
+            renderEditorFields(newType, currentData);
+          });
+        });
       };
 
       // Setup photo capture and selection
