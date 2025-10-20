@@ -361,6 +361,10 @@ How to use:
             color:var(--text);
         }
 
+        .close-btn{
+            display:none;
+        }
+
         .modal-body{
             padding:28px;
             overflow-y:auto;
@@ -682,10 +686,17 @@ How to use:
                 <h2>Scan Barcode</h2>
                 <button class="close-btn" id="closeScannerBtn">×</button>
             </div>
-            <div style="position:relative">
-                <video id="preview" playsinline></video>
+            <div class="modal-body">
+                <div style="position:relative">
+                    <video id="preview" playsinline></video>
+                </div>
+                <div class="muted" style="margin-top:8px;text-align:center" id="scanHint"></div>
             </div>
-            <div class="muted" style="margin-top:8px;text-align:center" id="scanHint"></div>
+            <div class="modal-footer">
+                <div class="row" style="margin:0">
+                    <button class="btn" id="cancelScannerBtn">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -749,17 +760,24 @@ How to use:
             <h2 id="pairingSelectorTitle">Select Item to Pair</h2>
             <button class="close-btn" id="closePairingSelectorBtn">×</button>
         </div>
-        <div style="margin-bottom:16px">
-            <div class="search-wrapper">
-                <label for="pairingSearchInput" class="visually-hidden">Search items to pair</label>
-                <input id="pairingSearchInput" type="text" placeholder="Search items to pair..."/>
-                <button class="barcode-btn" id="pairingBarcodeScanBtn" title="Scan barcode">
-                    <img src="icons/barcode.png" alt="Scan barcode" />
-                </button>
+        <div class="modal-body">
+            <div style="margin-bottom:16px">
+                <div class="search-wrapper">
+                    <label for="pairingSearchInput" class="visually-hidden">Search items to pair</label>
+                    <input id="pairingSearchInput" type="text" placeholder="Search items to pair..."/>
+                    <button class="barcode-btn" id="pairingBarcodeScanBtn" title="Scan barcode">
+                        <img src="icons/barcode.png" alt="Scan barcode" />
+                    </button>
+                </div>
+            </div>
+            <div id="pairingItemsList" class="list" style="max-height:400px;overflow-y:auto"></div>
+            <div class="muted" style="margin-top:8px;text-align:center" id="pairingStatus"></div>
+        </div>
+        <div class="modal-footer">
+            <div class="row" style="margin:0">
+                <button class="btn" id="cancelPairingSelectorBtn">Cancel</button>
             </div>
         </div>
-        <div id="pairingItemsList" class="list" style="max-height:400px;overflow-y:auto"></div>
-        <div class="muted" style="margin-top:8px;text-align:center" id="pairingStatus"></div>
     </div>
 </div>
 
@@ -1479,6 +1497,7 @@ How to use:
       detailsButtons.innerHTML = `
         <button class="btn primary" id="editDetailsBtn">Edit</button>
         <button class="btn" id="deleteDetailsBtn">Delete</button>
+        <button class="btn" id="cancelDetailsBtn">Cancel</button>
       `;
 
       openModal('detailsModal');
@@ -1513,6 +1532,11 @@ How to use:
           await refreshList();
           setStatus('Item deleted.');
         }
+      };
+
+      // Bind cancel button
+      el('cancelDetailsBtn').onclick = () => {
+        el('detailsModal').classList.remove('active');
       };
     }
 
@@ -1822,6 +1846,7 @@ How to use:
       el('searchInput').oninput = refreshList;
       el('barcodeScanBtn').onclick = startScan;
       el('closeScannerBtn')?.addEventListener('click', stopScan);
+      el('cancelScannerBtn').onclick = stopScan;
       el('closeDetailsBtn').onclick = () => el('detailsModal').classList.remove('active');
       el('fabBtn').onclick = () => openEditor();
       el('closeEditorBtn').onclick = closeEditor;
@@ -1829,6 +1854,7 @@ How to use:
 
       // Pairing selector modal handlers
       el('closePairingSelectorBtn').onclick = closePairingSelector;
+      el('cancelPairingSelectorBtn').onclick = closePairingSelector;
       el('pairingSearchInput').oninput = refreshPairingList;
       el('pairingBarcodeScanBtn').onclick = async () => {
         el('scannerModal').classList.add('active');
