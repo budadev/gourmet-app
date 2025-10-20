@@ -3,72 +3,65 @@
     "label": "Wine",
     "icon": "🍷",
     "fields": [
-      {
-        "name": "color",
-        "label": "Color",
-        "type": "enum",
-        "options": ["Red", "White", "Rosé", "Sparkling", "Dessert"]
-      },
-      {
-        "name": "country",
-        "label": "Country",
-        "type": "string"
-      },
-      {
-        "name": "region",
-        "label": "Region",
-        "type": "string"
-      },
-      {
-        "name": "year",
-        "label": "Year",
-        "type": "number"
-      }
+      { "name": "producer", "label": "Producer", "type": "string" },
+      { "name": "color", "label": "Color", "type": "enum", "options": ["Red", "White", "Rosé", "Sparkling", "Dessert"] },
+      { "name": "country", "label": "Country", "type": "string" },
+      { "name": "region", "label": "Region/Appellation", "type": "string" },
+      { "name": "grapes", "label": "Grape Varieties", "type": "string" },
+      { "name": "year", "label": "Vintage (Year)", "type": "number" },
+      { "name": "sweetness", "label": "Sweetness", "type": "enum", "options": ["Dry","Off-Dry","Medium Sweet","Sweet"] },
+      { "name": "body", "label": "Body", "type": "enum", "options": ["Light","Medium","Full"] },
+      { "name": "abv", "label": "ABV %", "type": "number" },
+      { "name": "closure", "label": "Closure", "type": "enum", "options": ["Cork","Screwcap","Crown Cap","Other"] }
     ]
   },
+
   "cheese": {
     "label": "Cheese",
     "icon": "🧀",
     "fields": [
-      {
-        "name": "cheeseType",
-        "label": "Type",
-        "type": "enum",
-        "options": ["Hard", "Soft", "Semi-soft", "Blue", "Fresh", "Aged"]
-      },
-      {
-        "name": "country",
-        "label": "Country",
-        "type": "string"
-      },
-      {
-        "name": "region",
-        "label": "Region",
-        "type": "string"
-      }
+      { "name": "producer", "label": "Producer", "type": "string" },
+      { "name": "country", "label": "Country", "type": "string" },
+      { "name": "region", "label": "Region", "type": "string" },
+      { "name": "milk", "label": "Milk", "type": "enum", "options": ["Cow","Goat","Sheep","Buffalo","Mixed"] },
+      { "name": "pasteurized", "label": "Pasteurized", "type": "enum", "options": ["Yes","No","Unknown"] },
+      { "name": "texture", "label": "Texture", "type": "enum", "options": ["Fresh","Soft","Semi-Soft","Semi-Hard","Hard","Blue"] },
+      { "name": "style", "label": "Style", "type": "enum", "options": ["Bloomy Rind","Washed Rind","Natural Rind","Blue","Cooked Pressed","Uncooked Pressed"] },
+      { "name": "aging_days", "label": "Aging (days)", "type": "number" }
     ]
   },
+
   "olives": {
     "label": "Olives",
     "icon": "🫒",
     "fields": [
-      {
-        "name": "color",
-        "label": "Color",
-        "type": "enum",
-        "options": ["Green", "Black", "Purple", "Mixed"]
-      },
-      {
-        "name": "country",
-        "label": "Country",
-        "type": "string"
-      },
-      {
-        "name": "region",
-        "label": "Region",
-        "type": "string"
-      }
+      { "name": "brand", "label": "Brand", "type": "string" },
+      { "name": "variety", "label": "Olive Variety", "type": "enum", "options": ["Kalamata","Castelvetrano","Manzanilla","Gordal","Arbequina","Picual","Gaeta","Nyon","Taggiasca","Halkidiki","Other"] },
+      { "name": "color", "label": "Color", "type": "enum", "options": ["Green","Black","Purple","Mixed"] },
+      { "name": "country", "label": "Country", "type": "string" },
+      { "name": "region", "label": "Region", "type": "string" },
+      { "name": "pit", "label": "Pit", "type": "enum", "options": ["Whole (with pit)","Pitted","Stuffed"] },
+      { "name": "stuffing", "label": "Stuffing", "type": "string" },
+      { "name": "cure_method", "label": "Cure Method", "type": "enum", "options": ["Brine","Lye-cured","Water-cured","Dry-salt","Oil-cured"] },
+      { "name": "size", "label": "Size", "type": "enum", "options": ["S","M","L","XL"] }
+    ]
+  },
+
+  "ham": {
+    "label": "Ham",
+    "icon": "🍖",
+    "fields": [
+      { "name": "subtype", "label": "Subtype", "type": "enum", "options": ["Prosciutto crudo", "Prosciutto cotto", "Jamón serrano", "Jamón ibérico", "Speck", "Jambon de Bayonne", "Parma (Prosciutto di Parma)", "San Daniele", "Culatello", "Other"]},
+      { "name": "country", "label": "Country", "type": "string" },
+      { "name": "region", "label": "Region", "type": "string" },
+      { "name": "producer", "label": "Producer", "type": "string" },
+      { "name": "breed", "label": "Breed (if known)", "type": "enum", "options": ["Iberian","Duroc","Large White","Landrace","Mangalica","Other","Unknown"] },
+      { "name": "diet_grade", "label": "Diet/Grade (Ibérico)", "type": "enum", "options": ["Bellota","Recebo (older term)","Cebo de Campo","Cebo","N/A"] },
+      { "name": "curing_method", "label": "Curing Method", "type": "enum", "options": ["Dry-cured","Wet-cured/Brined"] },
+      { "name": "smoked", "label": "Smoked", "type": "enum", "options": ["Yes","No"] },
+      { "name": "aging_months", "label": "Aging (months)", "type": "number" },
+      { "name": "slice_style", "label": "Cut / Format", "type": "enum", "options": ["Whole leg","Boneless","Pre-sliced","Cubed"] },
+      { "name": "protection", "label": "PDO/PGI/DOP", "type": "string" }
     ]
   }
 }
-
