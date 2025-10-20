@@ -579,7 +579,7 @@ How to use:
             <div style="position:relative">
                 <video id="preview" playsinline></video>
             </div>
-            <div class="muted" style="margin-top:8px;text-align:center" id="scanHint">Point your camera at a barcode (EAN/UPC/Code128).</div>
+            <div class="muted" style="margin-top:8px;text-align:center" id="scanHint"></div>
         </div>
     </div>
 
@@ -1298,7 +1298,7 @@ How to use:
       try{ codeReader.reset(); }catch(_){ }
       if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream = null; }
       el('scannerModal').classList.remove('active');
-      el('scanHint').textContent = 'Point your camera at a barcode (EAN/UPC/Code128).';
+      el('scanHint').textContent = '';
     }
     async function startScanForInput(){
       el('scannerModal').classList.add('active'); currentCameraIndex = 0;
