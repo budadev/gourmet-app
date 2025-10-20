@@ -46,12 +46,29 @@ How to use:
 
         *{box-sizing:border-box}
 
+        html{
+            overflow-x:hidden;
+            width:100%;
+            position:relative;
+            /* Handle iOS safe areas (notch/Dynamic Island) */
+            padding-top:env(safe-area-inset-top);
+            padding-bottom:env(safe-area-inset-bottom);
+            padding-left:env(safe-area-inset-left);
+            padding-right:env(safe-area-inset-right);
+        }
+
         body{
             margin:0;
             background:linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
             color:var(--text);
             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
             min-height:100vh;
+            overflow-x:hidden;
+            width:100%;
+            position:relative;
+            overscroll-behavior-x:none;
+            /* Additional safe area handling */
+            min-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         }
 
         header{
@@ -63,6 +80,10 @@ How to use:
             border-bottom:1px solid var(--border);
             z-index:100;
             box-shadow:var(--shadow);
+            /* Add safe area insets for notch */
+            padding-top:calc(16px + env(safe-area-inset-top));
+            padding-left:calc(20px + env(safe-area-inset-left));
+            padding-right:calc(20px + env(safe-area-inset-right));
         }
 
         h1{
@@ -936,6 +957,24 @@ How to use:
     let currentPhotos = []; // Store photos for current item being edited
     let currentPairings = { good: [], bad: [] }; // Store pairings for current item being edited
 
+    // Helper function to open modal and reset scroll position
+    function openModal(modalId) {
+      const modal = el(modalId);
+      modal.classList.add('active');
+
+      // Reset scroll position for modal body
+      const modalBody = modal.querySelector('.modal-body');
+      if (modalBody) {
+        modalBody.scrollTop = 0;
+      }
+
+      // Also reset the modal content scroll if it exists
+      const modalContent = modal.querySelector('.modal-content');
+      if (modalContent) {
+        modalContent.scrollTop = 0;
+      }
+    }
+
     // ====== Pairing Management with Bidirectional Linking ======
     let pairingMode = null; // 'good' or 'bad'
     let pairingSourceId = null; // ID of the item being edited
@@ -994,7 +1033,7 @@ How to use:
       const title = type === 'good' ? 'Select Good Pairing' : 'Select Bad Pairing';
       el('pairingSelectorTitle').textContent = title;
       el('pairingSearchInput').value = '';
-      el('pairingSelectorModal').classList.add('active');
+      openModal('pairingSelectorModal');
 
       await refreshPairingList();
     }
@@ -1444,7 +1483,7 @@ How to use:
         <button class="btn" id="deleteDetailsBtn">Delete</button>
       `;
 
-      el('detailsModal').classList.add('active');
+      openModal('detailsModal');
 
       // Bind photo thumbnails to show full screen
       detailsContent.querySelectorAll('.photo-thumbnail').forEach(img => {
@@ -1651,7 +1690,7 @@ How to use:
         currentPairings = { good: [], bad: [] };
         renderEditorFields(Object.keys(ITEM_TYPES_CONFIG)[0], {});
       }
-      el('editorModal').classList.add('active');
+      openModal('editorModal');
       enhanceSelectInteractivity(el('editorModal'));
       setStatus('');
       // Initialize pairings section after a brief delay
