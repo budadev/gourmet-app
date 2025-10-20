@@ -555,6 +555,94 @@ How to use:
             top:20px;
             right:20px;
         }
+
+        /* Pairings section */
+        .pairings-section{
+            margin-top:20px;
+            padding-top:20px;
+            border-top:2px solid var(--border-light);
+        }
+        .pairing-category{
+            margin-bottom:24px;
+        }
+        .pairing-category h3{
+            font-size:16px;
+            font-weight:700;
+            color:var(--text-secondary);
+            margin:0 0 12px 0;
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .pairing-list{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            margin-bottom:12px;
+        }
+        .pairing-item{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:10px 12px;
+            background:var(--bg-secondary);
+            border:1px solid var(--border);
+            border-radius:10px;
+            font-size:14px;
+        }
+        .pairing-item.good{
+            background:#d1fae5;
+            border-color:var(--accent);
+        }
+        .pairing-item.bad{
+            background:#fee2e2;
+            border-color:#ef4444;
+        }
+        .pairing-item-name{
+            font-weight:600;
+            display:flex;
+            align-items:center;
+            gap:6px;
+        }
+        .pairing-item-remove{
+            background:transparent;
+            border:none;
+            color:var(--muted);
+            cursor:pointer;
+            font-size:18px;
+            padding:4px 8px;
+            border-radius:6px;
+            transition:all 0.2s ease;
+        }
+        .pairing-item-remove:hover{
+            background:rgba(239, 68, 68, 0.2);
+            color:#ef4444;
+        }
+        .add-pairing-btn{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:8px 14px;
+            font-size:13px;
+            background:var(--card);
+            border:2px dashed var(--border);
+            border-radius:10px;
+            cursor:pointer;
+            transition:all 0.2s ease;
+            color:var(--text-secondary);
+            font-weight:600;
+        }
+        .add-pairing-btn:hover{
+            border-color:var(--primary);
+            color:var(--primary);
+            background:var(--bg-secondary);
+        }
+        .empty-pairings{
+            color:var(--muted);
+            font-size:13px;
+            font-style:italic;
+            padding:8px 0;
+        }
     </style>
 </head>
 <body>
@@ -623,6 +711,26 @@ How to use:
 <div id="photoModal" class="photo-modal">
     <button class="close-btn" id="closePhotoBtn">×</button>
     <img id="photoModalImg" src="" alt="Full size photo" />
+</div>
+
+<!-- Pairing selector modal -->
+<div id="pairingSelectorModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="pairingSelectorTitle">Select Item to Pair</h2>
+            <button class="close-btn" id="closePairingSelectorBtn">×</button>
+        </div>
+        <div style="margin-bottom:16px">
+            <div class="search-wrapper">
+                <input id="pairingSearchInput" type="text" placeholder="Search items to pair..."/>
+                <button class="barcode-btn" id="pairingBarcodeScanBtn" title="Scan barcode">
+                    <img src="icons/barcode.png" alt="Scan barcode" />
+                </button>
+            </div>
+        </div>
+        <div id="pairingItemsList" class="list" style="max-height:400px;overflow-y:auto"></div>
+        <div class="muted" style="margin-top:8px;text-align:center" id="pairingStatus"></div>
+    </div>
 </div>
 
 <!-- ZXing barcode scanner via ESM build -->
@@ -785,6 +893,300 @@ How to use:
     let currentEditingId = null;
     let starRatingController = null;
     let currentPhotos = []; // Store photos for current item being edited
+    let currentPairings = { good: [], bad: [] }; // Store pairings for current item being edited
+
+    // ====== Pairing Management with Bidirectional Linking ======
+    let pairingMode = null; // 'good' or 'bad'
+    let pairingSourceId = null; // ID of the item being edited
+
+    // Add pairing bidirectionally
+    async function addPairing(sourceId, targetId, type) {
+      const sourceItem = await getItem(sourceId);
+      const targetItem = await getItem(targetId);
+
+      if (!sourceItem || !targetItem) return;
+
+      // Initialize pairings if not exist
+      if (!sourceItem.pairings) sourceItem.pairings = { good: [], bad: [] };
+      if (!targetItem.pairings) targetItem.pairings = { good: [], bad: [] };
+
+      // Add to source item
+      if (!sourceItem.pairings[type].includes(targetId)) {
+        sourceItem.pairings[type].push(targetId);
+      }
+
+      // Add reverse pairing to target item
+      if (!targetItem.pairings[type].includes(sourceId)) {
+        targetItem.pairings[type].push(sourceId);
+      }
+
+      // Save both items
+      await updateItem(sourceId, { pairings: sourceItem.pairings });
+      await updateItem(targetId, { pairings: targetItem.pairings });
+    }
+
+    // Remove pairing bidirectionally
+    async function removePairing(sourceId, targetId, type) {
+      const sourceItem = await getItem(sourceId);
+      const targetItem = await getItem(targetId);
+
+      if (!sourceItem || !targetItem) return;
+
+      // Remove from source item
+      if (sourceItem.pairings && sourceItem.pairings[type]) {
+        sourceItem.pairings[type] = sourceItem.pairings[type].filter(id => id !== targetId);
+        await updateItem(sourceId, { pairings: sourceItem.pairings });
+      }
+
+      // Remove from target item
+      if (targetItem.pairings && targetItem.pairings[type]) {
+        targetItem.pairings[type] = targetItem.pairings[type].filter(id => id !== sourceId);
+        await updateItem(targetId, { pairings: targetItem.pairings });
+      }
+    }
+
+    // Open pairing selector modal
+    async function openPairingSelector(type) {
+      pairingMode = type;
+      pairingSourceId = currentEditingId;
+
+      const title = type === 'good' ? 'Select Good Pairing' : 'Select Bad Pairing';
+      el('pairingSelectorTitle').textContent = title;
+      el('pairingSearchInput').value = '';
+      el('pairingSelectorModal').classList.add('active');
+
+      await refreshPairingList();
+    }
+
+    function closePairingSelector() {
+      el('pairingSelectorModal').classList.remove('active');
+      pairingMode = null;
+      pairingSourceId = null;
+    }
+
+    // Render available items for pairing
+    async function refreshPairingList() {
+      const query = el('pairingSearchInput').value.trim();
+      const allItems = await searchByText(query);
+
+      // Exclude current item being edited
+      const availableItems = allItems.filter(item => item.id !== currentEditingId);
+
+      const pairingItemsList = el('pairingItemsList');
+
+      if (availableItems.length === 0) {
+        pairingItemsList.innerHTML = '<div class="empty-state" style="padding:40px 20px">No items available to pair</div>';
+        return;
+      }
+
+      pairingItemsList.innerHTML = availableItems.map(item => {
+        const typeInfo = getTypeInfo(item.type);
+        const isAlreadyPaired = currentPairings.good.includes(item.id) || currentPairings.bad.includes(item.id);
+
+        return `
+          <div class="item ${isAlreadyPaired ? 'selected' : ''}" data-pairing-item-id="${item.id}">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:16px">${typeInfo.icon} ${escapeHtml(item.name||'Unnamed')}</div>
+                <div class="muted" style="font-size:12px;margin-top:4px">${typeInfo.label}</div>
+              </div>
+              ${isAlreadyPaired ? '<div class="badge">Already paired</div>' : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Bind click events
+      pairingItemsList.querySelectorAll('.item').forEach(itemEl => {
+        itemEl.onclick = async () => {
+          const targetId = Number(itemEl.getAttribute('data-pairing-item-id'));
+
+          // Check if already paired
+          if (currentPairings.good.includes(targetId) || currentPairings.bad.includes(targetId)) {
+            el('pairingStatus').textContent = 'This item is already paired';
+            return;
+          }
+
+          // Add to current pairings
+          currentPairings[pairingMode].push(targetId);
+
+          // If editing existing item, save immediately with bidirectional link
+          if (currentEditingId) {
+            await addPairing(currentEditingId, targetId, pairingMode);
+            el('pairingStatus').textContent = `${pairingMode === 'good' ? 'Good' : 'Bad'} pairing added!`;
+            setTimeout(() => {
+              closePairingSelector();
+              // Re-render pairings section in editor
+              renderPairingsInEditor();
+            }, 500);
+          } else {
+            // For new items, just add to current pairings
+            el('pairingStatus').textContent = 'Pairing added! Save the item to finalize.';
+            setTimeout(() => {
+              closePairingSelector();
+              renderPairingsInEditor();
+            }, 500);
+          }
+        };
+      });
+    }
+
+    // Render pairings section in editor
+    async function renderPairingsInEditor() {
+      const container = document.getElementById('pairingsEditorContainer');
+      if (!container) return;
+
+      const allItems = await listAll();
+
+      let html = '<div class="pairings-section">';
+
+      // Good pairings
+      html += '<div class="pairing-category">';
+      html += '<h3>✅ Good Pairings</h3>';
+
+      if (currentPairings.good.length === 0) {
+        html += '<div class="empty-pairings">No good pairings yet</div>';
+      } else {
+        html += '<div class="pairing-list">';
+        for (const pairedId of currentPairings.good) {
+          const pairedItem = allItems.find(it => it.id === pairedId);
+          if (pairedItem) {
+            const typeInfo = getTypeInfo(pairedItem.type);
+            html += `
+              <div class="pairing-item good">
+                <div class="pairing-item-name">
+                  <span>${typeInfo.icon}</span>
+                  <span>${escapeHtml(pairedItem.name)}</span>
+                </div>
+                <button class="pairing-item-remove" data-pairing-id="${pairedId}" data-pairing-type="good" type="button">×</button>
+              </div>
+            `;
+          }
+        }
+        html += '</div>';
+      }
+      html += '<button class="add-pairing-btn" id="addGoodPairingBtn" type="button">+ Add Good Pairing</button>';
+      html += '</div>';
+
+      // Bad pairings
+      html += '<div class="pairing-category">';
+      html += '<h3>❌ Bad Pairings</h3>';
+
+      if (currentPairings.bad.length === 0) {
+        html += '<div class="empty-pairings">No bad pairings yet</div>';
+      } else {
+        html += '<div class="pairing-list">';
+        for (const pairedId of currentPairings.bad) {
+          const pairedItem = allItems.find(it => it.id === pairedId);
+          if (pairedItem) {
+            const typeInfo = getTypeInfo(pairedItem.type);
+            html += `
+              <div class="pairing-item bad">
+                <div class="pairing-item-name">
+                  <span>${typeInfo.icon}</span>
+                  <span>${escapeHtml(pairedItem.name)}</span>
+                </div>
+                <button class="pairing-item-remove" data-pairing-id="${pairedId}" data-pairing-type="bad" type="button">×</button>
+              </div>
+            `;
+          }
+        }
+        html += '</div>';
+      }
+      html += '<button class="add-pairing-btn" id="addBadPairingBtn" type="button">+ Add Bad Pairing</button>';
+      html += '</div>';
+
+      html += '</div>';
+
+      container.innerHTML = html;
+
+      // Bind add buttons
+      const addGoodBtn = document.getElementById('addGoodPairingBtn');
+      if (addGoodBtn) {
+        addGoodBtn.onclick = () => openPairingSelector('good');
+      }
+
+      const addBadBtn = document.getElementById('addBadPairingBtn');
+      if (addBadBtn) {
+        addBadBtn.onclick = () => openPairingSelector('bad');
+      }
+
+      // Bind remove buttons
+      container.querySelectorAll('.pairing-item-remove').forEach(btn => {
+        btn.onclick = async () => {
+          const pairedId = Number(btn.getAttribute('data-pairing-id'));
+          const type = btn.getAttribute('data-pairing-type');
+
+          currentPairings[type] = currentPairings[type].filter(id => id !== pairedId);
+
+          // If editing existing item, remove bidirectionally
+          if (currentEditingId) {
+            await removePairing(currentEditingId, pairedId, type);
+          }
+
+          await renderPairingsInEditor();
+        };
+      });
+    }
+
+    // Render pairings in details view
+    async function renderPairingsHTML(item) {
+      if (!item.pairings || (item.pairings.good.length === 0 && item.pairings.bad.length === 0)) {
+        return '';
+      }
+
+      const allItems = await listAll();
+      let html = '<div class="pairings-section">';
+
+      // Good pairings
+      if (item.pairings.good.length > 0) {
+        html += '<div class="pairing-category">';
+        html += '<h3>✅ Good Pairings</h3>';
+        html += '<div class="pairing-list">';
+
+        for (const pairedId of item.pairings.good) {
+          const pairedItem = allItems.find(it => it.id === pairedId);
+          if (pairedItem) {
+            const typeInfo = getTypeInfo(pairedItem.type);
+            html += `
+              <div class="pairing-item good" style="cursor:pointer" data-view-item-id="${pairedId}">
+                <div class="pairing-item-name">
+                  <span>${typeInfo.icon}</span>
+                  <span>${escapeHtml(pairedItem.name)}</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+        html += '</div></div>';
+      }
+
+      // Bad pairings
+      if (item.pairings.bad.length > 0) {
+        html += '<div class="pairing-category">';
+        html += '<h3>❌ Bad Pairings</h3>';
+        html += '<div class="pairing-list">';
+
+        for (const pairedId of item.pairings.bad) {
+          const pairedItem = allItems.find(it => it.id === pairedId);
+          if (pairedItem) {
+            const typeInfo = getTypeInfo(pairedItem.type);
+            html += `
+              <div class="pairing-item bad" style="cursor:pointer" data-view-item-id="${pairedId}">
+                <div class="pairing-item-name">
+                  <span>${typeInfo.icon}</span>
+                  <span>${escapeHtml(pairedItem.name)}</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+        html += '</div></div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
 
     // ====== Photo Management ======
     // Convert file to base64 data URL
@@ -985,9 +1387,13 @@ How to use:
         `;
       }
 
+      // Render pairings
+      const pairingsHTML = await renderPairingsHTML(item);
+
       detailsContent.innerHTML = `
         <div class="detail-section">${fieldsHTML}</div>
         ${photosHTML}
+        ${pairingsHTML}
         <div class="row" style="margin-top:16px">
           <button class="btn primary" id="editDetailsBtn">Edit</button>
           <button class="btn" id="deleteDetailsBtn">Delete</button>
@@ -1001,6 +1407,14 @@ How to use:
         img.onclick = () => {
           const photoUrl = img.getAttribute('data-photo-url');
           showPhotoModal(photoUrl);
+        };
+      });
+
+      // Bind pairing items to show their details
+      detailsContent.querySelectorAll('[data-view-item-id]').forEach(pairingEl => {
+        pairingEl.onclick = () => {
+          const pairedItemId = Number(pairingEl.getAttribute('data-view-item-id'));
+          showItemDetails(pairedItemId);
         };
       });
 
@@ -1070,6 +1484,9 @@ How to use:
           <button class="btn" id="selectPhotoBtn" type="button">🖼️ Choose Photo</button>
         </div>
       </div>`;
+
+      // Pairings section - full width
+      html += `<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>`;
 
       html += '</div>';
 
@@ -1181,21 +1598,26 @@ How to use:
       if(item){
         el('editorTitle').textContent = 'Edit Item';
         currentEditingId = item.id;
+        currentPairings = item.pairings ? { good: [...item.pairings.good], bad: [...item.pairings.bad] } : { good: [], bad: [] };
         renderEditorFields(item.type || Object.keys(ITEM_TYPES_CONFIG)[0], item);
       } else {
         el('editorTitle').textContent = 'Add Item';
         currentEditingId = null;
+        currentPairings = { good: [], bad: [] };
         renderEditorFields(Object.keys(ITEM_TYPES_CONFIG)[0], {});
       }
       el('editorModal').classList.add('active');
       enhanceSelectInteractivity(el('editorModal'));
       setStatus('');
+      // Initialize pairings section after a brief delay
+      setTimeout(() => renderPairingsInEditor(), 100);
     }
     function closeEditor(){
       el('editorModal').classList.remove('active');
       currentEditingId = null;
       starRatingController = null;
       currentPhotos = [];
+      currentPairings = { good: [], bad: [] };
     }
 
     // ====== Refresh list & status helpers (restored) ======
@@ -1322,6 +1744,27 @@ How to use:
       el('fabBtn').onclick = () => openEditor();
       el('closeEditorBtn').onclick = closeEditor;
       el('cancelEditorBtn').onclick = closeEditor;
+
+      // Pairing selector modal handlers
+      el('closePairingSelectorBtn').onclick = closePairingSelector;
+      el('pairingSearchInput').oninput = refreshPairingList;
+      el('pairingBarcodeScanBtn').onclick = async () => {
+        el('scannerModal').classList.add('active');
+        currentCameraIndex = 0;
+        await startCamera(async (code) => {
+          const items = await findByBarcode(code);
+          if (items && items.length > 0) {
+            el('pairingSearchInput').value = code;
+            await refreshPairingList();
+          }
+        });
+      };
+      el('pairingSelectorModal').onclick = (e) => {
+        if (e.target === el('pairingSelectorModal')) {
+          closePairingSelector();
+        }
+      };
+
       el('saveBtn').onclick = async () => {
         const payload = collectFormData();
         if(!payload.name){ setStatus('Please enter a name.'); return; }
