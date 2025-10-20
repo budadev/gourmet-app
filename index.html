@@ -779,7 +779,37 @@ How to use:
     }
     async function addItem(item){ const store = await tx('readwrite'); return new Promise((res,rej)=>{ const r=store.add({...item, createdAt: Date.now(), updatedAt: Date.now()}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
     async function updateItem(id, patch){ const store = await tx('readwrite'); const get=store.get(id); return new Promise((res,rej)=>{ get.onsuccess=()=>{ const cur=get.result; if(!cur) return rej(new Error('Not found')); const put=store.put({...cur, ...patch, updatedAt: Date.now()}); put.onsuccess=()=>res(put.result); put.onerror=()=>rej(put.error); }; get.onerror=()=>rej(get.error); }); }
-    async function deleteItem(id){ const store = await tx('readwrite'); return new Promise((res,rej)=>{ const r=store.delete(id); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); }); }
+    async function deleteItem(id){
+      // First, get the item to check for pairings
+      const item = await getItem(id);
+
+      // Clean up all pairing references in other items
+      if (item && item.pairings) {
+        const allPairedIds = [...(item.pairings.good || []), ...(item.pairings.bad || [])];
+
+        for (const pairedId of allPairedIds) {
+          const pairedItem = await getItem(pairedId);
+          if (pairedItem && pairedItem.pairings) {
+            // Remove this item's ID from both good and bad pairings
+            if (pairedItem.pairings.good) {
+              pairedItem.pairings.good = pairedItem.pairings.good.filter(pid => pid !== id);
+            }
+            if (pairedItem.pairings.bad) {
+              pairedItem.pairings.bad = pairedItem.pairings.bad.filter(pid => pid !== id);
+            }
+            await updateItem(pairedId, { pairings: pairedItem.pairings });
+          }
+        }
+      }
+
+      // Now delete the item itself
+      const store = await tx('readwrite');
+      return new Promise((res,rej)=>{
+        const r=store.delete(id);
+        r.onsuccess=()=>res();
+        r.onerror=()=>rej(r.error);
+      });
+    }
     async function getItem(id){
       const store = await tx('readonly');
       return new Promise((res,rej)=>{ const r=store.get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
@@ -1042,10 +1072,10 @@ How to use:
 
       // Good pairings
       html += '<div class="pairing-category">';
-      html += '<h3>✅ Good Pairings</h3>';
+      html += '<h3>✅ Pairs well with...</h3>';
 
       if (currentPairings.good.length === 0) {
-        html += '<div class="empty-pairings">No good pairings yet</div>';
+        html += '<div class="empty-pairings">No pairings yet</div>';
       } else {
         html += '<div class="pairing-list">';
         for (const pairedId of currentPairings.good) {
@@ -1065,15 +1095,15 @@ How to use:
         }
         html += '</div>';
       }
-      html += '<button class="add-pairing-btn" id="addGoodPairingBtn" type="button">+ Add Good Pairing</button>';
+      html += '<button class="add-pairing-btn" id="addGoodPairingBtn" type="button">+ Add Pairing</button>';
       html += '</div>';
 
       // Bad pairings
       html += '<div class="pairing-category">';
-      html += '<h3>❌ Bad Pairings</h3>';
+      html += '<h3>❌ Not a good match for...</h3>';
 
       if (currentPairings.bad.length === 0) {
-        html += '<div class="empty-pairings">No bad pairings yet</div>';
+        html += '<div class="empty-pairings">No pairings yet</div>';
       } else {
         html += '<div class="pairing-list">';
         for (const pairedId of currentPairings.bad) {
@@ -1093,7 +1123,7 @@ How to use:
         }
         html += '</div>';
       }
-      html += '<button class="add-pairing-btn" id="addBadPairingBtn" type="button">+ Add Bad Pairing</button>';
+      html += '<button class="add-pairing-btn" id="addBadPairingBtn" type="button">+ Add Pairing</button>';
       html += '</div>';
 
       html += '</div>';
@@ -1141,7 +1171,7 @@ How to use:
       // Good pairings
       if (item.pairings.good.length > 0) {
         html += '<div class="pairing-category">';
-        html += '<h3>✅ Good Pairings</h3>';
+        html += '<h3>✅ Pairs well with...</h3>';
         html += '<div class="pairing-list">';
 
         for (const pairedId of item.pairings.good) {
@@ -1164,7 +1194,7 @@ How to use:
       // Bad pairings
       if (item.pairings.bad.length > 0) {
         html += '<div class="pairing-category">';
-        html += '<h3>❌ Bad Pairings</h3>';
+        html += '<h3>❌ Not a good match for...</h3>';
         html += '<div class="pairing-list">';
 
         for (const pairedId of item.pairings.bad) {
@@ -1590,6 +1620,7 @@ How to use:
         }
       });
       data.photos = currentPhotos;
+      data.pairings = currentPairings;
       return data;
     }
 
@@ -1769,8 +1800,29 @@ How to use:
         const payload = collectFormData();
         if(!payload.name){ setStatus('Please enter a name.'); return; }
         try{
-          if(currentEditingId){ await updateItem(currentEditingId, payload); setStatus('Item updated!'); }
-          else { await addItem(payload); setStatus('Item added!'); }
+          if(currentEditingId){
+            await updateItem(currentEditingId, payload);
+            setStatus('Item updated!');
+          }
+          else {
+            // For new items, we need to save the item first to get its ID
+            const newItemId = await addItem(payload);
+
+            // Then establish bidirectional pairing links
+            if (payload.pairings && (payload.pairings.good.length > 0 || payload.pairings.bad.length > 0)) {
+              // Add good pairings
+              for (const targetId of payload.pairings.good) {
+                await addPairing(newItemId, targetId, 'good');
+              }
+
+              // Add bad pairings
+              for (const targetId of payload.pairings.bad) {
+                await addPairing(newItemId, targetId, 'bad');
+              }
+            }
+
+            setStatus('Item added!');
+          }
           setTimeout(() => { closeEditor(); refreshList(); }, 800);
         }catch(e){ setStatus('Error: ' + e.message); }
       };
