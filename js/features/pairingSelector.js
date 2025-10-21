@@ -11,24 +11,28 @@ import { getTypeInfo } from '../config.js';
 let pairingMode = null; // 'good' or 'bad'
 let pairingSourceId = null;
 let currentPairings = { good: [], bad: [] };
+let pairingCallback = null; // new: callback to re-render editor after selection
 
-export function openPairingSelector(type, sourceId, pairings) {
+export function openPairingSelector(type, sourceId, pairings, onPairingAdded) {
   pairingMode = type;
   pairingSourceId = sourceId;
   currentPairings = pairings;
+  pairingCallback = typeof onPairingAdded === 'function' ? onPairingAdded : null;
 
   const title = type === 'good' ? 'Select Good Pairing' : 'Select Bad Pairing';
   el('pairingSelectorTitle').textContent = title;
   el('pairingSearchInput').value = '';
   openModal('pairingSelectorModal');
 
-  refreshPairingList();
+  // Initial list render then bind click handlers
+  refreshPairingList().then(() => setupPairingListClickHandlers(pairingCallback));
 }
 
 export function closePairingSelector() {
   closeModal('pairingSelectorModal');
   pairingMode = null;
   pairingSourceId = null;
+  pairingCallback = null;
 }
 
 export async function refreshPairingList() {
@@ -103,7 +107,7 @@ export function setCurrentPairings(pairings) {
 
 export function setupPairingListClickHandlers(onPairingAdded) {
   const pairingItemsList = el('pairingItemsList');
-
+  if (!pairingItemsList) return;
   pairingItemsList.querySelectorAll('.item').forEach(itemEl => {
     itemEl.onclick = async () => {
       const targetId = Number(itemEl.getAttribute('data-pairing-item-id'));
@@ -111,4 +115,3 @@ export function setupPairingListClickHandlers(onPairingAdded) {
     };
   });
 }
-

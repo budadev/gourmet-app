@@ -15,22 +15,23 @@ import { openPairingSelector, closePairingSelector, refreshPairingList, setupPai
 import { lookupByBarcode } from './external/openFoodFacts.js';
 
 async function refreshList() {
-  const items = await searchByText(el('searchInput').value.trim());
-  renderList(items, showItemDetails);
+  const query = el('searchInput').value.trim();
+  const items = await searchByText(query);
+  renderList(items, (id) => {
+    showItemDetails(
+      id,
+      (item) => openEditor(item, refreshList), // onEdit opens editor
+      refreshList // onDelete refreshes list
+    );
+  });
 }
 
 async function initApp() {
   // Load configuration
   await loadConfig();
 
-  // Setup search
-  setupSearch(async (items) => {
-    renderList(items, (id) => {
-      showItemDetails(id, (item) => {
-        openEditor(item, refreshList);
-      }, refreshList);
-    });
-  });
+  // Setup search (reuse refreshList behavior)
+  setupSearch(async () => { await refreshList(); });
 
   // Barcode scan from header
   el('barcodeScanBtn').onclick = async () => {

@@ -225,30 +225,19 @@ export async function saveItem() {
       await updateItem(currentEditingId, payload);
       setStatus('Item updated!');
     } else {
-      // For new items, we need to save the item first to get its ID
       const newItemId = await addItem(payload);
-
-      // Then establish bidirectional pairing links
       if (payload.pairings && (payload.pairings.good.length > 0 || payload.pairings.bad.length > 0)) {
-        // Add good pairings
-        for (const targetId of payload.pairings.good) {
-          await addPairing(newItemId, targetId, 'good');
-        }
-
-        // Add bad pairings
-        for (const targetId of payload.pairings.bad) {
-          await addPairing(newItemId, targetId, 'bad');
-        }
+        for (const targetId of payload.pairings.good) await addPairing(newItemId, targetId, 'good');
+        for (const targetId of payload.pairings.bad) await addPairing(newItemId, targetId, 'bad');
       }
-
+      // Clear any active search so the newly added item is visible immediately
+      const searchInput = el('searchInput');
+      if (searchInput) searchInput.value = '';
       setStatus('Item added!');
     }
-
-    setTimeout(() => {
-      closeEditor();
-      if (window.__editorOnSave) window.__editorOnSave();
-    }, 800);
-
+    // Immediately refresh list (via callback) and close editor without delay
+    if (window.__editorOnSave) window.__editorOnSave();
+    closeEditor();
     return true;
   } catch (e) {
     setStatus('Error: ' + e.message);
@@ -329,14 +318,14 @@ async function renderPairingsInEditor() {
   const addGoodBtn = document.getElementById('addGoodPairingBtn');
   if (addGoodBtn) {
     addGoodBtn.onclick = () => {
-      openPairingSelector('good', currentEditingId, getCurrentPairings());
+      openPairingSelector('good', currentEditingId, getCurrentPairings(), renderPairingsInEditor);
     };
   }
 
   const addBadBtn = document.getElementById('addBadPairingBtn');
   if (addBadBtn) {
     addBadBtn.onclick = () => {
-      openPairingSelector('bad', currentEditingId, getCurrentPairings());
+      openPairingSelector('bad', currentEditingId, getCurrentPairings(), renderPairingsInEditor);
     };
   }
 
