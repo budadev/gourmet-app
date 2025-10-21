@@ -1,0 +1,92 @@
+/* =============================
+   Pairing Section Styles
+   ============================= */
+
+/* Pairings section */
+.pairings-section{
+    margin-top:20px;
+    padding-top:20px;
+    border-top:2px solid var(--border-light);
+}
+.pairing-category{
+    margin-bottom:24px;
+}
+.pairing-category h3{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text-secondary);
+    margin:0 0 12px 0;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.pairing-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:12px;
+}
+.pairing-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 12px;
+    background:var(--bg-secondary);
+    border:1px solid var(--border);
+    border-radius:10px;
+    font-size:14px;
+}
+.pairing-item.good{
+    background:#d1fae5;
+    border-color:var(--accent);
+}
+.pairing-item.bad{
+    background:#fee2e2;
+    border-color:#ef4444;
+}
+.pairing-item-name{
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+.pairing-item-remove{
+    background:transparent;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:18px;
+    padding:4px 8px;
+    border-radius:6px;
+    transition:all 0.2s ease;
+}
+.pairing-item-remove:hover{
+    background:rgba(239, 68, 68, 0.2);
+    color:#ef4444;
+}
+.add-pairing-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 14px;
+    font-size:13px;
+    background:var(--card);
+    border:2px dashed var(--border);
+    border-radius:10px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    color:var(--text-secondary);
+    font-weight:600;
+}
+.add-pairing-btn:hover{
+    border-color:var(--primary);
+    color:var(--primary);
+    background:var(--bg-secondary);
+}
+.empty-pairings{
+    color:var(--muted);
+    font-size:13px;
+    font-style:italic;
+    padding:8px 0;
+}
+

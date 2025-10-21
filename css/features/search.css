@@ -1,0 +1,58 @@
+/* =============================
+   Search Bar Styles
+   ============================= */
+
+/* Search bar with barcode icon */
+.search-wrapper{position:relative;width:100%}
+.search-wrapper input{padding-right:50px}
+.search-wrapper .barcode-btn{
+    position:absolute;
+    right:4px;
+    top:50%;
+    transform:translateY(-50%);
+    background:transparent;
+    border:none;
+    cursor:pointer;
+    padding:8px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:42px;
+    height:42px;
+    transition:all 0.2s ease;
+}
+.search-wrapper .barcode-btn:hover{
+    background:var(--primary-light);
+    transform:translateY(-50%) scale(1.05);
+}
+.search-wrapper .barcode-btn img{width:24px;height:24px;opacity:0.8}
+.search-wrapper .barcode-btn:hover img{opacity:1}
+
+/* Input field with barcode icon */
+.input-with-barcode{position:relative}
+.input-with-barcode input{padding-right:50px}
+.input-with-barcode .barcode-btn{
+    position:absolute;
+    right:4px;
+    top:50%;
+    transform:translateY(-50%);
+    background:transparent;
+    border:none;
+    cursor:pointer;
+    padding:8px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:42px;
+    height:42px;
+    transition:all 0.2s ease;
+}
+.input-with-barcode .barcode-btn:hover{
+    background:var(--primary-light);
+    transform:translateY(-50%) scale(1.05);
+}
+.input-with-barcode .barcode-btn img{width:24px;height:24px;opacity:0.8}
+.input-with-barcode .barcode-btn:hover img{opacity:1}
+

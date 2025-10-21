@@ -1,0 +1,58 @@
+/* =============================
+   Item List & Detail Styles
+   ============================= */
+
+.item{
+    background:var(--card);
+    border:2px solid var(--border);
+    border-radius:16px;
+    padding:16px 18px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    box-shadow:var(--shadow);
+}
+
+.item:hover{
+    border-color:var(--primary-light);
+    background:var(--card-hover);
+    transform:translateY(-2px);
+    box-shadow:var(--shadow-md);
+}
+
+.item.selected{
+    border-color:var(--primary);
+    background:var(--accent-light);
+    box-shadow:var(--shadow-md);
+}
+
+.empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+    font-size:16px;
+}
+
+/* Item details */
+.detail-section{margin-top:20px}
+.detail-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:16px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--border-light);
+    align-items:center;
+}
+.detail-row:last-child{border-bottom:none}
+.detail-label{
+    color:var(--text-secondary);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    text-transform:uppercase;
+}
+.detail-value{
+    font-weight:600;
+    color:var(--text);
+    text-align:right;
+}
+

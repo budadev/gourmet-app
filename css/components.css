@@ -1,0 +1,127 @@
+/* =============================
+   Component Styles (Buttons, Cards, Forms)
+   ============================= */
+
+.btn{
+    appearance:none;
+    border:2px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    border-radius:12px;
+    padding:12px 20px;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    box-shadow:var(--shadow);
+}
+
+.btn:hover{
+    border-color:var(--primary-light);
+    transform:translateY(-1px);
+    box-shadow:var(--shadow-md);
+}
+
+.btn.primary{
+    background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-color:var(--primary);
+    color:#ffffff;
+}
+
+.btn.primary:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 16px rgba(59, 130, 246, 0.3);
+}
+
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+.card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:var(--shadow);
+}
+
+input,select,textarea{
+    width:100%;
+    background:var(--bg-secondary);
+    border:2px solid var(--border);
+    border-radius:12px;
+    color:var(--text);
+    padding:12px 14px;
+    font-size:15px;
+    transition:all 0.2s ease;
+    font-family:inherit;
+    /* Add touch-action optimization for interactive form elements to reduce iOS 300ms ghost tap */
+    touch-action:manipulation;
+}
+
+input:focus,select:focus,textarea:focus{
+    outline:none;
+    border-color:var(--primary);
+    background:var(--card);
+    box-shadow:0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+input::placeholder,textarea::placeholder{
+    color:var(--muted);
+}
+
+/* Improve select tap highlight removal */
+select{-webkit-tap-highlight-color:transparent;}
+
+label{
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-secondary);
+    display:block;
+    margin-bottom:6px;
+    letter-spacing:0.3px;
+}
+
+.badge{
+    display:inline-block;
+    padding:6px 14px;
+    border-radius:999px;
+    background:var(--accent-light);
+    color:var(--accent);
+    border:1px solid var(--accent);
+    font-size:13px;
+    font-weight:700;
+}
+
+.muted{color:var(--muted);font-size:14px}
+
+/* Floating add button */
+.fab{
+    position:fixed;
+    bottom:28px;
+    right:28px;
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border:none;
+    color:#ffffff;
+    font-size:32px;
+    font-weight:300;
+    box-shadow:var(--shadow-xl);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    transition:all 0.3s ease;
+}
+.fab:hover{
+    transform:scale(1.1) rotate(90deg);
+    box-shadow:0 25px 35px rgba(59, 130, 246, 0.4);
+}
+.fab:active{transform:scale(0.95) rotate(90deg)}
+
+/* Dynamic fields */
+.field-group{margin-bottom:16px}
+.field-group label{display:block;margin-bottom:6px}
+

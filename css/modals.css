@@ -1,0 +1,78 @@
+/* =============================
+   Modal/Overlay Styles
+   ============================= */
+
+.modal{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
+    background:rgba(0, 0, 0, 0.5);
+    backdrop-filter:blur(4px);
+    z-index:2000;
+    display:none;
+    overflow-y:auto;
+}
+.modal.active{display:flex;}
+
+.modal-content{
+    background:var(--card);
+    border:none;
+    border-radius:0;
+    width:100%;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    box-shadow:none;
+    /* Replaced slide/transform animation (causes iOS double-tap bug on selects) with fade-only */
+    animation:modalFadeIn 0.25s ease-out;
+}
+
+@keyframes modalFadeIn{
+    from{opacity:0;}
+    to{opacity:1;}
+}
+
+.modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:28px 28px 16px 28px;
+    border-bottom:2px solid var(--border-light);
+    flex-shrink:0;
+}
+.modal-header h2{
+    margin:0;
+    font-size:24px;
+    font-weight:700;
+    color:var(--text);
+}
+
+.close-btn{
+    display:none;
+}
+
+.modal-body{
+    padding:28px;
+    overflow-y:auto;
+    flex:1;
+    min-height:0;
+}
+
+.modal-footer{
+    padding:16px 28px 28px 28px;
+    border-top:2px solid var(--border-light);
+    flex-shrink:0;
+}
+
+/* Scanner modal needs higher z-index to appear above editor */
+#scannerModal{z-index:3000}
+
+video{
+    width:100%;
+    border-radius:16px;
+    background:#000;
+    box-shadow:var(--shadow-lg);
+}
+

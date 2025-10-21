@@ -1,0 +1,137 @@
+/* =============================
+   Main Application Initialization
+   ============================= */
+
+import { loadConfig } from './config.js';
+import { el, enhanceSelectInteractivity } from './utils.js';
+import { searchByText, findByBarcode } from './db.js';
+import { setupSearch, setSearchValue } from './features/search.js';
+import { renderList } from './features/itemList.js';
+import { showItemDetails } from './features/itemDetails.js';
+import { openEditor, closeEditor, saveItem, renderPairingsInEditor } from './features/itemEditor.js';
+import { startScan, stopScan, startScanForInput } from './features/scanner.js';
+import { closePhotoModal } from './components/photos.js';
+import { openPairingSelector, closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
+import { lookupByBarcode } from './external/openFoodFacts.js';
+
+async function refreshList() {
+  const items = await searchByText(el('searchInput').value.trim());
+  renderList(items, showItemDetails);
+}
+
+async function initApp() {
+  // Load configuration
+  await loadConfig();
+
+  // Setup search
+  setupSearch(async (items) => {
+    renderList(items, (id) => {
+      showItemDetails(id, (item) => {
+        openEditor(item, refreshList);
+      }, refreshList);
+    });
+  });
+
+  // Barcode scan from header
+  el('barcodeScanBtn').onclick = async () => {
+    await startScan(async (code) => {
+      const items = await findByBarcode(code);
+      if (items && items.length) {
+        setSearchValue(code);
+        renderList(items, (id) => {
+          showItemDetails(id, (item) => {
+            openEditor(item, refreshList);
+          }, refreshList);
+        });
+      } else {
+        setSearchValue(code);
+        renderList([]);
+        const fetched = await lookupByBarcode(code);
+        if (fetched && confirm(`Barcode not found. Found "${fetched.name}" in Open Food Facts. Add it?`)) {
+          openEditor({ ...fetched, barcode: code }, refreshList);
+        } else if (!fetched) {
+          if (confirm('Barcode not found. Add new item?')) {
+            openEditor({ barcode: code }, refreshList);
+          }
+        }
+      }
+    });
+  };
+
+  // Scanner modal controls
+  el('closeScannerBtn')?.addEventListener('click', stopScan);
+  el('cancelScannerBtn').onclick = stopScan;
+
+  // Details modal controls
+  el('closeDetailsBtn').onclick = () => el('detailsModal').classList.remove('active');
+
+  // Floating add button
+  el('fabBtn').onclick = () => openEditor(null, refreshList);
+
+  // Editor modal controls
+  el('closeEditorBtn').onclick = closeEditor;
+  el('cancelEditorBtn').onclick = closeEditor;
+  el('saveBtn').onclick = saveItem;
+
+  // Pairing selector modal handlers
+  el('closePairingSelectorBtn').onclick = closePairingSelector;
+  el('cancelPairingSelectorBtn').onclick = closePairingSelector;
+  el('pairingSearchInput').oninput = async () => {
+    await refreshPairingList();
+    setupPairingListClickHandlers(renderPairingsInEditor);
+  };
+
+  el('pairingBarcodeScanBtn').onclick = async () => {
+    await startScan(async (code) => {
+      const items = await findByBarcode(code);
+      if (items && items.length > 0) {
+        el('pairingSearchInput').value = code;
+        await refreshPairingList();
+        setupPairingListClickHandlers(renderPairingsInEditor);
+      }
+    });
+  };
+
+  // Click outside modal to close
+  [el('scannerModal'), el('detailsModal'), el('editorModal')].forEach(modal => {
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+        if (modal === el('scannerModal')) stopScan();
+      }
+    };
+  });
+
+  el('pairingSelectorModal').onclick = (e) => {
+    if (e.target === el('pairingSelectorModal')) {
+      closePairingSelector();
+    }
+  };
+
+  // Photo modal controls
+  el('closePhotoBtn').onclick = closePhotoModal;
+  el('photoModal').onclick = (e) => {
+    if (e.target === el('photoModal') || e.target === el('closePhotoBtn')) {
+      closePhotoModal();
+    }
+  };
+
+  // Initial list render
+  await refreshList();
+
+  // Enhance select interactions for iOS
+  enhanceSelectInteractivity(document);
+
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then(
+        (registration) => console.log('Service Worker registered:', registration.scope),
+        (err) => console.log('Service Worker registration failed:', err)
+      );
+    });
+  }
+}
+
+// Initialize the app
+initApp();

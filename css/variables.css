@@ -1,0 +1,24 @@
+/* =============================
+   CSS Custom Properties (Variables)
+   ============================= */
+:root{
+    --bg:#f8fafc;
+    --bg-secondary:#f1f5f9;
+    --card:#ffffff;
+    --card-hover:#f8fafc;
+    --muted:#64748b;
+    --text:#0f172a;
+    --text-secondary:#475569;
+    --primary:#3b82f6;
+    --primary-dark:#2563eb;
+    --primary-light:#93c5fd;
+    --accent:#10b981;
+    --accent-light:#d1fae5;
+    --border:#e2e8f0;
+    --border-light:#f1f5f9;
+    --shadow:0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md:0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg:0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+    --shadow-xl:0 20px 25px rgba(0,0,0,0.15), 0 10px 10px rgba(0,0,0,0.04);
+}
+
