@@ -88,7 +88,6 @@ export async function showItemDetails(id, onEdit, onDelete) {
   detailsButtons.innerHTML = `
     <button class="btn primary" id="editDetailsBtn">Edit</button>
     <button class="btn" id="deleteDetailsBtn">Delete</button>
-    <button class="btn" id="cancelDetailsBtn">Cancel</button>
   `;
 
   openModal('detailsModal');
@@ -123,11 +122,6 @@ export async function showItemDetails(id, onEdit, onDelete) {
       closeModal('detailsModal');
       if (onDelete) onDelete();
     }
-  };
-
-  // Bind cancel button
-  el('cancelDetailsBtn').onclick = () => {
-    closeModal('detailsModal');
   };
 }
 

@@ -9,9 +9,9 @@ import { setupSearch, setSearchValue } from './features/search.js';
 import { renderList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
 import { openEditor, closeEditor, saveItem, renderPairingsInEditor } from './features/itemEditor.js';
-import { startScan, stopScan, startScanForInput } from './features/scanner.js';
+import { startScan, stopScan } from './features/scanner.js';
 import { closePhotoModal } from './components/photos.js';
-import { openPairingSelector, closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
+import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
 import { lookupByBarcode } from './external/openFoodFacts.js';
 
 async function refreshList() {
@@ -59,29 +59,27 @@ async function initApp() {
     });
   };
 
-  // Scanner modal controls
-  el('closeScannerBtn')?.addEventListener('click', stopScan);
-  el('cancelScannerBtn').onclick = stopScan;
-
-  // Details modal controls
-  el('closeDetailsBtn').onclick = () => el('detailsModal').classList.remove('active');
+  // Remove legacy listeners referencing deleted buttons
+  // (closeScannerBtn, cancelScannerBtn, closeDetailsBtn, closeEditorBtn, cancelEditorBtn, closePairingSelectorBtn, cancelPairingSelectorBtn)
+  // New back button handlers:
+  el('backScannerBtn')?.addEventListener('click', () => {
+    stopScan();
+    el('scannerModal').classList.remove('active');
+  });
+  el('backDetailsBtn')?.addEventListener('click', () => {
+    el('detailsModal').classList.remove('active');
+  });
+  el('backEditorBtn')?.addEventListener('click', closeEditor);
+  el('backPairingSelectorBtn')?.addEventListener('click', closePairingSelector);
 
   // Floating add button
   el('fabBtn').onclick = () => openEditor(null, refreshList);
 
-  // Editor modal controls
-  el('closeEditorBtn').onclick = closeEditor;
-  el('cancelEditorBtn').onclick = closeEditor;
-  el('saveBtn').onclick = saveItem;
-
-  // Pairing selector modal handlers
-  el('closePairingSelectorBtn').onclick = closePairingSelector;
-  el('cancelPairingSelectorBtn').onclick = closePairingSelector;
+  // Pairing selector search input & barcode scan
   el('pairingSearchInput').oninput = async () => {
     await refreshPairingList();
     setupPairingListClickHandlers(renderPairingsInEditor);
   };
-
   el('pairingBarcodeScanBtn').onclick = async () => {
     await startScan(async (code) => {
       const items = await findByBarcode(code);
@@ -93,7 +91,7 @@ async function initApp() {
     });
   };
 
-  // Click outside modal to close
+  // Click outside modal to close (maintain existing behavior)
   [el('scannerModal'), el('detailsModal'), el('editorModal')].forEach(modal => {
     modal.onclick = (e) => {
       if (e.target === modal) {
@@ -102,7 +100,6 @@ async function initApp() {
       }
     };
   });
-
   el('pairingSelectorModal').onclick = (e) => {
     if (e.target === el('pairingSelectorModal')) {
       closePairingSelector();
