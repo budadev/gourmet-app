@@ -27,6 +27,8 @@ let currentCameraIndex = 0;
 let manualLoopActive = false;
 let manualLoopTimeout = null;
 let onScanCallback = null;
+let hasResult = false; // prevent double fires
+let closeDelayTimer = null;
 
 async function getAvailableCameras() {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -41,10 +43,29 @@ async function getAvailableCameras() {
   return videoDevices;
 }
 
+function isValidCode(text) {
+  if (!text) return false;
+  const trimmed = text.trim();
+  // Accept numeric barcodes of typical lengths or any QR (alphanumeric > 4 chars)
+  if (/^[0-9]{8,14}$/.test(trimmed)) return true;
+  if (trimmed.length >= 4) return true; // allow other formats (QR, CODE_128 with letters)
+  return false;
+}
+
 function handleSuccessfulScan(code) {
+  if (hasResult) return; // already processed
+  if (!isValidCode(code)) return; // ignore noise / partial reads
+  hasResult = true;
   el('scanHint').textContent = `Scanned: ${code}`;
-  stopScan();
-  if (onScanCallback) onScanCallback(code);
+  // Defer closing until callback resolves to avoid race conditions
+  Promise.resolve(onScanCallback ? onScanCallback(code) : null)
+    .catch(err => console.error('Scan callback error:', err))
+    .finally(() => {
+      // Give user brief visual confirmation before closing
+      closeDelayTimer = setTimeout(() => {
+        stopScan();
+      }, 450); // ~0.45s visual pause
+    });
 }
 
 // Manual fallback decoding loop: captures frame and tries rotated versions
@@ -54,63 +75,40 @@ function startManualFallbackLoop(video) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
+  const orientations = [0, 90, 180, 270];
+
   const attempt = async () => {
-    if (!manualLoopActive) return;
+    if (!manualLoopActive || hasResult) return;
     try {
       if (!video.videoWidth || !video.videoHeight) {
         manualLoopTimeout = setTimeout(attempt, 300);return;
       }
-      // Base orientation
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      try {
-        const res = await codeReader.decodeFromCanvas(canvas);
-        if (res) { handleSuccessfulScan(res.getText()); return; }
-      } catch (_) {}
-
-      // 90 degrees
-      canvas.width = video.videoHeight;
-      canvas.height = video.videoWidth;
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI / 2);
-      ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
-      ctx.restore();
-      try {
-        const res90 = await codeReader.decodeFromCanvas(canvas);
-        if (res90) { handleSuccessfulScan(res90.getText()); return; }
-      } catch (_) {}
-
-      // 180 degrees
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI);
-      ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
-      ctx.restore();
-      try {
-        const res180 = await codeReader.decodeFromCanvas(canvas);
-        if (res180) { handleSuccessfulScan(res180.getText()); return; }
-      } catch (_) {}
-
-      // 270 degrees
-      canvas.width = video.videoHeight;
-      canvas.height = video.videoWidth;
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(3 * Math.PI / 2);
-      ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
-      ctx.restore();
-      try {
-        const res270 = await codeReader.decodeFromCanvas(canvas);
-        if (res270) { handleSuccessfulScan(res270.getText()); return; }
-      } catch (_) {}
-
+      for (const angle of orientations) {
+        if (hasResult) break;
+        if (angle === 0 || angle === 180) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        } else {
+          canvas.width = video.videoHeight;
+          canvas.height = video.videoWidth;
+        }
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(angle * Math.PI / 180);
+        ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
+        ctx.restore();
+        try {
+          const res = await codeReader.decodeFromCanvas(canvas);
+          if (res) {
+            handleSuccessfulScan(res.getText());
+            break;
+          }
+        } catch (_) {
+          // ignore per orientation
+        }
+      }
     } finally {
-      // Schedule next attempt if still active
-      if (manualLoopActive) manualLoopTimeout = setTimeout(attempt, 400); // ~2.5 fps for fallback (light CPU)
+      if (!hasResult && manualLoopActive) manualLoopTimeout = setTimeout(attempt, 500); // throttle to reduce CPU
     }
   };
   attempt();
@@ -146,7 +144,7 @@ async function startCamera(onScanComplete) {
 
     // Start manual fallback loop for rotated cases
     startManualFallbackLoop(vid);
-    el('scanHint').textContent = 'Align barcode; rotation supported';
+    el('scanHint').textContent = '';
   } catch (e) {
     el('scanHint').textContent = 'Camera error: ' + e.message;
     setTimeout(stopScan, 3000);
@@ -171,6 +169,9 @@ export function stopScan() {
   el('scannerModal').classList.remove('active');
   el('scanHint').textContent = '';
   onScanCallback = null;
+  hasResult = false;
+  if (closeDelayTimer) clearTimeout(closeDelayTimer);
+  closeDelayTimer = null;
 }
 
 export async function startScanForInput(onScanComplete) {
