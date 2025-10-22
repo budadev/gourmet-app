@@ -33,7 +33,7 @@ main{
     max-width:900px;
     margin:0 auto;
     padding:16px 20px; /* reduced top padding below header */
-    padding-bottom:calc(100px + env(safe-area-inset-bottom));
+    padding-bottom:calc(60px + env(safe-area-inset-bottom));
 }
 
 .row{display:flex;gap:10px;flex-wrap:wrap}
@@ -42,3 +42,5 @@ main{
 @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
 
 .list{display:grid;gap:12px}
+
+.fab{bottom:calc(20px + env(safe-area-inset-bottom));}

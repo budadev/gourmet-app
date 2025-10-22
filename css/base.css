@@ -20,19 +20,11 @@ body{
     color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
     /* Consolidated min-height (removed earlier 100vh to avoid duplicate warning) */
-    min-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height:100vh;
     /* Remove padding-bottom; use pseudo-element instead to paint safe-area */
-    padding-bottom:0;
+    padding-bottom:env(safe-area-inset-bottom);
 }
-body::after{
-    content:'';
-    position:fixed;
-    left:0;right:0;bottom:0;
-    height:env(safe-area-inset-bottom);
-    background:var(--gradient-surface);
-    pointer-events:none;
-    z-index:5;
-}
+body::after{display:none;}
 
 /* Selection styling */
 ::selection{
