@@ -33,6 +33,9 @@ export function openEditor(item = null, onSave) {
 
   openModal('editorModal');
   enhanceSelectInteractivity(el('editorModal'));
+  // Reinforce save binding in case initial binding was lost
+  const saveBtn = el('saveBtn');
+  if (saveBtn) { saveBtn.onclick = saveItem; }
   setStatus('');
 
   // Initialize pairings section after a brief delay
@@ -52,7 +55,6 @@ export function closeEditor() {
 }
 
 function renderEditorFields(selectedType, itemData = {}) {
-  const typeInfo = getTypeInfo(selectedType);
   const editorFields = el('editorFields');
   const config = getConfig();
 

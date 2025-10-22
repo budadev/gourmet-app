@@ -1,58 +1,41 @@
 /* =============================
-   Search Bar Styles
+   Search Bar Styles (modern)
    ============================= */
 
 /* Search bar with barcode icon */
 .search-wrapper{position:relative;width:100%}
-.search-wrapper input{padding-right:50px}
+.search-wrapper input{
+  border-radius:999px;
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  padding:14px 56px 14px 18px; /* extra right space for icon */
+  box-shadow:var(--shadow-sm);
+}
+.search-wrapper input:focus{background:var(--card);box-shadow:0 4px 12px rgba(0,0,0,.08);}
+
 .search-wrapper .barcode-btn{
-    position:absolute;
-    right:4px;
-    top:50%;
-    transform:translateY(-50%);
-    background:transparent;
-    border:none;
-    cursor:pointer;
-    padding:8px;
-    border-radius:10px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    width:42px;
-    height:42px;
-    transition:all 0.2s ease;
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:transparent;border:none;box-shadow:none;width:36px;height:36px;padding:6px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;
+  transition:background var(--transition-fast) var(--ease), opacity var(--transition-fast) var,--ease), transform var(--transition-fast) var,--ease);
 }
-.search-wrapper .barcode-btn:hover{
-    background:var(--primary-light);
-    transform:translateY(-50%) scale(1.05);
-}
-.search-wrapper .barcode-btn img{width:24px;height:24px;opacity:0.8}
-.search-wrapper .barcode-btn:hover img{opacity:1}
+.search-wrapper .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(20%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);}
+.search-wrapper .barcode-btn:hover{background:var(--bg-secondary);}
+.search-wrapper .barcode-btn:hover img{opacity:1;filter:none;}
+.search-wrapper .barcode-btn:active{transform:scale(.9);}
+.search-wrapper .barcode-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:12px;}
 
-/* Input field with barcode icon */
+/* Input-with-barcode variant (editor form) */
 .input-with-barcode{position:relative}
-.input-with-barcode input{padding-right:50px}
+.input-with-barcode input{padding-right:56px;}
 .input-with-barcode .barcode-btn{
-    position:absolute;
-    right:4px;
-    top:50%;
-    transform:translateY(-50%);
-    background:transparent;
-    border:none;
-    cursor:pointer;
-    padding:8px;
-    border-radius:10px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    width:42px;
-    height:42px;
-    transition:all 0.2s ease;
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:transparent;border:none;box-shadow:none;width:38px;height:38px;padding:6px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;
+  transition:background var(--transition-fast) var,--ease), opacity var(--transition-fast) var,--ease), transform var(--transition-fast) var,--ease);
 }
-.input-with-barcode .barcode-btn:hover{
-    background:var(--primary-light);
-    transform:translateY(-50%) scale(1.05);
-}
-.input-with-barcode .barcode-btn img{width:24px;height:24px;opacity:0.8}
-.input-with-barcode .barcode-btn:hover img{opacity:1}
-
+.input-with-barcode .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(25%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);}
+.input-with-barcode .barcode-btn:hover{background:var(--bg-secondary);}
+.input-with-barcode .barcode-btn:hover img{opacity:1;filter:none;}
+.input-with-barcode .barcode-btn:active{transform:scale(.9);}
+.input-with-barcode .barcode-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:12px;}

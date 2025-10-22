@@ -31,18 +31,19 @@
     justify-content:space-between;
     align-items:center;
     padding:10px 12px;
-    background:var(--bg-secondary);
+    background:var(--card);
     border:1px solid var(--border);
-    border-radius:10px;
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow-sm);
     font-size:14px;
 }
 .pairing-item.good{
-    background:#d1fae5;
-    border-color:var(--accent);
+    background:var(--success-bg);
+    border-color:var(--success);
 }
 .pairing-item.bad{
-    background:#fee2e2;
-    border-color:#ef4444;
+    background:var(--danger-bg);
+    border-color:var(--danger);
 }
 .pairing-item-name{
     font-weight:600;
@@ -71,7 +72,7 @@
     padding:8px 14px;
     font-size:13px;
     background:var(--card);
-    border:2px dashed var(--border);
+    border:1px dashed var(--border);
     border-radius:10px;
     cursor:pointer;
     transition:all 0.2s ease;
@@ -89,4 +90,3 @@
     font-style:italic;
     padding:8px 0;
 }
-
