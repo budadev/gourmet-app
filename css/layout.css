@@ -7,12 +7,13 @@ header{
     top:0;
     background:rgba(255, 255, 255, 0.95);
     backdrop-filter:blur(12px);
-    padding:16px 20px;
+    /* Vertical padding reduced further (html no longer adds safe-area) */
+    padding:10px 20px;
     border-bottom:1px solid var(--border);
     z-index:100;
     box-shadow:var(--shadow);
-    /* Add safe area insets for notch */
-    padding-top:calc(16px + env(safe-area-inset-top));
+    /* Safe area inset for notch / Dynamic Island */
+    padding-top:calc(env(safe-area-inset-top) + 4px);
     padding-left:calc(20px + env(safe-area-inset-left));
     padding-right:calc(20px + env(safe-area-inset-right));
 }
@@ -31,7 +32,7 @@ h1{
 main{
     max-width:900px;
     margin:0 auto;
-    padding:24px 20px;
+    padding:16px 20px; /* reduced top padding below header */
     padding-bottom:100px;
 }
 
@@ -41,4 +42,3 @@ main{
 @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
 
 .list{display:grid;gap:12px}
-

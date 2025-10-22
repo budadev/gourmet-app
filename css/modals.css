@@ -13,6 +13,7 @@
     z-index:2000;
     display:none;
     overflow-y:auto;
+    /* Removed top/side safe-area padding to prevent duplication; handled in header */
 }
 .modal.active{display:flex;}
 
@@ -38,7 +39,8 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
-    padding:28px 28px 16px 28px;
+    /* Include safe-area inset in top padding to avoid Dynamic Island overlap */
+    padding:calc(env(safe-area-inset-top) + 12px) 28px 12px 28px;
     border-bottom:2px solid var(--border-light);
     flex-shrink:0;
 }
@@ -54,14 +56,14 @@
 }
 
 .modal-body{
-    padding:28px;
+    padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
     overflow-y:auto;
     flex:1;
     min-height:0;
 }
 
 .modal-footer{
-    padding:16px 28px 28px 28px;
+    padding:12px 28px calc(28px + env(safe-area-inset-bottom)) 28px; /* add bottom safe-area inset */
     border-top:2px solid var(--border-light);
     flex-shrink:0;
 }
@@ -75,4 +77,3 @@ video{
     background:#000;
     box-shadow:var(--shadow-lg);
 }
-
