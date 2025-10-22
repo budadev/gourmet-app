@@ -33,7 +33,7 @@ main{
     max-width:900px;
     margin:0 auto;
     padding:16px 20px; /* reduced top padding below header */
-    padding-bottom:100px;
+    padding-bottom:calc(100px + env(safe-area-inset-bottom));
 }
 
 .row{display:flex;gap:10px;flex-wrap:wrap}

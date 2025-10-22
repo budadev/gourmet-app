@@ -30,10 +30,19 @@
     background:var(--gradient-primary);
     border:1px solid var(--primary-dark);
     box-shadow:0 4px 10px rgba(59,130,246,.35);
+    color:#ffffff!important;
+    mix-blend-mode:normal;
+    filter:none;
+    text-shadow:0 1px 2px rgba(0,0,0,0.15);
 }
 
 .btn.primary:hover{
     box-shadow:0 6px 14px rgba(59,130,246,.4);
+}
+
+.btn.primary:focus-visible{
+    outline:2px solid #ffffff;
+    outline-offset:3px;
 }
 
 .btn.ghost{
