@@ -18,11 +18,14 @@ export async function showItemDetails(id, onEdit, onDelete) {
   const detailsContent = el('detailsContent');
   const detailsButtons = el('detailsButtons');
 
+  // Update header with item name or fallback to "Item Details"
+  const detailsHeader = document.querySelector('#detailsModal .modal-header h2');
+  if (detailsHeader) {
+    detailsHeader.textContent = item.name || 'Item Details';
+  }
+
+  // Remove the name row from details - start with Type instead
   let fieldsHTML = `
-    <div class="detail-row">
-      <div class="detail-label">Name</div>
-      <div class="detail-value">${escapeHtml(item.name || 'Unnamed')}</div>
-    </div>
     <div class="detail-row">
       <div class="detail-label">Type</div>
       <div class="detail-value">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div>
