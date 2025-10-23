@@ -2,149 +2,109 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const VERSION = '0.0.7'; // App version - increment this to trigger updates
-const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`; // e.g., gourmetapp-v0-0-6
+const VERSION = '0.0.8';
+const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`;
 
-// Critical assets to cache on install (essential for offline startup)
-const CRITICAL_ASSETS = [
+const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './version.json',
+  './item-types-config.json',
+  // Icons
+  './icons/barcode.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  // Core CSS (layout and base styles)
-  './css/variables.css',
+  // CSS files
   './css/base.css',
-  './css/layout.css',
   './css/components.css',
+  './css/layout.css',
   './css/modals.css',
-  // Core JS (app initialization)
+  './css/variables.css',
+  './css/features/items.css',
+  './css/features/pairings.css',
+  './css/features/photos.css',
+  './css/features/ratings.css',
+  './css/features/search.css',
+  './css/features/side-menu.css',
+  './css/features/update-banner.css',
+  // JS files
   './js/app.js',
+  './js/config.js',
+  './js/dataManager.js',
   './js/db.js',
-  './js/utils.js'
+  './js/updateManager.js',
+  './js/utils.js',
+  './js/components/modal.js',
+  './js/components/photos.js',
+  './js/components/rating.js',
+  './js/features/itemDetails.js',
+  './js/features/itemEditor.js',
+  './js/features/itemList.js',
+  './js/features/pairingSelector.js',
+  './js/features/scanner.js',
+  './js/features/search.js',
+  './js/features/sideMenu.js',
+  './js/models/pairings.js',
+  './js/external/openFoodFacts.js'
 ];
-
-// File patterns to cache dynamically (all other same-origin resources)
-const CACHEABLE_PATTERNS = [
-  /\.css$/,
-  /\.js$/,
-  /\.json$/,
-  /\.png$/,
-  /\.jpg$/,
-  /\.jpeg$/,
-  /\.svg$/,
-  /\.webp$/,
-  /\.woff2?$/,
-  /\.ttf$/
-];
-
-function shouldCache(url) {
-  const urlObj = new URL(url);
-
-  // Only cache same-origin requests
-  if (urlObj.origin !== location.origin) {
-    return false;
-  }
-
-  // Check if URL matches any cacheable pattern
-  return CACHEABLE_PATTERNS.some(pattern => pattern.test(urlObj.pathname));
-}
 
 self.addEventListener('install', e => {
-  console.log('[SW] Installing service worker version:', VERSION);
+  console.log('[SW] Installing version:', VERSION);
   e.waitUntil(
-    caches.open(CACHE)
-      .then(cache => {
-        console.log('[SW] Caching critical assets');
-        return cache.addAll(CRITICAL_ASSETS);
-      })
-      .then(() => {
-        console.log('[SW] Critical assets cached, skipping waiting');
-        return self.skipWaiting();
-      })
-      .catch(err => {
-        console.error('[SW] Failed to cache critical assets:', err);
-      })
+    caches.open(CACHE).then(cache => {
+      console.log('[SW] Caching assets');
+      return cache.addAll(ASSETS);
+    }).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', e => {
-  console.log('[SW] Activating service worker version:', VERSION);
+  console.log('[SW] Activating version:', VERSION);
   e.waitUntil(
-    caches.keys()
-      .then(keys => {
-        console.log('[SW] Cleaning old caches');
-        return Promise.all(
-          keys.filter(k => k !== CACHE).map(k => {
-            console.log('[SW] Deleting old cache:', k);
-            return caches.delete(k);
-          })
-        );
-      })
-      .then(() => {
-        console.log('[SW] Claiming clients');
-        return self.clients.claim();
-      })
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-
-  // Only handle same-origin requests
-  if (url.origin !== location.origin) {
-    // For external APIs (like Open Food Facts), use network-first with cache fallback
-    if (e.request.url.includes('openfoodfacts.org')) {
-      e.respondWith(
-        fetch(e.request)
-          .then(response => {
-            // Cache successful API responses
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE).then(cache => cache.put(e.request, clone));
-            }
-            return response;
-          })
-          .catch(() => caches.match(e.request)) // Fallback to cache if offline
-      );
-    }
-    return; // Let browser handle other external requests normally
+  // Network-first for external APIs
+  if (e.request.url.includes('openfoodfacts.org')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
   }
 
-  // For same-origin: cache-first strategy with dynamic caching
+  // Cache-first for app assets
   e.respondWith(
-    caches.match(e.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
+    caches.match(e.request).then(cached => {
+      return cached || fetch(e.request).then(response => {
+        // Cache new responses
+        if (response.status === 200 && e.request.url.startsWith(self.location.origin)) {
+          const clone = response.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
         }
-
-        // Not in cache, fetch from network
-        return fetch(e.request).then(response => {
-          // Cache successful responses for future offline use
-          if (response.ok && e.request.method === 'GET' && shouldCache(e.request.url)) {
-            const clone = response.clone();
-            caches.open(CACHE).then(cache => {
-              cache.put(e.request, clone);
-              console.log('[SW] Dynamically cached:', e.request.url);
-            });
-          }
-          return response;
-        });
-      })
-      .catch(() => {
-        // If both cache and network fail, return offline page for navigation requests
-        if (e.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      })
+        return response;
+      });
+    }).catch(() => {
+      // Fallback to index.html for navigation requests
+      if (e.request.mode === 'navigate') {
+        return caches.match('./index.html');
+      }
+    })
   );
 });
 
-// Allow manual skipWaiting from page if needed
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING' || e.data?.type === 'SKIP_WAITING') {
-    console.log('[SW] Received SKIP_WAITING message');
     self.skipWaiting();
   }
 });
