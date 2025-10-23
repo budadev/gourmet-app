@@ -2,12 +2,14 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const CACHE = 'gourmetapp-v3'; // bumped version for enhanced offline support
+const VERSION = '0.0.1'; // App version - increment this to trigger updates
+const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`; // e.g., gourmetapp-v1-0-0
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './item-types-config.json',
+  './version.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/barcode.png'
@@ -77,5 +79,7 @@ self.addEventListener('fetch', e => {
 
 // Allow manual skipWaiting from page if needed
 self.addEventListener('message', e => {
-  if (e.data === 'SKIP_WAITING') self.skipWaiting();
+  if (e.data === 'SKIP_WAITING' || e.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

@@ -13,6 +13,7 @@ import { startScan, stopScan } from './features/scanner.js';
 import { initPhotoModal } from './components/photos.js';
 import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
 import { lookupByBarcode } from './external/openFoodFacts.js';
+import { initUpdateManager } from './updateManager.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -133,6 +134,9 @@ async function initApp() {
       );
     });
   }
+
+  // Initialize update manager for PWA updates
+  initUpdateManager();
 
   // Hide loading screen after initialization
   hideLoader();
