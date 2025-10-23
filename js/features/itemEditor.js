@@ -120,10 +120,31 @@ function renderEditorFields(selectedType, itemData = {}) {
   // Setup barcode input scan button
   const barcodeInputScanBtn = el('barcodeInputScanBtn');
   if (barcodeInputScanBtn) {
-    barcodeInputScanBtn.onclick = () => {
+    barcodeInputScanBtn.onclick = async () => {
       startScanForInput(async (code) => {
         const barcodeInput = el('barcodeInput');
-        if (barcodeInput) {
+        if (!barcodeInput) return;
+
+        // Check for existing items with this barcode
+        const { findByBarcode } = await import('../db.js');
+        const existingItems = await findByBarcode(code);
+
+        // Filter out the current item being edited (if any)
+        const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
+
+        if (duplicates.length > 0) {
+          // Build warning message
+          const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
+          const message = duplicates.length === 1
+            ? `This barcode already exists for ${itemNames}. Are you sure you want to use it?`
+            : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to use it?`;
+
+          if (confirm(message)) {
+            barcodeInput.value = code;
+          }
+          // If user cancels, don't set the barcode
+        } else {
+          // No duplicates found, set the barcode
           barcodeInput.value = code;
         }
       });
