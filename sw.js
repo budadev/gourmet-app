@@ -2,60 +2,89 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const VERSION = '0.0.6'; // App version - increment this to trigger updates
-const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`; // e.g., gourmetapp-v1-0-0
-const ASSETS = [
+const VERSION = '0.0.7'; // App version - increment this to trigger updates
+const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`; // e.g., gourmetapp-v0-0-6
+
+// Critical assets to cache on install (essential for offline startup)
+const CRITICAL_ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './item-types-config.json',
-  './version.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/barcode.png',
-  // CSS files
+  // Core CSS (layout and base styles)
   './css/variables.css',
   './css/base.css',
   './css/layout.css',
   './css/components.css',
   './css/modals.css',
-  './css/features/search.css',
-  './css/features/items.css',
-  './css/features/ratings.css',
-  './css/features/photos.css',
-  './css/features/pairings.css',
-  './css/features/update-banner.css',
-  './css/features/side-menu.css',
-  // JS files
+  // Core JS (app initialization)
   './js/app.js',
-  './js/config.js',
-  './js/dataManager.js',
   './js/db.js',
-  './js/updateManager.js',
-  './js/utils.js',
-  './js/components/modal.js',
-  './js/components/photos.js',
-  './js/components/rating.js',
-  './js/external/openFoodFacts.js',
-  './js/features/itemDetails.js',
-  './js/features/itemEditor.js',
-  './js/features/itemList.js',
-  './js/features/pairingSelector.js',
-  './js/features/scanner.js',
-  './js/features/search.js',
-  './js/features/sideMenu.js',
-  './js/models/pairings.js'
+  './js/utils.js'
 ];
 
+// File patterns to cache dynamically (all other same-origin resources)
+const CACHEABLE_PATTERNS = [
+  /\.css$/,
+  /\.js$/,
+  /\.json$/,
+  /\.png$/,
+  /\.jpg$/,
+  /\.jpeg$/,
+  /\.svg$/,
+  /\.webp$/,
+  /\.woff2?$/,
+  /\.ttf$/
+];
+
+function shouldCache(url) {
+  const urlObj = new URL(url);
+
+  // Only cache same-origin requests
+  if (urlObj.origin !== location.origin) {
+    return false;
+  }
+
+  // Check if URL matches any cacheable pattern
+  return CACHEABLE_PATTERNS.some(pattern => pattern.test(urlObj.pathname));
+}
+
 self.addEventListener('install', e => {
+  console.log('[SW] Installing service worker version:', VERSION);
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(cache => {
+        console.log('[SW] Caching critical assets');
+        return cache.addAll(CRITICAL_ASSETS);
+      })
+      .then(() => {
+        console.log('[SW] Critical assets cached, skipping waiting');
+        return self.skipWaiting();
+      })
+      .catch(err => {
+        console.error('[SW] Failed to cache critical assets:', err);
+      })
   );
 });
 
 self.addEventListener('activate', e => {
+  console.log('[SW] Activating service worker version:', VERSION);
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => {
+        console.log('[SW] Cleaning old caches');
+        return Promise.all(
+          keys.filter(k => k !== CACHE).map(k => {
+            console.log('[SW] Deleting old cache:', k);
+            return caches.delete(k);
+          })
+        );
+      })
+      .then(() => {
+        console.log('[SW] Claiming clients');
+        return self.clients.claim();
+      })
   );
 });
 
@@ -82,7 +111,7 @@ self.addEventListener('fetch', e => {
     return; // Let browser handle other external requests normally
   }
 
-  // For same-origin: cache-first strategy for better offline performance
+  // For same-origin: cache-first strategy with dynamic caching
   e.respondWith(
     caches.match(e.request)
       .then(cachedResponse => {
@@ -93,9 +122,12 @@ self.addEventListener('fetch', e => {
         // Not in cache, fetch from network
         return fetch(e.request).then(response => {
           // Cache successful responses for future offline use
-          if (response.ok && e.request.method === 'GET') {
+          if (response.ok && e.request.method === 'GET' && shouldCache(e.request.url)) {
             const clone = response.clone();
-            caches.open(CACHE).then(cache => cache.put(e.request, clone));
+            caches.open(CACHE).then(cache => {
+              cache.put(e.request, clone);
+              console.log('[SW] Dynamically cached:', e.request.url);
+            });
           }
           return response;
         });
@@ -112,6 +144,7 @@ self.addEventListener('fetch', e => {
 // Allow manual skipWaiting from page if needed
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING' || e.data?.type === 'SKIP_WAITING') {
+    console.log('[SW] Received SKIP_WAITING message');
     self.skipWaiting();
   }
 });
