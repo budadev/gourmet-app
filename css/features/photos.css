@@ -100,16 +100,145 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
+  transition: background-color 0.3s ease;
 }
-.photo-modal.active { display: flex; }
+.photo-modal.active {
+  display: flex;
+}
 .photo-modal img {
   max-width: 100%;
   max-height: 90vh;
   border-radius: 12px;
   box-shadow: var(--shadow-xl);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
+
+/* Photo modal controls */
 .photo-modal .close-btn {
   position: absolute;
-  top: 20px;
+  top: env(safe-area-inset-top, 20px);
   right: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-weight: 300;
+  z-index: 4010;
+  opacity: 1;
+  visibility: visible;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.photo-modal .close-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+/* Navigation buttons */
+.photo-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-weight: 300;
+  z-index: 4010;
+  opacity: 1;
+  visibility: visible;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.photo-prev-btn {
+  left: 20px;
+}
+
+.photo-next-btn {
+  right: 20px;
+}
+
+.photo-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Photo counter */
+.photo-counter {
+  position: absolute;
+  bottom: env(safe-area-inset-bottom, 30px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 4010;
+  opacity: 1;
+  visibility: visible;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+/* Hide controls when not in controls-visible mode */
+.photo-modal:not(.controls-visible) .close-btn,
+.photo-modal:not(.controls-visible) .photo-nav-btn,
+.photo-modal:not(.controls-visible) .photo-counter {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* iOS safe area adjustments */
+@supports (padding: max(0px)) {
+  .photo-modal .close-btn {
+    top: max(env(safe-area-inset-top, 0px), 20px);
+    right: max(env(safe-area-inset-right, 0px), 20px);
+  }
+
+  .photo-prev-btn {
+    left: max(env(safe-area-inset-left, 0px), 20px);
+  }
+
+  .photo-next-btn {
+    right: max(env(safe-area-inset-right, 0px), 20px);
+  }
+
+  .photo-counter {
+    bottom: max(env(safe-area-inset-bottom, 0px), 30px);
+  }
+}
+
+/* Smooth transitions for control visibility */
+.photo-modal .close-btn,
+.photo-modal .photo-nav-btn,
+.photo-modal .photo-counter {
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
 }

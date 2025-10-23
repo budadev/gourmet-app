@@ -10,7 +10,7 @@ import { renderList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
 import { openEditor, closeEditor, saveItem, renderPairingsInEditor } from './features/itemEditor.js';
 import { startScan, stopScan } from './features/scanner.js';
-import { closePhotoModal } from './components/photos.js';
+import { initPhotoModal } from './components/photos.js';
 import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
 import { lookupByBarcode } from './external/openFoodFacts.js';
 
@@ -106,13 +106,8 @@ async function initApp() {
     }
   };
 
-  // Photo modal controls
-  el('closePhotoBtn').onclick = closePhotoModal;
-  el('photoModal').onclick = (e) => {
-    if (e.target === el('photoModal') || e.target === el('closePhotoBtn')) {
-      closePhotoModal();
-    }
-  };
+  // Initialize photo modal with iOS-style controls and gestures
+  initPhotoModal();
 
   // Initial list render
   await refreshList();

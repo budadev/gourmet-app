@@ -96,7 +96,7 @@ export async function showItemDetails(id, onEdit, onDelete) {
   detailsContent.querySelectorAll('.photo-thumbnail').forEach(img => {
     img.onclick = () => {
       const photoUrl = img.getAttribute('data-photo-url');
-      showPhotoModal(photoUrl);
+      showPhotoModal(photoUrl, item.photos);
     };
   });
 
