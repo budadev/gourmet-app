@@ -124,6 +124,21 @@ async function initApp() {
       );
     });
   }
+
+  // Hide loading screen after initialization
+  hideLoader();
+}
+
+// Hide the loading screen with a smooth fade
+function hideLoader() {
+  const loader = document.getElementById('appLoader');
+  if (loader) {
+    loader.classList.add('hidden');
+    // Remove from DOM after transition completes
+    setTimeout(() => {
+      loader.remove();
+    }, 400);
+  }
 }
 
 // Initialize the app
