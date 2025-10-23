@@ -37,7 +37,14 @@ async function initApp() {
   el('barcodeScanBtn').onclick = async () => {
     await startScan(async (code) => {
       const items = await findByBarcode(code);
-      if (items && items.length) {
+
+      if (items && items.length === 1) {
+        // Single item found: navigate directly to item details without updating search
+        showItemDetails(items[0].id, (item) => {
+          openEditor(item, refreshList);
+        }, refreshList);
+      } else if (items && items.length > 1) {
+        // Multiple items found: show search results with barcode in search box
         setSearchValue(code);
         renderList(items, (id) => {
           showItemDetails(id, (item) => {
@@ -45,8 +52,7 @@ async function initApp() {
           }, refreshList);
         });
       } else {
-        setSearchValue(code);
-        renderList([]);
+        // No items found: offer to add new item
         const fetched = await lookupByBarcode(code);
         if (fetched && confirm(`Barcode not found. Found "${fetched.name}" in Open Food Facts. Add it?`)) {
           openEditor({ ...fetched, barcode: code }, refreshList);
@@ -55,6 +61,9 @@ async function initApp() {
             openEditor({ barcode: code }, refreshList);
           }
         }
+        // Only update search if user declined to add - clear the current view
+        // Don't add barcode to search input, just show empty results
+        renderList([]);
       }
     });
   };
