@@ -1,8 +1,9 @@
 {
-  "version": "0.0.12",
+  "version": "0.0.15",
   "releaseDate": "2025-10-23",
   "changes": [
-    "Fixed iOS PWA update mechanism to properly apply updates",
-    "Fixed dropdown opening when scrolling on iOS"
+    "Fixed iOS PWA update mechanism with aggressive cache clearing",
+    "Fixed dropdown opening when scrolling on iOS",
+    "About dialog now always shows the correct version"
   ]
 }

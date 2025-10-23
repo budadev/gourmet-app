@@ -191,8 +191,8 @@ function showAboutDialog() {
   const dialog = el('aboutDialog');
   dialog.classList.add('active');
 
-  // Load version info
-  fetch('./version.json')
+  // Load version info with cache busting to always get the latest
+  fetch(`./version.json?t=${Date.now()}`)
     .then(res => res.json())
     .then(data => {
       el('aboutVersion').textContent = `Version ${data.version}`;
@@ -264,4 +264,3 @@ function showNotification(message, type = 'info') {
     }, 300);
   }, 4000);
 }
-

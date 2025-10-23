@@ -174,34 +174,29 @@ async function applyUpdate(newVersion) {
   `;
 
   try {
-    // Step 1: Clear all caches FIRST
+    // Step 1: Unregister ALL service workers first
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let registration of registrations) {
+        await registration.unregister();
+      }
+      console.log('All service workers unregistered');
+    }
+
+    // Step 2: Clear all caches
     if ('caches' in window) {
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
       console.log('All caches cleared');
     }
 
-    // Step 2: Unregister the current service worker
-    if (serviceWorkerRegistration) {
-      await serviceWorkerRegistration.unregister();
-      console.log('Service worker unregistered');
-    }
-
-    // Step 3: Wait a bit for unregistration to complete (especially important on iOS)
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 4: Re-register the service worker to get the new version
-    if ('serviceWorker' in navigator) {
-      serviceWorkerRegistration = await navigator.serviceWorker.register('./sw.js');
-      console.log('New service worker registered');
-
-      // Wait for the new service worker to be ready
-      await navigator.serviceWorker.ready;
-    }
-
-    // Step 5: NOW update the version in localStorage (only after successful update)
+    // Step 3: Update version BEFORE reload (this is critical!)
+    // This way, when the app reloads, it knows it should be on the new version
     localStorage.setItem(CURRENT_VERSION_KEY, newVersion);
     localStorage.removeItem(SKIPPED_VERSION_KEY);
+
+    // Step 4: Set a flag that we're in the middle of an update
+    sessionStorage.setItem('gourmetapp_updating', 'true');
 
     // Show success message
     banner.innerHTML = `
@@ -216,10 +211,31 @@ async function applyUpdate(newVersion) {
       </div>
     `;
 
-    // Step 6: Reload with a hard refresh to bypass any remaining cache
+    // Step 5: Force a hard reload - on iOS, we need to actually navigate away and back
     setTimeout(() => {
-      // Use location.replace for a hard reload on iOS
-      window.location.replace(window.location.href + '?v=' + Date.now());
+      // For iOS PWA, we need a VERY aggressive reload
+      // This forces iOS to re-fetch everything
+      const timestamp = Date.now();
+
+      // Get the base path of the app (e.g., /gourmet-app/ or /)
+      const basePath = window.location.pathname.endsWith('.html')
+        ? window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1)
+        : window.location.pathname;
+
+      const baseUrl = window.location.origin + basePath;
+
+      // Try multiple reload strategies for iOS
+      if (window.navigator.standalone) {
+        // We're in iOS PWA mode - use the most aggressive approach
+        // Navigate to a blank page first, then back to the app
+        window.location.href = 'about:blank';
+        setTimeout(() => {
+          window.location.href = baseUrl + '?' + timestamp;
+        }, 100);
+      } else {
+        // Standard PWA or web - use hard reload
+        window.location.href = baseUrl + '?' + timestamp;
+      }
     }, 1000);
 
   } catch (err) {
