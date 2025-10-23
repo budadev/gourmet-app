@@ -174,25 +174,34 @@ async function applyUpdate(newVersion) {
   `;
 
   try {
-    // Update the current version
-    localStorage.setItem(CURRENT_VERSION_KEY, newVersion);
-    localStorage.removeItem(SKIPPED_VERSION_KEY);
-
-    // Tell service worker to skip waiting and activate
-    if (serviceWorkerRegistration && serviceWorkerRegistration.waiting) {
-      serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-
-    // Force service worker update
-    if (serviceWorkerRegistration) {
-      await serviceWorkerRegistration.update();
-    }
-
-    // Clear caches to ensure fresh content
+    // Step 1: Clear all caches FIRST
     if ('caches' in window) {
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
+      console.log('All caches cleared');
     }
+
+    // Step 2: Unregister the current service worker
+    if (serviceWorkerRegistration) {
+      await serviceWorkerRegistration.unregister();
+      console.log('Service worker unregistered');
+    }
+
+    // Step 3: Wait a bit for unregistration to complete (especially important on iOS)
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Step 4: Re-register the service worker to get the new version
+    if ('serviceWorker' in navigator) {
+      serviceWorkerRegistration = await navigator.serviceWorker.register('./sw.js');
+      console.log('New service worker registered');
+
+      // Wait for the new service worker to be ready
+      await navigator.serviceWorker.ready;
+    }
+
+    // Step 5: NOW update the version in localStorage (only after successful update)
+    localStorage.setItem(CURRENT_VERSION_KEY, newVersion);
+    localStorage.removeItem(SKIPPED_VERSION_KEY);
 
     // Show success message
     banner.innerHTML = `
@@ -207,9 +216,10 @@ async function applyUpdate(newVersion) {
       </div>
     `;
 
-    // Reload the page after a short delay
+    // Step 6: Reload with a hard refresh to bypass any remaining cache
     setTimeout(() => {
-      window.location.reload();
+      // Use location.replace for a hard reload on iOS
+      window.location.replace(window.location.href + '?v=' + Date.now());
     }, 1000);
 
   } catch (err) {
@@ -268,4 +278,3 @@ export async function forceUpdateCheck() {
   updateBannerShown = false;
   await checkForUpdates();
 }
-
