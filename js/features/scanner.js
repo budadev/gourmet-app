@@ -153,4 +153,43 @@ async function startCamera(onScanComplete) {
         const code = res.getText();
         el('scanHint').textContent = `Scanned: ${code}`;
         stopScan();
-        if
+        if (onScanComplete) await onScanComplete(code);
+      }
+    });
+  } catch (e) {
+    el('scanHint').textContent = 'Camera error: ' + e.message;
+    setTimeout(stopScan, 3000);
+  }
+}
+
+export async function startScan(onScanComplete) {
+  el('scannerModal').classList.add('active');
+  currentCameraIndex = 0;
+  await startCamera(onScanComplete);
+}
+
+export function stopScan() {
+  try {
+    codeReader.reset();
+  } catch (_) { }
+
+  if (currentStream) {
+    // Clear focus interval if it exists
+    if (currentStream._focusInterval) {
+      clearInterval(currentStream._focusInterval);
+      currentStream._focusInterval = null;
+    }
+
+    currentStream.getTracks().forEach(t => t.stop());
+    currentStream = null;
+  }
+
+  el('scannerModal').classList.remove('active');
+  el('scanHint').textContent = '';
+}
+
+export async function startScanForInput(onScanComplete) {
+  el('scannerModal').classList.add('active');
+  currentCameraIndex = 0;
+  await startCamera(onScanComplete);
+}
