@@ -31,16 +31,15 @@ export function enhanceSelectInteractivity(root = document) {
     sel.__enhanced = true;
 
     let startY = 0;
+    let startTime = 0;
     let moved = false;
-    const MOVE_THRESHOLD = 10; // px vertical move considered scroll
-
-    const focusIfNeeded = () => {
-      if (document.activeElement !== sel) sel.focus();
-    };
+    const MOVE_THRESHOLD = 5; // px vertical move considered scroll (reduced for better detection)
+    const TIME_THRESHOLD = 300; // ms - if touch is longer than this, likely scrolling
 
     sel.addEventListener('touchstart', e => {
       if (e.touches && e.touches.length) {
         startY = e.touches[0].clientY;
+        startTime = Date.now();
         moved = false;
       }
     }, { passive: true });
@@ -48,26 +47,46 @@ export function enhanceSelectInteractivity(root = document) {
     sel.addEventListener('touchmove', e => {
       if (e.touches && e.touches.length) {
         const dy = Math.abs(e.touches[0].clientY - startY);
-        if (dy > MOVE_THRESHOLD) moved = true;
+        if (dy > MOVE_THRESHOLD) {
+          moved = true;
+        }
       }
     }, { passive: true });
 
     sel.addEventListener('touchend', e => {
-      // If user was scrolling, prevent the select from opening.
-      if (moved) {
-        // Prevent native open caused by tap end on select after scroll
+      const touchDuration = Date.now() - startTime;
+
+      // If user was scrolling or touch was too long, prevent the select from opening
+      if (moved || touchDuration > TIME_THRESHOLD) {
         e.preventDefault();
+        e.stopPropagation();
         // Blur to avoid lingering focus style
         sel.blur();
         return;
       }
-      // Treat as intentional tap
-      focusIfNeeded();
-      // Delay refocus slightly to dodge iOS double-tap quirks
-      setTimeout(focusIfNeeded, 30);
+
+      // Treat as intentional tap - ensure the select gets focus
+      if (document.activeElement !== sel) {
+        sel.focus();
+      }
+    }, { passive: false });
+
+    // Click event handler as additional safeguard
+    sel.addEventListener('click', e => {
+      // If we detected movement during the last touch, prevent click too
+      if (moved) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
     }, { passive: false });
 
     // Pointer events fallback (non-touch or stylus)
-    sel.addEventListener('pointerdown', focusIfNeeded, { passive: true });
+    sel.addEventListener('pointerdown', e => {
+      // Only handle non-touch pointer events
+      if (e.pointerType !== 'touch' && document.activeElement !== sel) {
+        sel.focus();
+      }
+    }, { passive: true });
   });
 }
