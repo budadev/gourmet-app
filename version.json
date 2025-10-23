@@ -1,9 +1,7 @@
 {
-  "version": "0.0.17",
+  "version": "0.0.18",
   "releaseDate": "2025-10-23",
   "changes": [
-    "Fixed update reload to work properly on both web and iOS PWA",
-    "Removed URL artifacts after update",
-    "Fixed about:blank issue on iOS PWA"
+    "Test version"
   ]
 }
