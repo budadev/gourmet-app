@@ -36,6 +36,7 @@ How to use:
     <link rel="stylesheet" href="css/features/photos.css" />
     <link rel="stylesheet" href="css/features/pairings.css" />
     <link rel="stylesheet" href="css/features/update-banner.css" />
+    <link rel="stylesheet" href="css/features/side-menu.css" />
 
     <!-- Inline loading screen styles to show immediately -->
     <style>
@@ -92,6 +93,11 @@ How to use:
 </div>
 
 <header>
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
+        <div class="hamburger-line"></div>
+        <div class="hamburger-line"></div>
+        <div class="hamburger-line"></div>
+    </button>
     <div class="search-wrapper">
         <label for="searchInput" class="visually-hidden">Search items</label>
         <input id="searchInput" type="text" placeholder="Search for your gourmet items…"/>
@@ -101,6 +107,83 @@ How to use:
         </button>
     </div>
 </header>
+
+<!-- Side Menu -->
+<div class="side-menu-overlay" id="sideMenuOverlay"></div>
+<nav class="side-menu" id="sideMenu">
+    <div class="side-menu-header">
+        <h1>GourmetApp</h1>
+        <div class="app-subtitle">Gourmet Item Manager</div>
+    </div>
+    <div class="side-menu-content">
+        <button class="side-menu-item" id="exportDataBtn">
+            <span class="side-menu-item-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </span>
+            <span>Export Data</span>
+        </button>
+        <button class="side-menu-item" id="importDataBtn">
+            <span class="side-menu-item-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </span>
+            <span>Import Data</span>
+        </button>
+        <div class="side-menu-divider"></div>
+        <button class="side-menu-item" id="aboutBtn">
+            <span class="side-menu-item-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+            </span>
+            <span>About</span>
+        </button>
+    </div>
+</nav>
+
+<!-- Hidden file input for import -->
+<input type="file" id="importFileInput" class="hidden-file-input" accept=".json" />
+
+<!-- About Dialog -->
+<div class="about-dialog" id="aboutDialog">
+    <div class="about-dialog-content">
+        <div class="about-dialog-header">
+            <img src="icons/icon-192.png" alt="GourmetApp" class="about-dialog-icon" />
+            <h2 class="about-dialog-title">GourmetApp</h2>
+            <div class="about-dialog-version" id="aboutVersion">Version 0.0.5</div>
+        </div>
+        <div class="about-dialog-body">
+            <div class="about-info-row">
+                <span class="about-info-label">Application</span>
+                <span class="about-info-value">GourmetApp</span>
+            </div>
+            <div class="about-info-row">
+                <span class="about-info-label">Release Date</span>
+                <span class="about-info-value" id="aboutReleaseDate">2025-10-23</span>
+            </div>
+            <div class="about-info-row">
+                <span class="about-info-label">Platform</span>
+                <span class="about-info-value">Progressive Web App</span>
+            </div>
+            <div class="about-info-row">
+                <span class="about-info-label">Database</span>
+                <span class="about-info-value">IndexedDB</span>
+            </div>
+        </div>
+        <div class="about-dialog-footer">
+            <button class="btn primary" id="closeAboutBtn">Close</button>
+        </div>
+    </div>
+</div>
 
 <main>
     <!-- Scanner section (shown in modal) -->

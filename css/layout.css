@@ -16,6 +16,9 @@ header{
     padding-top:calc(env(safe-area-inset-top) + 4px);
     padding-left:calc(20px + env(safe-area-inset-left));
     padding-right:calc(20px + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 h1{
