@@ -211,31 +211,11 @@ async function applyUpdate(newVersion) {
       </div>
     `;
 
-    // Step 5: Force a hard reload - on iOS, we need to actually navigate away and back
+    // Step 5: Force a hard reload
     setTimeout(() => {
-      // For iOS PWA, we need a VERY aggressive reload
-      // This forces iOS to re-fetch everything
-      const timestamp = Date.now();
-
-      // Get the base path of the app (e.g., /gourmet-app/ or /)
-      const basePath = window.location.pathname.endsWith('.html')
-        ? window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1)
-        : window.location.pathname;
-
-      const baseUrl = window.location.origin + basePath;
-
-      // Try multiple reload strategies for iOS
-      if (window.navigator.standalone) {
-        // We're in iOS PWA mode - use the most aggressive approach
-        // Navigate to a blank page first, then back to the app
-        window.location.href = 'about:blank';
-        setTimeout(() => {
-          window.location.href = baseUrl + '?' + timestamp;
-        }, 100);
-      } else {
-        // Standard PWA or web - use hard reload
-        window.location.href = baseUrl + '?' + timestamp;
-      }
+      // Simply use location.reload(true) for a hard refresh
+      // This works on both web and iOS PWA without leaving artifacts
+      window.location.reload(true);
     }, 1000);
 
   } catch (err) {
