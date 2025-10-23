@@ -1,5 +1,5 @@
 {
-  "version": "0.0.15",
+  "version": "0.0.16",
   "releaseDate": "2025-10-23",
   "changes": [
     "Fixed iOS PWA update mechanism with aggressive cache clearing",
