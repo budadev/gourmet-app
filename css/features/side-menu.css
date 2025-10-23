@@ -42,6 +42,7 @@
 
 .side-menu-header {
     padding: 40px 24px 32px;
+    padding-top: calc(40px + env(safe-area-inset-top));
     background: var(--card);
     color: var(--text);
     border-bottom: 1px solid var(--border);
