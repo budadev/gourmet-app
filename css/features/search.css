@@ -8,10 +8,24 @@
   border-radius:999px;
   background:var(--bg-secondary);
   border:1px solid var(--border);
-  padding:14px 56px 14px 18px; /* extra right space for icon */
+  padding:14px 100px 14px 18px; /* extra right space for clear button and barcode icon */
   box-shadow:var(--shadow-sm);
 }
 .search-wrapper input:focus{background:var(--card);box-shadow:0 4px 12px rgba(0,0,0,.08);}
+
+/* Clear button */
+.search-wrapper .clear-btn{
+  position:absolute;right:52px;top:50%;transform:translateY(-50%);
+  background:transparent;border:none;box-shadow:none;width:32px;height:32px;
+  display:none;align-items:center;justify-content:center;cursor:pointer;
+  font-size:18px;color:var(--text-muted);
+  transition:all var(--transition-fast) var(--ease);
+  border-radius:50%;
+  font-weight:300;
+}
+.search-wrapper .clear-btn.visible{display:flex;}
+.search-wrapper .clear-btn:hover{background:var(--bg-secondary);color:var(--text-primary);}
+.search-wrapper .clear-btn:active{transform:translateY(-50%) scale(.9);}
 
 .search-wrapper .barcode-btn{
   position:absolute;right:10px;top:50%;transform:translateY(-50%);
@@ -34,7 +48,7 @@
   display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;
   transition:background var(--transition-fast) var(--ease), opacity var(--transition-fast) var(--ease), transform var(--transition-fast) var(--ease);
 }
-.input-with-barcode .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(25%);transition:opacity var(--transition-fast) var(--ease), filter var(--transition-fast) var(--ease);}
+.input-with-barcode .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(25%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);}
 .input-with-barcode .barcode-btn:hover{background:var(--bg-secondary);}
 .input-with-barcode .barcode-btn:hover img{opacity:1;filter:none;}
 .input-with-barcode .barcode-btn:active{transform:scale(.9);}
