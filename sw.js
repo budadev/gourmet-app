@@ -2,7 +2,7 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const VERSION = '0.0.4'; // App version - increment this to trigger updates
+const VERSION = '0.0.5'; // App version - increment this to trigger updates
 const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`; // e.g., gourmetapp-v1-0-0
 const ASSETS = [
   './',
@@ -12,7 +12,39 @@ const ASSETS = [
   './version.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/barcode.png'
+  './icons/barcode.png',
+  // CSS files
+  './css/variables.css',
+  './css/base.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/modals.css',
+  './css/features/search.css',
+  './css/features/items.css',
+  './css/features/ratings.css',
+  './css/features/photos.css',
+  './css/features/pairings.css',
+  './css/features/update-banner.css',
+  './css/features/side-menu.css',
+  // JS files
+  './js/app.js',
+  './js/config.js',
+  './js/dataManager.js',
+  './js/db.js',
+  './js/updateManager.js',
+  './js/utils.js',
+  './js/components/modal.js',
+  './js/components/photos.js',
+  './js/components/rating.js',
+  './js/external/openFoodFacts.js',
+  './js/features/itemDetails.js',
+  './js/features/itemEditor.js',
+  './js/features/itemList.js',
+  './js/features/pairingSelector.js',
+  './js/features/scanner.js',
+  './js/features/search.js',
+  './js/features/sideMenu.js',
+  './js/models/pairings.js'
 ];
 
 self.addEventListener('install', e => {
