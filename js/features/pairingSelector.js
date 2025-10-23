@@ -22,6 +22,10 @@ export function openPairingSelector(type, sourceId, pairings, onPairingAdded) {
   const title = type === 'good' ? 'Select Good Pairing' : 'Select Bad Pairing';
   el('pairingSelectorTitle').textContent = title;
   el('pairingSearchInput').value = '';
+
+  // Clear any previous status messages when opening
+  el('pairingStatus').textContent = '';
+
   openModal('pairingSelectorModal');
 
   // Initial list render then bind click handlers

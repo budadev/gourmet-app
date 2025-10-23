@@ -61,9 +61,9 @@ async function initApp() {
             openEditor({ barcode: code }, refreshList);
           }
         }
-        // Only update search if user declined to add - clear the current view
-        // Don't add barcode to search input, just show empty results
-        renderList([]);
+        // If user declined to add, restore the current list view
+        // This maintains the existing search state instead of showing empty results
+        await refreshList();
       }
     });
   };
