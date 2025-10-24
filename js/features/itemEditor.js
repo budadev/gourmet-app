@@ -11,6 +11,8 @@ import { getConfig, getTypeInfo } from '../config.js';
 import { addPairing, removePairing } from '../models/pairings.js';
 import { openPairingSelector, setCurrentPairings, getCurrentPairings } from './pairingSelector.js';
 import { startScanForInput } from './scanner.js';
+import { renderPlaceSelector } from '../components/placeSelector.js';
+import { setCurrentPlaces, getCurrentPlaces } from '../models/places.js';
 
 let currentEditingId = null;
 let starRatingController = null;
@@ -23,11 +25,14 @@ export function openEditor(item = null, onSave) {
     currentEditingId = item.id;
     const itemPairings = item.pairings ? { good: [...item.pairings.good], bad: [...item.pairings.bad] } : { good: [], bad: [] };
     setCurrentPairings(itemPairings);
+    const itemPlaces = item.places ? [...item.places] : [];
+    setCurrentPlaces(itemPlaces);
     renderEditorFields(item.type || Object.keys(config)[0], item);
   } else {
     el('editorTitle').textContent = 'Add Item';
     currentEditingId = null;
     setCurrentPairings({ good: [], bad: [] });
+    setCurrentPlaces([]);
     renderEditorFields(Object.keys(config)[0], {});
   }
 
@@ -51,6 +56,7 @@ export function closeEditor() {
   starRatingController = null;
   clearPhotos();
   setCurrentPairings({ good: [], bad: [] });
+  setCurrentPlaces([]);
   window.__editorOnSave = null;
 }
 
@@ -102,6 +108,9 @@ function renderEditorFields(selectedType, itemData = {}) {
 
   // Pairings section - full width
   html += `<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>`;
+
+  // Places section - full width
+  html += `<div id="placesEditorContainer" style="grid-column:1/-1"></div>`;
 
   html += '</div>';
 
@@ -183,6 +192,12 @@ function renderEditorFields(selectedType, itemData = {}) {
     setPhotos(itemData.photos);
     renderPhotoPreview();
   }
+
+  // Render places selector
+  const placesContainer = el('placesEditorContainer');
+  if (placesContainer) {
+    renderPlaceSelector(placesContainer, itemData.places || []);
+  }
 }
 
 // Update only dynamic fields section to avoid full form rebuild
@@ -233,6 +248,7 @@ function collectFormData() {
   });
   data.photos = getPhotos();
   data.pairings = getCurrentPairings();
+  data.places = getCurrentPlaces();
   return data;
 }
 

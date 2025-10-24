@@ -9,6 +9,7 @@ import { openModal, closeModal } from '../components/modal.js';
 import { showPhotoModal } from '../components/photos.js';
 import { getTypeInfo } from '../config.js';
 import { cleanupPairingsOnDelete } from '../models/pairings.js';
+import { renderPlacesInDetails } from '../components/placeSelector.js';
 
 export async function showItemDetails(id, onEdit, onDelete) {
   const item = await getItem(id);
@@ -57,6 +58,14 @@ export async function showItemDetails(id, onEdit, onDelete) {
       <div class="detail-label">Notes</div>
       <div class="detail-value">${escapeHtml(item.notes)}</div>
     </div>` : ''}
+  `;
+
+  // Add places if available
+  if (item.places && item.places.length > 0) {
+    fieldsHTML += await renderPlacesInDetails(item.places);
+  }
+
+  fieldsHTML += `
     <div class="detail-row">
       <div class="detail-label">Last Updated</div>
       <div class="detail-value">${formatDate(item.updatedAt)}</div>
