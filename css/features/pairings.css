@@ -90,3 +90,27 @@
     font-style:italic;
     padding:8px 0;
 }
+
+/* Pairing selector specific (paired state) */
+.item.paired{
+  opacity:0.55;
+  filter:grayscale(0.2);
+  position:relative;
+  cursor:default;
+}
+.item.paired-good{border-left:4px solid var(--success);padding-left:8px;}
+.item.paired-bad{border-left:4px solid var(--danger);padding-left:8px;}
+.pairing-chip{
+  font-size:11px;
+  font-weight:600;
+  padding:4px 8px;
+  border-radius:999px;
+  line-height:1;
+  background:var(--border-light);
+  color:var(--text-secondary);
+  white-space:nowrap;
+  box-shadow:var(--shadow-sm);
+}
+.pairing-chip.good{background:var(--success-bg);color:var(--success);}
+.pairing-chip.bad{background:var(--danger-bg);color:var(--danger);}
+.truncate{display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap;}

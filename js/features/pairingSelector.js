@@ -46,25 +46,41 @@ export async function refreshPairingList() {
   // Exclude current item being edited
   const availableItems = allItems.filter(item => item.id !== pairingSourceId);
 
+  const goodSet = new Set(currentPairings.good || []);
+  const badSet = new Set(currentPairings.bad || []);
+
+  // Sort: unpaired first (keep original relative order for stability), then paired
+  const indexed = availableItems.map((item, idx) => ({ item, idx }));
+  indexed.sort((a, b) => {
+    const aPaired = goodSet.has(a.item.id) || badSet.has(a.item.id);
+    const bPaired = goodSet.has(b.item.id) || badSet.has(b.item.id);
+    if (aPaired !== bPaired) return aPaired ? 1 : -1; // unpaired first
+    return a.idx - b.idx; // stable fallback (explicit)
+  });
+
   const pairingItemsList = el('pairingItemsList');
 
-  if (availableItems.length === 0) {
+  if (indexed.length === 0) {
     pairingItemsList.innerHTML = '<div class="empty-state" style="padding:40px 20px">No items available to pair</div>';
     return;
   }
 
-  pairingItemsList.innerHTML = availableItems.map(item => {
+  pairingItemsList.innerHTML = indexed.map(({ item }) => {
     const typeInfo = getTypeInfo(item.type);
-    const isAlreadyPaired = currentPairings.good.includes(item.id) || currentPairings.bad.includes(item.id);
+    const isGood = goodSet.has(item.id);
+    const isBad = badSet.has(item.id);
+    const isPaired = isGood || isBad;
+    const pairedClass = isGood ? 'paired paired-good' : isBad ? 'paired paired-bad' : '';
+    const label = isGood ? 'Good pairing' : isBad ? 'Bad pairing' : '';
 
     return `
-      <div class="item ${isAlreadyPaired ? 'selected' : ''}" data-pairing-item-id="${item.id}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:16px">${typeInfo.icon} ${escapeHtml(item.name || 'Unnamed')}</div>
+      <div class="item ${pairedClass}" data-pairing-item-id="${item.id}" ${isPaired ? 'data-paired="true"' : ''}>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:16px;display:flex;align-items:center;gap:6px;${isPaired ? 'opacity:.85;' : ''}">${typeInfo.icon} <span class="truncate">${escapeHtml(item.name || 'Unnamed')}</span></div>
             <div class="muted" style="font-size:12px;margin-top:4px">${typeInfo.label}</div>
           </div>
-          ${isAlreadyPaired ? '<div class="badge">Already paired</div>' : ''}
+          ${isPaired ? `<div class="pairing-chip ${isGood ? 'good' : 'bad'}">${label}</div>` : ''}
         </div>
       </div>
     `;
@@ -114,6 +130,11 @@ export function setupPairingListClickHandlers(onPairingAdded) {
   if (!pairingItemsList) return;
   pairingItemsList.querySelectorAll('.item').forEach(itemEl => {
     itemEl.onclick = async () => {
+      if (itemEl.hasAttribute('data-paired')) {
+        // Provide subtle feedback instead of re-adding
+        el('pairingStatus').textContent = 'Already paired';
+        return;
+      }
       const targetId = Number(itemEl.getAttribute('data-pairing-item-id'));
       await handlePairingSelection(targetId, onPairingAdded);
     };
