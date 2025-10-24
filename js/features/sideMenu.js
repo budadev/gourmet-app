@@ -11,7 +11,6 @@ let aboutDialogOpen = false;
 export function initSideMenu() {
   const hamburgerBtn = el('hamburgerBtn');
   const overlay = el('sideMenuOverlay');
-  const menu = el('sideMenu');
   const aboutDialog = el('aboutDialog');
   const closeAboutBtn = el('closeAboutBtn');
 
@@ -95,23 +94,62 @@ async function exportData() {
 
     const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const filename = `gourmetapp-export-${timestamp}.json`;
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Detection for installed PWA / iOS standalone
+    const isStandalone = (
+      window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+    ) || window.navigator.standalone === true; // iOS legacy
 
-    showNotification(`✓ Exported ${items.length} items successfully!`, 'success');
+    let shared = false;
+
+    if (isStandalone && navigator.share) {
+      try {
+        const file = new File([blob], filename, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'GourmetApp Export',
+            text: `Exported ${items.length} items on ${new Date().toLocaleString()}`
+          });
+          shared = true;
+        } else {
+            // Fallback: share raw JSON as text
+            await navigator.share({
+              title: 'GourmetApp Export',
+              text: dataStr
+            });
+            shared = true;
+        }
+      } catch (shareErr) {
+        if (shareErr && (shareErr.name === 'AbortError' || /abort/i.test(shareErr.message || ''))) {
+          // User cancelled share sheet intentionally -> treat as success, no download fallback
+          console.info('Share cancelled by user. Not falling back to download.');
+          shared = true; // prevents fallback
+        } else {
+          console.warn('Share failed (non-cancel). Will fallback to download.', shareErr);
+        }
+      }
+    }
+
+    if (!shared) {
+      // Traditional download fallback
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Always show success (even if share cancelled) per requirement
+    showNotification(`\u2713 Exported ${items.length} items successfully!`, 'success');
   } catch (error) {
     console.error('Export error:', error);
-    showNotification('✗ Failed to export data', 'error');
+    showNotification('\u2717 Failed to export data', 'error');
   }
 }
 
@@ -145,10 +183,8 @@ async function handleImportFile(event) {
 
     for (const item of importData.items) {
       try {
-        // Remove the id field as it's auto-generated
-        const { id, ...itemData } = item;
+        const { id, ...itemData } = item; // remove legacy id
 
-        // Check if item with same barcode already exists
         if (itemData.barcode && existingBarcodes.has(itemData.barcode)) {
           skipped++;
           continue;
@@ -156,33 +192,26 @@ async function handleImportFile(event) {
 
         await addItem(itemData);
         imported++;
-
-        // Add to existing barcodes set to avoid duplicates within import
-        if (itemData.barcode) {
-          existingBarcodes.add(itemData.barcode);
-        }
+        if (itemData.barcode) existingBarcodes.add(itemData.barcode);
       } catch (err) {
         console.error('Error importing item:', err);
         errors++;
       }
     }
 
-    // Show summary notification
-    let message = `✓ Import complete!\n`;
+    let message = `\u2713 Import complete!\n`;
     if (imported > 0) message += `Imported: ${imported} items\n`;
     if (skipped > 0) message += `Skipped (duplicates): ${skipped}\n`;
     if (errors > 0) message += `Errors: ${errors}`;
 
     showNotification(message, imported > 0 ? 'success' : 'warning');
 
-    // Trigger a refresh if items were imported
     if (imported > 0) {
-      // Dispatch custom event that the main app can listen to
       window.dispatchEvent(new CustomEvent('data-imported'));
     }
   } catch (error) {
     console.error('Import error:', error);
-    showNotification('✗ Failed to import data. Please check the file format.', 'error');
+    showNotification('\u2717 Failed to import data. Please check the file format.', 'error');
   }
 }
 
@@ -191,7 +220,6 @@ function showAboutDialog() {
   const dialog = el('aboutDialog');
   dialog.classList.add('active');
 
-  // Load version info with cache busting to always get the latest
   fetch(`./version.json?t=${Date.now()}`)
     .then(res => res.json())
     .then(data => {
@@ -213,7 +241,6 @@ function closeAboutDialog() {
 }
 
 function showNotification(message, type = 'info') {
-  // Create a simple toast notification
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.style.cssText = `
@@ -238,19 +265,9 @@ function showNotification(message, type = 'info') {
   toast.textContent = message;
   document.body.appendChild(toast);
 
-  // Add animation
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
+    @keyframes slideDown { from { opacity: 0; transform: translateX(-50%) translateY(-20px);} to { opacity:1; transform: translateX(-50%) translateY(0);} }
   `;
   document.head.appendChild(style);
 

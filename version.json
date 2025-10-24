@@ -1,7 +1,9 @@
 {
-  "version": "0.0.29",
+  "version": "0.0.30",
   "releaseDate": "2025-10-24",
   "changes": [
+    "Enhanced Export: iOS installed PWA now opens native share sheet directly (AirDrop/Mail/Files) with JSON file attachment",
+    "Always shows success notification even if share is cancelled (per requirement)",
     "Added 'Where did you buy it?' functionality with place tracking",
     "Fixed iOS keyboard handling and scroll positioning",
     "Optimized scroll behavior for iOS PWA"
