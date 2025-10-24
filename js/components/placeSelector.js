@@ -161,14 +161,23 @@ function scrollPlacesSectionIntoView() {
     const modalBody = document.querySelector('#editorModal .modal-body');
 
     if (placesSection && modalBody) {
-      // Get the position of the places section relative to the modal body
-      const placesSectionTop = placesSection.offsetTop;
+      // Get the label element to scroll to
+      const label = placesSection.querySelector('label');
 
-      // Scroll the modal body so the places section is visible with proper spacing
-      // Add extra offset to account for the label and some breathing room
-      modalBody.scrollTop = placesSectionTop - 60;
+      if (label) {
+        // Use scrollIntoView with block: 'start' for better iOS compatibility
+        label.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      } else {
+        // Fallback: calculate offset manually
+        const placesSectionTop = placesSection.offsetTop;
+        modalBody.scrollTop = placesSectionTop - 10;
+      }
     }
-  }, 300); // Small delay to allow iOS keyboard animation
+  }, 350); // Slightly longer delay for iOS keyboard animation
 }
 
 /**

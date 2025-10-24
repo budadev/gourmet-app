@@ -1,9 +1,9 @@
 {
-  "version": "0.0.20",
+  "version": "0.0.21",
   "releaseDate": "2025-10-24",
   "changes": [
     "Added 'Where did you buy it?' functionality with place tracking",
-    "Improved iOS keyboard handling for places input",
-    "Repositioned places section for better mobile UX"
+    "Fixed iOS keyboard handling and scroll positioning",
+    "Optimized scroll behavior for iOS PWA"
   ]
 }
