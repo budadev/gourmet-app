@@ -209,43 +209,48 @@ function renderEditorFields(selectedType, itemData = {}) {
 function setupInputFocusHandling() {
   const editorModal = el('editorModal');
   if (!editorModal) return;
-  const modalBody = editorModal.querySelector('.modal-body');
-  if (!modalBody) return;
+  const scrollContainer = editorModal.querySelector('.modal-content');
   const header = editorModal.querySelector('.modal-header');
-  const headerHeight = header ? header.getBoundingClientRect().height : 72;
+  if (!scrollContainer || !header) return;
 
-  function scrollFieldIntoView(input){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  function ensureVisible(input){
     if (!input) return;
-    const targetTop = input.offsetTop - headerHeight - 12; // small gap
-    const currentTop = modalBody.scrollTop;
-    const maxScroll = modalBody.scrollHeight - modalBody.clientHeight;
-    let desired = targetTop < 0 ? 0 : targetTop;
-    if (desired > maxScroll) desired = maxScroll;
-    // Only scroll if input not already fully visible
-    const inputBottom = input.offsetTop + input.offsetHeight;
-    const visibleStart = currentTop;
-    const visibleEnd = currentTop + modalBody.clientHeight;
-    if (input.offsetTop < visibleStart + headerHeight + 8 || inputBottom > visibleEnd - 48){
-      modalBody.scrollTo({ top: desired, behavior:'smooth'});
-    }
+    // Second pass after keyboard settle
+    const attempt = () => {
+      const headerRect = header.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+
+      const topGap = 8; // space below header
+      const bottomGap = 56; // breathing space above keyboard area
+
+      // If input sits above header bottom + gap
+      if (inputRect.top < headerRect.bottom + topGap) {
+        const delta = (headerRect.bottom + topGap) - inputRect.top;
+        scrollContainer.scrollTop -= delta;
+      }
+      // If input bottom is below container bottom - bottomGap
+      else if (inputRect.bottom > containerRect.bottom - bottomGap) {
+        const delta = inputRect.bottom - (containerRect.bottom - bottomGap);
+        scrollContainer.scrollTop += delta;
+      }
+    };
+    attempt();
+    setTimeout(attempt, 300); // re-adjust after potential visualViewport resize
   }
 
-  window.__scrollEditorFieldIntoView = (elRef) => {
-    scrollFieldIntoView(elRef);
-    // Second attempt after keyboard settles
-    setTimeout(()=>scrollFieldIntoView(elRef), 300);
-  };
+  window.__scrollEditorFieldIntoView = ensureVisible;
 
   const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
-  inputs.forEach(input => {
-    input.addEventListener('focus', () => window.__scrollEditorFieldIntoView(input));
-  });
+  inputs.forEach(inp => inp.addEventListener('focus', () => ensureVisible(inp)));
 
   if (window.visualViewport){
     window.visualViewport.addEventListener('resize', () => {
       const active = document.activeElement;
-      if (active && editorModal.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')){
-        window.__scrollEditorFieldIntoView(active);
+      if (active && editorModal.contains(active) && /INPUT|TEXTAREA/.test(active.tagName)) {
+        ensureVisible(active);
       }
     });
   }

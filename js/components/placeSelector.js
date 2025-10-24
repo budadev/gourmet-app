@@ -136,13 +136,15 @@ function scrollInputIntoView(inputElement){
   if (window.__scrollEditorFieldIntoView){
     window.__scrollEditorFieldIntoView(inputElement);
   } else {
-    // Fallback approximate
-    const modalBody = document.querySelector('#editorModal .modal-body');
+    const scrollContainer = document.querySelector('#editorModal .modal-content');
     const header = document.querySelector('#editorModal .modal-header');
-    if (modalBody){
-      const headerHeight = header ? header.getBoundingClientRect().height : 72;
-      const targetTop = inputElement.offsetTop - headerHeight - 12;
-      modalBody.scrollTop = targetTop < 0 ? 0 : targetTop;
+    if (scrollContainer && header){
+      const headerRect = header.getBoundingClientRect();
+      const inputRect = inputElement.getBoundingClientRect();
+      if (inputRect.top < headerRect.bottom + 8){
+        const delta = (headerRect.bottom + 8) - inputRect.top;
+        scrollContainer.scrollTop -= delta;
+      }
     }
   }
 }
