@@ -1,9 +1,9 @@
 {
-  "version": "0.0.29",
+  "version": "0.0.30",
   "releaseDate": "2025-10-24",
   "changes": [
-    "Added 'Where did you buy it?' functionality with place tracking",
-    "Fixed iOS keyboard handling and scroll positioning",
-    "Optimized scroll behavior for iOS PWA"
+    "Refactored modal layout: header static, dedicated scroll area",
+    "Improved iOS keyboard handling (stable header, footer hides on keyboard)",
+    "Enhanced focus scrolling for inputs including place selector"
   ]
 }
