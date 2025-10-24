@@ -136,7 +136,7 @@ function scrollInputIntoView(inputElement){
   if (window.__scrollEditorFieldIntoView){
     window.__scrollEditorFieldIntoView(inputElement);
   } else {
-    const scrollContainer = document.querySelector('#editorModal .modal-body');
+    const scrollContainer = document.querySelector('#editorModal .modal-content');
     const header = document.querySelector('#editorModal .modal-header');
     if (scrollContainer && header){
       const headerRect = header.getBoundingClientRect();
