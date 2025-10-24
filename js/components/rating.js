@@ -2,8 +2,6 @@
    Star Rating Component
    ============================= */
 
-import { escapeHtml } from '../utils.js';
-
 export function renderStars(rating, interactive = false) {
   const stars = [];
   const fullStars = Math.floor(rating);
@@ -32,7 +30,9 @@ export function setupStarRating(container, initialValue = 0) {
   function getRatingFromPosition(clientX, clientY) {
     let rating = 0;
 
-    stars.forEach((star, index) => {
+    // Check each star to find which one the pointer is over
+    for (let index = 0; index < stars.length; index++) {
+      const star = stars[index];
       const rect = star.getBoundingClientRect();
       const clickX = clientX - rect.left;
       const starWidth = rect.width;
@@ -42,8 +42,49 @@ export function setupStarRating(container, initialValue = 0) {
           clientY >= rect.top && clientY <= rect.bottom) {
         const isLeftHalf = clickX < starWidth / 2;
         rating = isLeftHalf ? index + 0.5 : index + 1;
+        return rating; // Found exact star, return immediately
       }
-    });
+    }
+
+    // If not directly over a star, check if we're in the general horizontal range
+    // This handles the gaps between stars during dragging
+    const firstStar = stars[0].getBoundingClientRect();
+    const lastStar = stars[stars.length - 1].getBoundingClientRect();
+
+    // Check if we're in the vertical range of the stars (with some tolerance)
+    const tolerance = 20; // pixels of vertical tolerance
+    if (clientY >= firstStar.top - tolerance && clientY <= firstStar.bottom + tolerance) {
+      // Check horizontal position
+      if (clientX < firstStar.left) {
+        // Before first star
+        rating = 0.5; // Minimum rating
+      } else if (clientX > lastStar.right) {
+        // After last star
+        rating = 5;
+      } else {
+        // In the horizontal range - find closest star
+        let closestIndex = 0;
+        let minDistance = Infinity;
+
+        for (let index = 0; index < stars.length; index++) {
+          const rect = stars[index].getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const distance = Math.abs(clientX - centerX);
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        }
+
+        // Determine if it's left or right half of the closest star
+        const closestRect = stars[closestIndex].getBoundingClientRect();
+        const clickX = clientX - closestRect.left;
+        const starWidth = closestRect.width;
+        const isLeftHalf = clickX < starWidth / 2;
+        rating = isLeftHalf ? closestIndex + 0.5 : closestIndex + 1;
+      }
+    }
 
     return rating;
   }
@@ -141,3 +182,4 @@ export function setupStarRating(container, initialValue = 0) {
     }
   };
 }
+
