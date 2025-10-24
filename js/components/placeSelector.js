@@ -122,6 +122,9 @@ function setupPlaceSearchListeners() {
       const results = await searchPlaces(query);
       renderSearchResults(results, query);
     }
+
+    // Scroll the places section to the top of the modal on iOS
+    scrollPlacesSectionIntoView();
   });
 
   // Close dropdown when clicking outside
@@ -146,6 +149,26 @@ function setupPlaceSearchListeners() {
       resultsContainer.classList.add('hidden');
     }
   });
+}
+
+/**
+ * Scroll the places section into view (for iOS keyboard visibility)
+ */
+function scrollPlacesSectionIntoView() {
+  // Wait a brief moment for keyboard to appear
+  setTimeout(() => {
+    const placesSection = document.querySelector('.place-selector-section');
+    const modalBody = document.querySelector('#editorModal .modal-body');
+
+    if (placesSection && modalBody) {
+      // Get the position of the places section relative to the modal body
+      const placesSectionTop = placesSection.offsetTop;
+
+      // Scroll the modal body so the places section is visible with proper spacing
+      // Add extra offset to account for the label and some breathing room
+      modalBody.scrollTop = placesSectionTop - 60;
+    }
+  }, 300); // Small delay to allow iOS keyboard animation
 }
 
 /**

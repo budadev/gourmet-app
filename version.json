@@ -1,7 +1,9 @@
 {
-  "version": "0.0.19",
-  "releaseDate": "2025-10-23",
+  "version": "0.0.20",
+  "releaseDate": "2025-10-24",
   "changes": [
-    "Test version"
+    "Added 'Where did you buy it?' functionality with place tracking",
+    "Improved iOS keyboard handling for places input",
+    "Repositioned places section for better mobile UX"
   ]
 }

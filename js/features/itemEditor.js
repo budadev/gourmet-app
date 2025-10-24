@@ -96,6 +96,9 @@ function renderEditorFields(selectedType, itemData = {}) {
   // Notes (always) - full width
   html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes || '')}</textarea></div>`;
 
+  // Places section - full width (moved before Photos)
+  html += `<div id="placesEditorContainer" style="grid-column:1/-1"></div>`;
+
   // Photos (optional) - full width
   html += `<div class="field-group" style="grid-column:1/-1">
     <label>Photos (optional)</label>
@@ -108,9 +111,6 @@ function renderEditorFields(selectedType, itemData = {}) {
 
   // Pairings section - full width
   html += `<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>`;
-
-  // Places section - full width
-  html += `<div id="placesEditorContainer" style="grid-column:1/-1"></div>`;
 
   html += '</div>';
 
