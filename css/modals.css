@@ -32,6 +32,7 @@
     border-top-right-radius:var(--radius-xl);
     /* Ensure content doesn't overflow */
     overflow:hidden;
+    position:relative; /* Add relative positioning for fixed children */
 }
 
 @keyframes modalFadeIn{
@@ -44,9 +45,11 @@
     display:flex;
     align-items:center;
     justify-content:flex-start; /* allow h2 to center via flex grow */
-    position:sticky; /* Changed from relative to sticky */
+    position:fixed; /* Changed from sticky to fixed */
     top:0; /* Stick to top */
-    z-index:10; /* Stay above modal body content */
+    left:0;
+    right:0;
+    z-index:2001; /* Higher than modal to stay on top */
     padding:calc(env(safe-area-inset-top) + 12px) 28px 12px 28px;
     border-bottom:2px solid var(--border-light);
     flex-shrink:0;
@@ -89,6 +92,8 @@
 
 .modal-body{
     padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
+    padding-top:calc(env(safe-area-inset-top) + 72px); /* Account for fixed header height */
+    padding-bottom:calc(80px + env(safe-area-inset-bottom)); /* Account for fixed footer height */
     overflow-y:auto;
     overflow-x:hidden;
     flex:1;
@@ -98,6 +103,11 @@
 }
 
 .modal-footer{
+    position:fixed; /* Make footer fixed */
+    bottom:0;
+    left:0;
+    right:0;
+    z-index:2001; /* Same as header to stay on top */
     padding:12px 20px calc(env(safe-area-inset-bottom) + 12px) 20px;
     border-top:1px solid var(--border);
     background:var(--gradient-surface);
