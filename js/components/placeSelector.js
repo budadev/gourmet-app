@@ -23,7 +23,7 @@ export async function renderPlaceSelector(containerEl, currentPlaceIds = []) {
         type="text" 
         id="placeSearchInput" 
         class="place-search-input"
-        placeholder="Search or add a place (e.g., Buddha Bar Monaco)..."
+        placeholder="Search or add a place..."
         autocomplete="off"
       />
       <button class="place-add-btn hidden" id="placeAddBtn" type="button" title="Add new place">+</button>
