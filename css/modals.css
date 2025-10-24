@@ -9,7 +9,7 @@
     right:0;
     bottom:0;
     background:rgba(0, 0, 0, 0.5);
-    backdrop-filter:blur(18px);
+    padding-top:0; /* removed previously added top padding that created gap */
     z-index:2000;
     display:none;
     /* Removed overflow-y:auto - handle scrolling in modal-body instead */
@@ -28,10 +28,10 @@
     box-shadow:var(--shadow-lg);
     /* Replaced slide/transform animation (causes iOS double-tap bug on selects) with fade-only */
     animation:modalFadeIn 0.25s ease-out;
-    border-top-left-radius:var(--radius-xl);
-    border-top-right-radius:var(--radius-xl);
+    border-top-left-radius:0; /* removed curve */
+    border-top-right-radius:0; /* removed curve */
     /* Ensure content doesn't overflow */
-    overflow:hidden;
+    overflow:visible; /* changed */
     position:relative; /* Add relative positioning for fixed children */
 }
 
@@ -45,11 +45,9 @@
     display:flex;
     align-items:center;
     justify-content:flex-start; /* allow h2 to center via flex grow */
-    position:fixed; /* Changed from sticky to fixed */
-    top:0; /* Stick to top */
-    left:0;
-    right:0;
-    z-index:2001; /* Higher than modal to stay on top */
+    position:fixed; /* revert from sticky to fixed for consistent visibility */
+    top:0;left:0;right:0;
+    z-index:2001; /* ensure above body */
     padding:calc(env(safe-area-inset-top) + 12px) 28px 12px 28px;
     border-bottom:2px solid var(--border-light);
     flex-shrink:0;
@@ -92,8 +90,9 @@
 
 .modal-body{
     padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
-    padding-top:calc(env(safe-area-inset-top) + 72px); /* Account for fixed header height */
-    padding-bottom:calc(80px + env(safe-area-inset-bottom)); /* Account for fixed footer height */
+    padding-top:0; /* dynamic header height applied via JS */
+    /* Remove extra space for fixed footer */
+    padding-bottom:32px; /* simpler bottom padding */
     overflow-y:auto;
     overflow-x:hidden;
     flex:1;
@@ -103,12 +102,10 @@
 }
 
 .modal-footer{
-    position:fixed; /* Make footer fixed */
-    bottom:0;
-    left:0;
-    right:0;
-    z-index:2001; /* Same as header to stay on top */
-    padding:12px 20px calc(env(safe-area-inset-bottom) + 12px) 20px;
+    position:static; /* changed from fixed so it won't jump on iOS when keyboard opens */
+    bottom:auto;left:auto;right:auto; /* reset */
+    z-index:auto; /* no special stacking needed */
+    padding:12px 20px calc(env(safe-area-inset-bottom) + 12px) 20px; /* keep safe-area bottom padding */
     border-top:1px solid var(--border);
     background:var(--gradient-surface);
     flex-shrink:0;

@@ -209,30 +209,55 @@ function renderEditorFields(selectedType, itemData = {}) {
 function setupInputFocusHandling() {
   const editorModal = el('editorModal');
   if (!editorModal) return;
-
   const modalBody = editorModal.querySelector('.modal-body');
   if (!modalBody) return;
 
-  // Get all inputs and textareas in the editor
-  const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
+  // Helper to scroll an input so it sits just below the header
+  function scrollFieldIntoView(input) {
+    if (!input) return;
+    const header = editorModal.querySelector('.modal-header');
+    const headerHeight = header ? header.getBoundingClientRect().height : 64;
+    const inputTop = input.offsetTop; // offset within modal-body
+    const inputBottom = inputTop + input.offsetHeight;
+    const currentScroll = modalBody.scrollTop;
+    const viewportHeight = modalBody.clientHeight;
+    const visibleStart = currentScroll;
+    const visibleEnd = currentScroll + viewportHeight;
 
+    // If input is above visible area (considering header) or below visible area, adjust.
+    const needsScrollUp = inputTop - headerHeight - 8 < visibleStart;
+    const needsScrollDown = inputBottom + 48 > visibleEnd; // give some breathing space below
+    if (needsScrollUp || needsScrollDown) {
+      let target = inputTop - headerHeight - 12; // place a small gap below header
+      if (target < 0) target = 0;
+      modalBody.scrollTo({ top: target, behavior: 'smooth' });
+    }
+  }
+
+  // Expose globally for other components (e.g., placeSelector)
+  window.__scrollEditorFieldIntoView = (elRef) => {
+    // Immediate attempt then a delayed second attempt for iOS viewport resize after keyboard shows
+    scrollFieldIntoView(elRef);
+    setTimeout(() => scrollFieldIntoView(elRef), 300);
+  };
+
+  // Attach listeners to current inputs/textareas
+  const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
   inputs.forEach(input => {
     input.addEventListener('focus', () => {
-      // Small delay to allow keyboard to appear
-      setTimeout(() => {
-        const inputRect = input.getBoundingClientRect();
-        const modalBodyRect = modalBody.getBoundingClientRect();
-
-        // Calculate scroll position to show input just below the header
-        const targetScrollTop = input.offsetTop - 20; // 20px padding from top
-
-        // Only scroll if input is not visible or too close to edges
-        if (inputRect.top < modalBodyRect.top + 60 || inputRect.bottom > modalBodyRect.bottom - 60) {
-          modalBody.scrollTop = targetScrollTop;
-        }
-      }, 100); // Short delay for iOS keyboard animation
+      window.__scrollEditorFieldIntoView(input);
     });
   });
+
+  // Listen for viewport resize (keyboard show/hide) and re-scroll active input
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const active = document.activeElement;
+      if (active && editorModal.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        window.__scrollEditorFieldIntoView(active);
+      }
+    });
+  }
 }
 
 /**
@@ -445,4 +470,3 @@ export function setStatus(msg) {
 }
 
 export { renderPairingsInEditor };
-

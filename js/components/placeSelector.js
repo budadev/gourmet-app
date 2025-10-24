@@ -133,7 +133,11 @@ function setupPlaceSearchListeners() {
  */
 function scrollInputIntoView(inputElement) {
   if (!inputElement) return;
-
+  if (window.__scrollEditorFieldIntoView) {
+    window.__scrollEditorFieldIntoView(inputElement);
+    return;
+  }
+  // Fallback legacy logic
   setTimeout(() => {
     const modalBody = document.querySelector('#editorModal .modal-body');
     if (!modalBody) return;
@@ -238,4 +242,3 @@ export async function renderPlacesInDetails(placeIds) {
 
   return html;
 }
-
