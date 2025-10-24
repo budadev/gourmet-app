@@ -20,7 +20,7 @@
 .modal-content{
     background:var(--gradient-surface);
     border:none;
-    border-radius:0;
+    border-radius:0; /* remove curved edge & avoid duplicate radius warnings */
     width:100%;
     height:100%;
     display:flex;
@@ -45,9 +45,9 @@
     display:flex;
     align-items:center;
     justify-content:flex-start; /* allow h2 to center via flex grow */
-    position:fixed; /* revert from sticky to fixed for consistent visibility */
+    position:fixed; /* keep header always visible */
     top:0;left:0;right:0;
-    z-index:2001; /* ensure above body */
+    z-index:3000; /* elevate above body content */
     padding:calc(env(safe-area-inset-top) + 12px) 28px 12px 28px;
     border-bottom:2px solid var(--border-light);
     flex-shrink:0;
@@ -90,7 +90,7 @@
 
 .modal-body{
     padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
-    padding-top:0; /* dynamic header height applied via JS */
+    padding-top:calc(env(safe-area-inset-top) + 72px); /* reserve space for fixed header */
     /* Remove extra space for fixed footer */
     padding-bottom:32px; /* simpler bottom padding */
     overflow-y:auto;
@@ -100,6 +100,8 @@
     /* Enable smooth scrolling on iOS */
     -webkit-overflow-scrolling:touch;
 }
+
+body.no-scroll{overflow:hidden;touch-action:none;}
 
 .modal-footer{
     position:static; /* changed from fixed so it won't jump on iOS when keyboard opens */

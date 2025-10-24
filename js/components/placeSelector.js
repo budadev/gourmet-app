@@ -131,25 +131,20 @@ function setupPlaceSearchListeners() {
 /**
  * Scroll input into view for iOS keyboard (gentle approach)
  */
-function scrollInputIntoView(inputElement) {
+function scrollInputIntoView(inputElement){
   if (!inputElement) return;
-  if (window.__scrollEditorFieldIntoView) {
+  if (window.__scrollEditorFieldIntoView){
     window.__scrollEditorFieldIntoView(inputElement);
-    return;
-  }
-  // Fallback legacy logic
-  setTimeout(() => {
+  } else {
+    // Fallback approximate
     const modalBody = document.querySelector('#editorModal .modal-body');
-    if (!modalBody) return;
-
-    const inputRect = inputElement.getBoundingClientRect();
-    const modalBodyRect = modalBody.getBoundingClientRect();
-    const targetScrollTop = inputElement.offsetTop - 20;
-
-    if (inputRect.top < modalBodyRect.top || inputRect.bottom > modalBodyRect.bottom) {
-      modalBody.scrollTop = targetScrollTop;
+    const header = document.querySelector('#editorModal .modal-header');
+    if (modalBody){
+      const headerHeight = header ? header.getBoundingClientRect().height : 72;
+      const targetTop = inputElement.offsetTop - headerHeight - 12;
+      modalBody.scrollTop = targetTop < 0 ? 0 : targetTop;
     }
-  }, 100);
+  }
 }
 
 /**

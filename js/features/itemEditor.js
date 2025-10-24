@@ -211,49 +211,40 @@ function setupInputFocusHandling() {
   if (!editorModal) return;
   const modalBody = editorModal.querySelector('.modal-body');
   if (!modalBody) return;
+  const header = editorModal.querySelector('.modal-header');
+  const headerHeight = header ? header.getBoundingClientRect().height : 72;
 
-  // Helper to scroll an input so it sits just below the header
-  function scrollFieldIntoView(input) {
+  function scrollFieldIntoView(input){
     if (!input) return;
-    const header = editorModal.querySelector('.modal-header');
-    const headerHeight = header ? header.getBoundingClientRect().height : 64;
-    const inputTop = input.offsetTop; // offset within modal-body
-    const inputBottom = inputTop + input.offsetHeight;
-    const currentScroll = modalBody.scrollTop;
-    const viewportHeight = modalBody.clientHeight;
-    const visibleStart = currentScroll;
-    const visibleEnd = currentScroll + viewportHeight;
-
-    // If input is above visible area (considering header) or below visible area, adjust.
-    const needsScrollUp = inputTop - headerHeight - 8 < visibleStart;
-    const needsScrollDown = inputBottom + 48 > visibleEnd; // give some breathing space below
-    if (needsScrollUp || needsScrollDown) {
-      let target = inputTop - headerHeight - 12; // place a small gap below header
-      if (target < 0) target = 0;
-      modalBody.scrollTo({ top: target, behavior: 'smooth' });
+    const targetTop = input.offsetTop - headerHeight - 12; // small gap
+    const currentTop = modalBody.scrollTop;
+    const maxScroll = modalBody.scrollHeight - modalBody.clientHeight;
+    let desired = targetTop < 0 ? 0 : targetTop;
+    if (desired > maxScroll) desired = maxScroll;
+    // Only scroll if input not already fully visible
+    const inputBottom = input.offsetTop + input.offsetHeight;
+    const visibleStart = currentTop;
+    const visibleEnd = currentTop + modalBody.clientHeight;
+    if (input.offsetTop < visibleStart + headerHeight + 8 || inputBottom > visibleEnd - 48){
+      modalBody.scrollTo({ top: desired, behavior:'smooth'});
     }
   }
 
-  // Expose globally for other components (e.g., placeSelector)
   window.__scrollEditorFieldIntoView = (elRef) => {
-    // Immediate attempt then a delayed second attempt for iOS viewport resize after keyboard shows
     scrollFieldIntoView(elRef);
-    setTimeout(() => scrollFieldIntoView(elRef), 300);
+    // Second attempt after keyboard settles
+    setTimeout(()=>scrollFieldIntoView(elRef), 300);
   };
 
-  // Attach listeners to current inputs/textareas
   const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
   inputs.forEach(input => {
-    input.addEventListener('focus', () => {
-      window.__scrollEditorFieldIntoView(input);
-    });
+    input.addEventListener('focus', () => window.__scrollEditorFieldIntoView(input));
   });
 
-  // Listen for viewport resize (keyboard show/hide) and re-scroll active input
-  if (window.visualViewport) {
+  if (window.visualViewport){
     window.visualViewport.addEventListener('resize', () => {
       const active = document.activeElement;
-      if (active && editorModal.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+      if (active && editorModal.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')){
         window.__scrollEditorFieldIntoView(active);
       }
     });
