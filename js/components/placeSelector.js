@@ -16,32 +16,18 @@ export async function renderPlaceSelector(containerEl, currentPlaceIds = []) {
   let html = '<div class="place-selector-section">';
   html += '<label>Where did you have it?</label>';
 
-  // Search input with '+' button inside
-  html += `
-    <div class="place-search-wrapper">
-      <input 
-        type="text" 
-        id="placeSearchInput" 
-        class="place-search-input"
-        placeholder="Search or add a place..."
-        autocomplete="off"
-      />
-      <button class="place-add-btn hidden" id="placeAddBtn" type="button" title="Add new place">+</button>
-      <div class="place-search-results hidden" id="placeSearchResults"></div>
-    </div>
-  `;
+  html += '<div class="place-search-wrapper">';
+  html += '<input type="text" id="placeSearchInput" class="place-search-input" placeholder="Search or add a place..." autocomplete="off" />';
+  html += '<button class="place-add-btn hidden" id="placeAddBtn" type="button" title="Add new place">+</button>';
+  html += '<div class="place-search-results hidden" id="placeSearchResults"></div>';
+  html += '</div>';
 
-  // Selected places
   html += '<div class="selected-places" id="selectedPlaces"></div>';
-
   html += '</div>';
 
   containerEl.innerHTML = html;
 
-  // Render currently selected places
   await renderSelectedPlaces(currentPlaceIds);
-
-  // Setup event listeners
   setupPlaceSearchListeners();
 }
 
@@ -62,20 +48,17 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   for (const placeId of placeIds) {
     const place = await getPlaceById(placeId);
     if (place) {
-      html += `
-        <div class="place-tag">
-          <span class="place-tag-icon">📍</span>
-          <span class="place-tag-name">${escapeHtml(place.name)}</span>
-          <button class="place-tag-remove" data-place-id="${placeId}" type="button">×</button>
-        </div>
-      `;
+      html += '<div class="place-tag">';
+      html += '<span class="place-tag-icon">📍</span>';
+      html += '<span class="place-tag-name">' + escapeHtml(place.name) + '</span>';
+      html += '<button class="place-tag-remove" data-place-id="' + placeId + '" type="button">×</button>';
+      html += '</div>';
     }
   }
 
   html += '</div>';
   container.innerHTML = html;
 
-  // Bind remove buttons
   container.querySelectorAll('.place-tag-remove').forEach(btn => {
     btn.onclick = async () => {
       const placeId = Number(btn.getAttribute('data-place-id'));
@@ -98,7 +81,6 @@ function setupPlaceSearchListeners() {
   searchInput.addEventListener('input', async (e) => {
     const query = e.target.value.trim();
 
-    // Clear previous timeout
     if (placeSearchTimeout) {
       clearTimeout(placeSearchTimeout);
     }
@@ -109,7 +91,6 @@ function setupPlaceSearchListeners() {
       return;
     }
 
-    // Debounce search
     placeSearchTimeout = setTimeout(async () => {
       const results = await searchPlaces(query);
       renderSearchResults(results, query);
@@ -123,19 +104,15 @@ function setupPlaceSearchListeners() {
       renderSearchResults(results, query);
     }
 
-    // Scroll the places section to the top of the modal on iOS
-    scrollPlacesSectionIntoView();
+    scrollInputIntoView(searchInput);
   });
 
-  // Close dropdown when clicking outside
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.place-search-wrapper') &&
-        !e.target.closest('.place-search-results')) {
+    if (!e.target.closest('.place-search-wrapper') && !e.target.closest('.place-search-results')) {
       resultsContainer.classList.add('hidden');
     }
   });
 
-  // Add new place button
   addBtn.addEventListener('click', async () => {
     const placeName = searchInput.value.trim();
     if (!placeName) return;
@@ -152,32 +129,23 @@ function setupPlaceSearchListeners() {
 }
 
 /**
- * Scroll the places section into view (for iOS keyboard visibility)
+ * Scroll input into view for iOS keyboard (gentle approach)
  */
-function scrollPlacesSectionIntoView() {
-  // Wait a brief moment for keyboard to appear
+function scrollInputIntoView(inputElement) {
+  if (!inputElement) return;
+
   setTimeout(() => {
-    const placesSection = document.querySelector('.place-selector-section');
     const modalBody = document.querySelector('#editorModal .modal-body');
+    if (!modalBody) return;
 
-    if (placesSection && modalBody) {
-      // Get the label element to scroll to
-      const label = placesSection.querySelector('label');
+    const inputRect = inputElement.getBoundingClientRect();
+    const modalBodyRect = modalBody.getBoundingClientRect();
+    const targetScrollTop = inputElement.offsetTop - 20;
 
-      if (label) {
-        // Use scrollIntoView with block: 'start' for better iOS compatibility
-        label.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-          inline: 'nearest'
-        });
-      } else {
-        // Fallback: calculate offset manually
-        const placesSectionTop = placesSection.offsetTop;
-        modalBody.scrollTop = placesSectionTop - 10;
-      }
+    if (inputRect.top < modalBodyRect.top || inputRect.bottom > modalBodyRect.bottom) {
+      modalBody.scrollTop = targetScrollTop;
     }
-  }, 350); // Slightly longer delay for iOS keyboard animation
+  }, 100);
 }
 
 /**
@@ -189,12 +157,9 @@ async function renderSearchResults(results, query) {
 
   if (!resultsContainer || !addBtn) return;
 
-  const exactMatch = results.find(
-    p => p.name.toLowerCase() === query.toLowerCase()
-  );
+  const exactMatch = results.find(p => p.name.toLowerCase() === query.toLowerCase());
 
   if (results.length === 0 || !exactMatch) {
-    // Show add button if no exact match
     addBtn.classList.remove('hidden');
   } else {
     addBtn.classList.add('hidden');
@@ -209,19 +174,18 @@ async function renderSearchResults(results, query) {
   let html = '';
   for (const place of results) {
     const isSelected = getCurrentPlaces().includes(place.id);
-    html += `
-      <div class="place-search-item ${isSelected ? 'selected' : ''}" data-place-id="${place.id}">
-        <span class="place-search-item-icon">📍</span>
-        <span class="place-search-item-name">${escapeHtml(place.name)}</span>
-        ${isSelected ? '<span class="place-search-item-check">✓</span>' : ''}
-      </div>
-    `;
+    html += '<div class="place-search-item ' + (isSelected ? 'selected' : '') + '" data-place-id="' + place.id + '">';
+    html += '<span class="place-search-item-icon">📍</span>';
+    html += '<span class="place-search-item-name">' + escapeHtml(place.name) + '</span>';
+    if (isSelected) {
+      html += '<span class="place-search-item-check">✓</span>';
+    }
+    html += '</div>';
   }
 
   resultsContainer.innerHTML = html;
   resultsContainer.classList.remove('hidden');
 
-  // Bind click handlers
   resultsContainer.querySelectorAll('.place-search-item').forEach(item => {
     item.addEventListener('click', async () => {
       const placeId = Number(item.getAttribute('data-place-id'));
@@ -235,14 +199,12 @@ async function renderSearchResults(results, query) {
 
       await renderSelectedPlaces();
 
-      // Clear search input and hide results after selection
       const searchInput = el('placeSearchInput');
       if (searchInput) {
         searchInput.value = '';
       }
       resultsContainer.classList.add('hidden');
 
-      // Hide the add button as well
       const addBtn = el('placeAddBtn');
       if (addBtn) {
         addBtn.classList.add('hidden');
@@ -271,8 +233,9 @@ export async function renderPlacesInDetails(placeIds) {
     }
   }
 
-  html += places.map(name => `<span class="place-badge">📍 ${escapeHtml(name)}</span>`).join(' ');
+  html += places.map(name => '<span class="place-badge">📍 ' + escapeHtml(name) + '</span>').join(' ');
   html += '</div></div>';
 
   return html;
 }
+

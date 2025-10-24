@@ -12,7 +12,7 @@
     backdrop-filter:blur(18px);
     z-index:2000;
     display:none;
-    overflow-y:auto;
+    /* Removed overflow-y:auto - handle scrolling in modal-body instead */
     /* Removed top/side safe-area padding to prevent duplication; handled in header */
 }
 .modal.active{display:flex;}
@@ -30,6 +30,8 @@
     animation:modalFadeIn 0.25s ease-out;
     border-top-left-radius:var(--radius-xl);
     border-top-right-radius:var(--radius-xl);
+    /* Ensure content doesn't overflow */
+    overflow:hidden;
 }
 
 @keyframes modalFadeIn{
@@ -42,11 +44,13 @@
     display:flex;
     align-items:center;
     justify-content:flex-start; /* allow h2 to center via flex grow */
-    position:relative;
+    position:sticky; /* Changed from relative to sticky */
+    top:0; /* Stick to top */
+    z-index:10; /* Stay above modal body content */
     padding:calc(env(safe-area-inset-top) + 12px) 28px 12px 28px;
     border-bottom:2px solid var(--border-light);
     flex-shrink:0;
-    background:transparent;
+    background:var(--gradient-surface); /* Ensure solid background */
 }
 .modal-header h2{
     margin:0;
@@ -86,14 +90,18 @@
 .modal-body{
     padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
     overflow-y:auto;
+    overflow-x:hidden;
     flex:1;
     min-height:0;
+    /* Enable smooth scrolling on iOS */
+    -webkit-overflow-scrolling:touch;
 }
 
 .modal-footer{
     padding:12px 20px calc(env(safe-area-inset-bottom) + 12px) 20px;
     border-top:1px solid var(--border);
     background:var(--gradient-surface);
+    flex-shrink:0;
 }
 @media (prefers-color-scheme: dark){
   .modal-footer{background:var(--gradient-surface);}

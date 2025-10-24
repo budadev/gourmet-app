@@ -198,9 +198,46 @@ function renderEditorFields(selectedType, itemData = {}) {
   if (placesContainer) {
     renderPlaceSelector(placesContainer, itemData.places || []);
   }
+
+  // Setup iOS-friendly focus handling for all inputs and textareas
+  setupInputFocusHandling();
 }
 
-// Update only dynamic fields section to avoid full form rebuild
+/**
+ * Setup focus handlers for all inputs to ensure they stay visible on iOS
+ */
+function setupInputFocusHandling() {
+  const editorModal = el('editorModal');
+  if (!editorModal) return;
+
+  const modalBody = editorModal.querySelector('.modal-body');
+  if (!modalBody) return;
+
+  // Get all inputs and textareas in the editor
+  const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
+
+  inputs.forEach(input => {
+    input.addEventListener('focus', () => {
+      // Small delay to allow keyboard to appear
+      setTimeout(() => {
+        const inputRect = input.getBoundingClientRect();
+        const modalBodyRect = modalBody.getBoundingClientRect();
+
+        // Calculate scroll position to show input just below the header
+        const targetScrollTop = input.offsetTop - 20; // 20px padding from top
+
+        // Only scroll if input is not visible or too close to edges
+        if (inputRect.top < modalBodyRect.top + 60 || inputRect.bottom > modalBodyRect.bottom - 60) {
+          modalBody.scrollTop = targetScrollTop;
+        }
+      }, 100); // Short delay for iOS keyboard animation
+    });
+  });
+}
+
+/**
+ * Update only dynamic fields section to avoid full form rebuild
+ */
 function updateDynamicFields(selectedType, itemData = {}) {
   const container = document.getElementById('dynamicFieldsContainer');
   if (!container) return;
@@ -227,8 +264,14 @@ function updateDynamicFields(selectedType, itemData = {}) {
   html += '</div>';
   container.innerHTML = html;
   enhanceSelectInteractivity(container);
+
+  // Re-setup focus handling for dynamically added inputs
+  setupInputFocusHandling();
 }
 
+/**
+ * Collect form data from the editor
+ */
 function collectFormData() {
   const config = getConfig();
   const selectedType = el('typeSelect')?.value || Object.keys(config)[0];
@@ -252,6 +295,9 @@ function collectFormData() {
   return data;
 }
 
+/**
+ * Save the item (add or update)
+ */
 export async function saveItem() {
   const payload = collectFormData();
   if (!payload.name) {
@@ -284,6 +330,9 @@ export async function saveItem() {
   }
 }
 
+/**
+ * Render the pairings section in the editor
+ */
 async function renderPairingsInEditor() {
   const container = document.getElementById('pairingsEditorContainer');
   if (!container) return;
@@ -388,8 +437,12 @@ async function renderPairingsInEditor() {
   });
 }
 
+/**
+ * Set the status message in the editor
+ */
 export function setStatus(msg) {
   el('status').textContent = msg;
 }
 
 export { renderPairingsInEditor };
+
