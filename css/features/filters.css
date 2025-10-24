@@ -1,0 +1,467 @@
+/* =============================
+   Filters Feature Styles - Modern 2025 Design
+   ============================= */
+
+/* Filter button with badge */
+.filter-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast) var(--ease);
+  cursor: pointer;
+  min-width: 44px;
+  justify-content: center;
+}
+
+.filter-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.filter-btn:active {
+  transform: scale(0.96);
+}
+
+.filter-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.filter-btn span:not(.filter-badge) {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .filter-btn {
+    padding: 8px 16px;
+  }
+  .filter-btn span:not(.filter-badge) {
+    display: inline;
+  }
+}
+
+.filter-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--gradient-primary);
+  color: #ffffff;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 5px;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+}
+
+/* Filter overlay */
+.filter-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition) var(--ease), visibility var(--transition) var(--ease);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.filter-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Filter panel - modern slide in from right */
+.filter-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 85vw);
+  background: var(--bg);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-panel.active {
+  transform: translateX(0);
+}
+
+/* Multi-select dropdown for types */
+.filter-multiselect {
+  position: relative;
+}
+
+.filter-multiselect-trigger {
+
+/* Filter panel header */
+  justify-content: space-between;
+.filter-panel-header {
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 20px 24px;
+  padding-top: calc(24px + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-multiselect-trigger:hover {
+  border-color: var(--primary-light);
+  font-size: 22px;
+}
+
+.filter-multiselect-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.filter-multiselect-arrow {
+  transition: transform var(--transition-fast) var(--ease);
+  color: var(--text-secondary);
+}
+
+.filter-multiselect-dropdown.active + .filter-multiselect-trigger .filter-multiselect-arrow {
+  transform: rotate(180deg);
+}
+
+.filter-multiselect-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all var(--transition) var(--ease);
+  box-shadow: var(--shadow-lg);
+}
+
+.filter-multiselect-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  display: flex;
+  align-items: center;
+.filter-multiselect-option {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background var(--transition-fast) var(--ease);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.filter-multiselect-option:last-child {
+  border-bottom: none;
+}
+
+.filter-multiselect-option:hover {
+  background: var(--bg-secondary);
+}
+
+.filter-multiselect-option input[type="checkbox"] {
+  width: 24px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+
+  border-radius: 6px;
+  margin-right: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+.filter-multiselect-option input[type="checkbox"]:checked {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  -webkit-overflow-scrolling: touch;
+}
+.filter-multiselect-option-label {
+/* Filter section */
+.filter-section {
+  font-weight: 500;
+  margin-bottom: 28px;
+}
+
+.filter-multiselect-check {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity var(--transition-fast) var(--ease);
+}
+
+.filter-multiselect-option input[type="checkbox"]:checked ~ .filter-multiselect-check {
+  opacity: 1;
+
+.filter-section:last-child {
+/* Place search component */
+.filter-place-search {
+
+.filter-section-title {
+  gap: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+.filter-place-input {
+  width: 100%;
+  padding: 14px 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+  font-size: 15px;
+/* Modern filter checkboxes */
+.filter-checkbox {
+  display: flex;
+.filter-place-input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.filter-place-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 8px;
+  background: var(--card);
+.filter-place-option {
+  border-radius: 12px;
+  transition: all var(--transition-fast) var(--ease);
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+}
+  transition: all var(--transition-fast) var(--ease);
+
+.filter-checkbox input[type="checkbox"]:hover {
+.filter-place-option:hover {
+  background: var(--card-hover);
+  border-color: var(--primary-light);
+  transform: translateX(2px);
+  background: var(--gradient-primary);
+  border-color: var(--primary);
+.filter-place-option input[type="checkbox"] {
+
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  margin-right: 12px;
+  top: 2px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  background: var(--bg);
+}
+
+.filter-place-option input[type="checkbox"]:checked {
+  background: var(--gradient-primary);
+  border-color: var(--primary);
+}
+
+.filter-place-option-label {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.filter-place-check {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity var(--transition-fast) var(--ease);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+.filter-place-option input[type="checkbox"]:checked ~ .filter-place-check {
+  opacity: 1;
+  flex: 1;
+  font-size: 15px;
+/* Star rating in filters */
+.filter-star-rating {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  transition: border-color var(--transition-fast) var(--ease);
+}
+
+.filter-star-rating:hover {
+  border-color: var(--primary-light);
+.filter-star-container {
+  margin-top: 8px;
+}
+
+.filter-star-container .star-rating {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.filter-star-container .star {
+  font-size: 28px;
+.filter-star-container .star:hover {
+}
+
+.filter-range-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+.filter-range-input {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--bg-secondary) 0%, var(--bg-secondary) 100%);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.filter-range-input::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+}
+
+.filter-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  transition: all var(--transition-fast) var(--ease);
+  margin-top: -8px;
+}
+
+.filter-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+}
+
+.filter-range-input::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.filter-range-input::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  border: none;
+}
+
+.filter-range-input::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  transition: all var(--transition-fast) var(--ease);
+}
+
+.filter-range-input::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+}
+
+.filter-range-input::-moz-range-thumb:active {
+  transform: scale(1.05);
+}
+
+/* Empty state */
+.filter-empty-state {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  background: var(--card);
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  font-style: italic;
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .filter-overlay {
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .filter-panel {
+    box-shadow: -4px 0 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .filter-checkbox input[type="checkbox"] {
+    background: var(--bg-secondary);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .filter-panel {
+    width: 100vw;
+  }
+
+  .filter-panel-header {
+    padding: 20px 20px 16px 20px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+
+  .filter-panel-body {
+    padding: 16px 20px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .filter-panel-title {
+    font-size: 20px;
+  }
+}
+
+/* Smooth animations */
+@media (prefers-reduced-motion: reduce) {
+  .filter-panel,
+  .filter-overlay,
+  .filter-checkbox,
+  .filter-range-input::-webkit-slider-thumb,
+  .filter-range-input::-moz-range-thumb {
+    transition: none;
+  }
+}

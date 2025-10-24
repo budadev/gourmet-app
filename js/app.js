@@ -15,10 +15,15 @@ import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers
 import { lookupByBarcode } from './external/openFoodFacts.js';
 import { initUpdateManager } from './updateManager.js';
 import { initSideMenu } from './features/sideMenu.js';
+import { initFilters, applyFilters, setFilterChangeCallback } from './features/filters.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
-  const items = await searchByText(query);
+  let items = await searchByText(query);
+
+  // Apply filters to the search results
+  items = applyFilters(items);
+
   renderList(items, (id) => {
     showItemDetails(
       id,
@@ -34,6 +39,12 @@ async function initApp() {
 
   // Setup search (reuse refreshList behavior)
   setupSearch(async () => { await refreshList(); });
+
+  // Initialize filters
+  await initFilters();
+  setFilterChangeCallback(async () => {
+    await refreshList();
+  });
 
   // Barcode scan from header
   el('barcodeScanBtn').onclick = async () => {

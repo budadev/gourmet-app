@@ -1,12 +1,18 @@
 {
-  "version": "0.0.31",
+  "version": "0.0.32",
   "releaseDate": "2025-10-24",
   "changes": [
+    "Redesigned Filter UI with modern 2025 aesthetics",
+    "Filter panel now slides from right (similar to hamburger menu)",
+    "Panel width reduced to 85vw/360px (doesn't cover entire screen)",
+    "Added multi-select dropdown for Type filter",
+    "Added searchable place selector (shows all places by default)",
+    "Added star rating selectors for min/max rating (same as item editor)",
+    "Removed shadow artifact from home screen",
+    "Filter panel can be closed by clicking overlay",
     "Enhanced Export: iOS installed PWA now opens native share sheet directly (AirDrop/Mail/Files) with JSON file attachment",
-    "Always shows success notification even if share is cancelled (per requirement)",
     "Added 'Where did you buy it?' functionality with place tracking",
     "Fixed iOS keyboard handling and scroll positioning",
-    "Optimized scroll behavior for iOS PWA",
     "Pairing selector: Unpaired items now shown first; already paired items greyed out and labeled Good/Bad with color coding"
   ]
 }

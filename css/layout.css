@@ -18,7 +18,21 @@ header{
     padding-right:calc(20px + env(safe-area-inset-right));
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+}
+
+.hamburger-btn {
+    order: 1;
+}
+
+.filter-btn {
+    order: 3;
+    margin-left: auto;
+}
+
+.search-wrapper {
+    order: 2;
+    flex: 1;
 }
 
 h1{

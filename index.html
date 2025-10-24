@@ -38,8 +38,8 @@ How to use:
     <link rel="stylesheet" href="css/features/update-banner.css" />
     <link rel="stylesheet" href="css/features/side-menu.css" />
     <link rel="stylesheet" href="css/features/places.css" />
+    <link rel="stylesheet" href="css/features/filters.css" />
 
-    <!-- Inline loading screen styles to show immediately -->
     <style>
         #appLoader {
             position: fixed;
@@ -99,6 +99,13 @@ How to use:
         <div class="hamburger-line"></div>
         <div class="hamburger-line"></div>
     </button>
+    <button class="filter-btn" id="filterBtn" title="Filter items">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+        <span>Filter</span>
+        <span class="filter-badge" id="filterBadge">0</span>
+    </button>
     <div class="search-wrapper">
         <label for="searchInput" class="visually-hidden">Search items</label>
         <input id="searchInput" type="text" placeholder="Search for your gourmet items…"/>
@@ -151,7 +158,7 @@ How to use:
     </div>
 </nav>
 
-<!-- Hidden file input for import -->
+<!-- File input for import -->
 <input type="file" id="importFileInput" class="hidden-file-input" accept=".json" />
 
 <!-- About Dialog -->
@@ -191,40 +198,31 @@ How to use:
     <div id="scannerModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <button class="back-btn" id="backScannerBtn" aria-label="Back">‹</button>
+                <button class="back-btn" id="backScanBtn" aria-label="Back">‹</button>
                 <h2>Scan Barcode</h2>
             </div>
             <div class="modal-body">
-                <div style="position:relative">
-                    <video id="preview" playsinline></video>
-                </div>
-                <div class="muted" style="margin-top:8px;text-align:center" id="scanHint"></div>
-            </div>
-            <div class="modal-footer">
-                <div class="row" style="margin:0"></div>
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display:none"></canvas>
+                <div id="scanStatus" class="muted" style="text-align:center;margin-top:12px"></div>
             </div>
         </div>
     </div>
 
-    <!-- Item details modal -->
+    <!-- Details Modal -->
     <div id="detailsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <button class="back-btn" id="backDetailsBtn" aria-label="Back">‹</button>
-                <h2>Item Details</h2>
+                <h2 id="detailsTitle">Item Details</h2>
             </div>
-            <div class="modal-body">
-                <div id="detailsContent"></div>
-            </div>
-            <div class="modal-footer">
-                <div class="row" style="margin:0" id="detailsButtons">
-                    <!-- Buttons will be dynamically inserted here -->
-                </div>
+            <div class="modal-body" id="detailsContent">
+                <!-- Dynamic content will be inserted here -->
             </div>
         </div>
     </div>
 
-    <!-- Editor modal -->
+    <!-- Editor Modal -->
     <div id="editorModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -245,6 +243,33 @@ How to use:
         </div>
     </div>
 
+    <!-- Pairing selector modal -->
+    <div id="pairingSelectorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="back-btn" id="backPairingSelectorBtn" aria-label="Back">‹</button>
+                <h2 id="pairingSelectorTitle">Select Item to Pair</h2>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:16px">
+                    <div class="search-wrapper">
+                        <label for="pairingSearchInput" class="visually-hidden">Search items to pair</label>
+                        <input id="pairingSearchInput" type="text" placeholder="Search items to pair..."/>
+                        <button class="barcode-btn" id="pairingBarcodeScanBtn" title="Scan barcode">
+                            <img src="icons/barcode.png" alt="Scan barcode" />
+                        </button>
+                    </div>
+                </div>
+                <div id="pairingItemsList" class="list" style="max-height:400px;overflow-y:auto"></div>
+                <div class="muted" style="margin-top:8px;text-align:center" id="pairingStatus"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="row" style="margin:0">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Items list -->
     <div id="results" class="list"></div>
 </main>
@@ -261,28 +286,41 @@ How to use:
     <img id="photoModalImg" src="" alt="Full size photo" />
 </div>
 
-<!-- Pairing selector modal -->
-<div id="pairingSelectorModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <button class="back-btn" id="backPairingSelectorBtn" aria-label="Back">‹</button>
-            <h2 id="pairingSelectorTitle">Select Item to Pair</h2>
+<!-- Filter Panel -->
+<div class="filter-overlay" id="filterOverlay"></div>
+<div class="filter-panel" id="filterPanel">
+    <div class="filter-panel-header">
+        <div class="filter-panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            Filters
         </div>
-        <div class="modal-body">
-            <div style="margin-bottom:16px">
-                <div class="search-wrapper">
-                    <label for="pairingSearchInput" class="visually-hidden">Search items to pair</label>
-                    <input id="pairingSearchInput" type="text" placeholder="Search items to pair..."/>
-                    <button class="barcode-btn" id="pairingBarcodeScanBtn" title="Scan barcode">
-                        <img src="icons/barcode.png" alt="Scan barcode" />
-                    </button>
+        <button class="clear-filters-btn" id="clearFiltersBtn">Clear All</button>
+    </div>
+    <div class="filter-panel-body">
+        <!-- Type Filter -->
+        <div class="filter-section">
+            <div class="filter-section-title">Type</div>
+            <div id="typeDropdownContainer"></div>
+        </div>
+
+        <!-- Places Filter -->
+        <div class="filter-section">
+            <div class="filter-section-title">Where did you buy it?</div>
+            <div id="placeSearchContainer"></div>
+        </div>
+
+        <!-- Rating Filter -->
+        <div class="filter-section">
+            <div class="filter-section-title">Rating</div>
+            <div class="filter-range-group">
+                <div class="filter-range-item">
+                    <div id="minRatingContainer"></div>
                 </div>
-            </div>
-            <div id="pairingItemsList" class="list" style="max-height:400px;overflow-y:auto"></div>
-            <div class="muted" style="margin-top:8px;text-align:center" id="pairingStatus"></div>
-        </div>
-        <div class="modal-footer">
-            <div class="row" style="margin:0">
+                <div class="filter-range-item">
+                    <div id="maxRatingContainer"></div>
+                </div>
             </div>
         </div>
     </div>
