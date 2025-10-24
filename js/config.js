@@ -16,7 +16,8 @@ export async function loadConfig() {
     ITEM_TYPES_CONFIG = {
       wine: { label: 'Wine', icon: '🍷', fields: [] },
       cheese: { label: 'Cheese', icon: '🧀', fields: [] },
-      olives: { label: 'Olives', icon: '🫒', fields: [] }
+      olives: { label: 'Olives', icon: '🫒', fields: [] },
+      ham: { label: 'Ham', icon: '🍖', fields: []}
     };
     return ITEM_TYPES_CONFIG;
   }
