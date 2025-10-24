@@ -209,42 +209,49 @@ function renderEditorFields(selectedType, itemData = {}) {
 function setupInputFocusHandling() {
   const editorModal = el('editorModal');
   if (!editorModal) return;
-  const scrollContainer = editorModal.querySelector('.modal-body');
+  const scrollContainer = editorModal.querySelector('.modal-content');
   const header = editorModal.querySelector('.modal-header');
   if (!scrollContainer || !header) return;
 
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
   function ensureVisible(input){
     if (!input) return;
+    // Second pass after keyboard settle
     const attempt = () => {
       const headerRect = header.getBoundingClientRect();
       const containerRect = scrollContainer.getBoundingClientRect();
       const inputRect = input.getBoundingClientRect();
-      const topGap = 8;
-      const bottomGap = 56; // space above keyboard
 
-      // Above header zone
-      if (inputRect.top < headerRect.bottom + topGap){
+      const topGap = 8; // space below header
+      const bottomGap = 56; // breathing space above keyboard area
+
+      // If input sits above header bottom + gap
+      if (inputRect.top < headerRect.bottom + topGap) {
         const delta = (headerRect.bottom + topGap) - inputRect.top;
         scrollContainer.scrollTop -= delta;
       }
-      // Below bottom visible area
-      else if (inputRect.bottom > containerRect.bottom - bottomGap){
+      // If input bottom is below container bottom - bottomGap
+      else if (inputRect.bottom > containerRect.bottom - bottomGap) {
         const delta = inputRect.bottom - (containerRect.bottom - bottomGap);
         scrollContainer.scrollTop += delta;
       }
     };
     attempt();
-    setTimeout(attempt, 250);
+    setTimeout(attempt, 300); // re-adjust after potential visualViewport resize
   }
 
   window.__scrollEditorFieldIntoView = ensureVisible;
+
   const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
   inputs.forEach(inp => inp.addEventListener('focus', () => ensureVisible(inp)));
 
   if (window.visualViewport){
     window.visualViewport.addEventListener('resize', () => {
       const active = document.activeElement;
-      if (active && editorModal.contains(active) && /INPUT|TEXTAREA/.test(active.tagName)) ensureVisible(active);
+      if (active && editorModal.contains(active) && /INPUT|TEXTAREA/.test(active.tagName)) {
+        ensureVisible(active);
+      }
     });
   }
 }
