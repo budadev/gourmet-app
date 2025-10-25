@@ -63,30 +63,39 @@ async function startCamera(onScanComplete) {
   const vid = el('video');
   el('scanStatus').textContent = 'Starting camera…';
 
-  // Reset any prior decoding session
   try { codeReader.reset(); } catch(_) {}
 
-  // Enumerate once (permission prompt may occur here if not yet granted)
   if (!availableCameras.length) {
     availableCameras = await getAvailableCameras();
   }
   const deviceId = availableCameras[currentCameraIndex]?.deviceId;
 
-  // Ensure video element is immediately visible (CSS now shows it black until frames come)
-  vid.classList.add('active');
+  // Ensure video element is immediately visible (black placeholder until frames arrive)
+  vid.style.visibility = 'visible';
+
+  // Wait for metadata BEFORE starting decode so ZXing sees correct dimensions
+  await new Promise((resolve) => {
+    if (vid.readyState >= vid.HAVE_METADATA) return resolve();
+    const handler = () => { vid.removeEventListener('loadedmetadata', handler); resolve(); };
+    vid.addEventListener('loadedmetadata', handler);
+    // Fallback: if metadata not fired within 750ms, continue anyway
+    setTimeout(() => { vid.removeEventListener('loadedmetadata', handler); resolve(); }, 750);
+  });
 
   // Use ZXing to manage the stream (single stream open = faster, less flicker)
   try {
     codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
-      // On first error before frames, show status (ignore decode errors after running)
-      if (err && !res && el('scanStatus').textContent.startsWith('Starting')) {
-        showCameraError(err);
-      }
       if (res) {
+        // Clear status on first successful decode
+        el('scanStatus').textContent = `Scanned: ${res.getText()}`;
         const code = res.getText();
-        el('scanStatus').textContent = `Scanned: ${code}`;
         stopScan();
         if (currentOnScanComplete) await currentOnScanComplete(code);
+      } else if (err) {
+        // Ignore NotFoundException spam; show other errors only once during startup
+        if (err.name && err.name !== 'NotFoundException' && el('scanStatus').textContent.startsWith('Starting')) {
+          showCameraError(err);
+        }
       }
     });
   } catch(e) {
@@ -95,14 +104,14 @@ async function startCamera(onScanComplete) {
     scanStarting = false;
   }
 
-  // When metadata loads, clear the status (gives quick feedback while camera warms up)
-  const onMeta = () => {
-    vid.removeEventListener('loadedmetadata', onMeta);
+  // Clear the starting status once video begins playing (if not yet cleared)
+  const clearStatus = () => {
     if (el('scanStatus').textContent.startsWith('Starting')) {
       el('scanStatus').textContent = '';
     }
+    vid.removeEventListener('playing', clearStatus);
   };
-  vid.addEventListener('loadedmetadata', onMeta);
+  vid.addEventListener('playing', clearStatus);
 }
 
 export async function startScan(onScanComplete) {
