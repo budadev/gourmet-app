@@ -6,7 +6,6 @@ import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from 'https:/
 import { el } from '../utils.js';
 
 const hints = new Map();
-hints.set(DecodeHintType.TRY_HARDER, true);
 hints.set(DecodeHintType.ALSO_INVERTED, true);
 hints.set(DecodeHintType.POSSIBLE_FORMATS, [
   BarcodeFormat.EAN_13,
@@ -14,6 +13,12 @@ hints.set(DecodeHintType.POSSIBLE_FORMATS, [
   BarcodeFormat.CODE_128,
 ]);
 const codeReader = new BrowserMultiFormatReader(hints);
+
+const rotatedHints = new Map(hints);
+rotatedHints.set(DecodeHintType.TRY_HARDER, true);
+const rotatedCodeReader = new BrowserMultiFormatReader(rotatedHints);
+
+let scanningWithRotatedReader = false;
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
@@ -47,70 +52,107 @@ async function startCamera(onScanComplete) {
   };
 
   const runDecoder = async () => {
-    try { codeReader.reset(); } catch(_) {}
+    try {
+      codeReader.reset();
+      rotatedCodeReader.reset();
+    } catch (_) {}
     // Clean previous
     if (vid && vid.srcObject) {
-      try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
+      try {
+        vid.srcObject.getTracks().forEach(t => t.stop());
+      } catch (_) {}
       vid.srcObject = null;
     }
 
     // Validate stored preferred back camera still exists
     try {
       const devs = await navigator.mediaDevices.enumerateDevices();
-      const vidsList = devs.filter(d=>d.kind==='videoinput');
-      if (preferredBackCameraId && !vidsList.some(d=>d.deviceId === preferredBackCameraId)) {
+      const vidsList = devs.filter(d => d.kind === 'videoinput');
+      if (preferredBackCameraId && !vidsList.some(d => d.deviceId === preferredBackCameraId)) {
         preferredBackCameraId = null;
-        try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+        try {
+          localStorage.removeItem(BACK_CAM_KEY);
+        } catch (_) {}
       }
-    } catch(_) {}
+    } catch (_) {}
 
     // Build constraints only referencing deviceId if we already know the back cam
-    const constraints = { video: buildVideoConstraints() };
+    const constraints = {
+      video: buildVideoConstraints()
+    };
     let decodeSucceeded = false;
-    try {
-      await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
-        if (res) {
-          const code = res.getText();
-            el('scanStatus').textContent = `✅ ${code}`;
-            stopScan();
-            if (onScanComplete) await onScanComplete(code);
-        }
-      });
-      decodeSucceeded = true;
-    } catch (err) {
-      if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        if (preferredBackCameraId) {
-          // Stored back camera no longer valid; clear and retry with environment
-            preferredBackCameraId = null;
-            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
-            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
-              if (res) {
-                const code = res.getText();
-                el('scanStatus').textContent = `✅ ${code}`;
-                stopScan();
-                if (onScanComplete) await onScanComplete(code);
-              }
-            });
-            decodeSucceeded = true;
-        } else if (!preferredBackCameraId) {
-          // Retry minimal fallback (still prefer environment)
-          el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
-            if (res) {
-              const code = res.getText();
-              el('scanStatus').textContent = `✅ ${code}`;
-              stopScan();
-              if (onScanComplete) await onScanComplete(code);
-            }
-          });
-          decodeSucceeded = true;
-        }
-      } else {
-        throw err;
+
+    const onDecode = async (res, err) => {
+      if (res) {
+        decodeSucceeded = true;
+        const code = res.getText();
+        el('scanStatus').textContent = `✅ ${code}`;
+        stopScan();
+        if (onScanComplete) await onScanComplete(code);
       }
+    };
+
+    const startReader = async (reader, readerConstraints) => {
+      try {
+        await reader.decodeFromConstraints(readerConstraints, vid, onDecode);
+        decodeSucceeded = true;
+      } catch (err) {
+        if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+          if (preferredBackCameraId) {
+            // Stored back camera no longer valid; clear and retry with environment
+            preferredBackCameraId = null;
+            try {
+              localStorage.removeItem(BACK_CAM_KEY);
+            } catch (_) {}
+            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
+            await reader.decodeFromConstraints({
+              video: {
+                facingMode: {
+                  ideal: 'environment'
+                }
+              }
+            }, vid, onDecode);
+            decodeSucceeded = true;
+          } else if (!preferredBackCameraId) {
+            // Retry minimal fallback (still prefer environment)
+            el('scanStatus').textContent = '🔄 Adjusting camera settings…';
+            await reader.decodeFromConstraints({
+              video: {
+                facingMode: {
+                  ideal: 'environment'
+                }
+              }
+            }, vid, onDecode);
+            decodeSucceeded = true;
+          }
+        } else {
+          throw err;
+        }
+      }
+    };
+
+    try {
+      scanningWithRotatedReader = false;
+      await startReader(codeReader, constraints);
+
+      setTimeout(() => {
+        if (!decodeSucceeded && el('scannerModal').classList.contains('active')) {
+          codeReader.reset();
+          scanningWithRotatedReader = true;
+          el('scanStatus').textContent = 'Trying rotated scan...';
+          startReader(rotatedCodeReader, constraints);
+        }
+      }, 2500);
+
+    } catch (err) {
+      throw err;
     }
-    if (!decodeSucceeded) throw new Error('Could not start decoder');
+
+    if (!decodeSucceeded) {
+      // This part might not be reached if decodeFromConstraints is blocking and never rejects without a device error.
+      // But as a fallback:
+      // throw new Error('Could not start decoder');
+    }
 
     // Wait for readiness
     await new Promise(r => {
@@ -213,22 +255,30 @@ export async function startScan(onScanComplete) {
 }
 
 export function stopScan() {
-  try { codeReader.reset(); } catch(_) {}
+  try {
+    codeReader.reset();
+    rotatedCodeReader.reset();
+  } catch (_) {}
   const vid = el('video');
   if (vid && vid.srcObject) {
-    try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
+    try {
+      vid.srcObject.getTracks().forEach(t => t.stop());
+    } catch (_) {}
     vid.srcObject = null;
   }
   if (currentStream) {
     if (currentStream._focusInterval) {
       clearInterval(currentStream._focusInterval);
     }
-    try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
+    try {
+      currentStream.getTracks().forEach(t => t.stop());
+    } catch (_) {}
     currentStream = null;
   }
   el('scannerModal').classList.remove('active');
   el('scanStatus').textContent = '';
   opening = false;
+  scanningWithRotatedReader = false;
 }
 
 export async function startScanForInput(onScanComplete) {
