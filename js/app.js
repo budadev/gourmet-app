@@ -4,7 +4,7 @@
 
 import { loadConfig } from './config.js';
 import { el, enhanceSelectInteractivity } from './utils.js';
-import { searchByText, findByBarcode } from './db.js';
+import { searchByText, findByBarcode, ensureDbReady } from './db.js';
 import { setupSearch, setSearchValue } from './features/search.js';
 import { renderList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
@@ -35,6 +35,9 @@ async function refreshList() {
 }
 
 async function initApp() {
+  // Ensure database is ready before any operations
+  await ensureDbReady();
+
   // Load configuration
   await loadConfig();
 

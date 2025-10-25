@@ -219,7 +219,7 @@ async function startCamera(onScanComplete) {
     });
 
     Quagga.start();
-    el('scanStatus').textContent = 'Point camera at barcode (any rotation OK)';
+    el('scanStatus').textContent = 'Point camera at barcode to scan';
 
     // Helpful message after delay
     setTimeout(() => {

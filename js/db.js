@@ -6,29 +6,53 @@ const DB_NAME = 'gourmetapp-db';
 const STORE = 'items';
 const PLACES_STORE = 'places';
 
-const dbp = new Promise((resolve, reject) => {
-  const req = indexedDB.open(DB_NAME, 2);
-  req.onupgradeneeded = (event) => {
-    const db = req.result;
-    const oldVersion = event.oldVersion;
+let dbp = null;
+let dbInitialized = false;
 
-    // Version 1: items store
-    if (oldVersion < 1) {
-      const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-      store.createIndex('by_barcode', 'barcode', { unique: false });
-      store.createIndex('by_name', 'name', { unique: false });
-      store.createIndex('by_type', 'type', { unique: false });
-    }
+function initDb() {
+  if (dbp) return dbp;
 
-    // Version 2: places store
-    if (oldVersion < 2) {
-      const placesStore = db.createObjectStore(PLACES_STORE, { keyPath: 'id', autoIncrement: true });
-      placesStore.createIndex('by_name', 'name', { unique: false });
-    }
-  };
-  req.onsuccess = () => resolve(req.result);
-  req.onerror = () => reject(req.error);
-});
+  dbp = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = (event) => {
+      const db = req.result;
+      const oldVersion = event.oldVersion;
+
+      // Version 1: items store
+      if (oldVersion < 1) {
+        const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+        store.createIndex('by_barcode', 'barcode', { unique: false });
+        store.createIndex('by_name', 'name', { unique: false });
+        store.createIndex('by_type', 'type', { unique: false });
+      }
+
+      // Version 2: places store
+      if (oldVersion < 2) {
+        const placesStore = db.createObjectStore(PLACES_STORE, { keyPath: 'id', autoIncrement: true });
+        placesStore.createIndex('by_name', 'name', { unique: false });
+      }
+    };
+    req.onsuccess = () => {
+      dbInitialized = true;
+      resolve(req.result);
+    };
+    req.onerror = () => reject(req.error);
+  });
+
+  return dbp;
+}
+
+// Ensure database is initialized and ready
+export async function ensureDbReady() {
+  if (!dbp) {
+    initDb();
+  }
+  await dbp;
+  return dbInitialized;
+}
+
+// Initialize database on module load
+initDb();
 
 async function tx(mode = 'readonly', storeName = STORE) {
   const db = await dbp;
