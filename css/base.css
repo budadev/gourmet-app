@@ -8,9 +8,6 @@ html{
     overflow-x:hidden;
     width:100%;
     position:relative;
-    /* Lock orientation to portrait */
-    transform: rotate(0deg);
-    transform-origin: center;
     /* Removed direct safe-area paddings to avoid double spacing; handled in header/modals */
 }
 
@@ -26,9 +23,6 @@ body{
     min-height:100vh;
     /* Remove padding-bottom; use pseudo-element instead to paint safe-area */
     padding-bottom:env(safe-area-inset-bottom);
-    /* Lock orientation */
-    width: 100vw;
-    overflow-x: hidden;
 }
 body::after{display:none;}
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.0.39",
+  "version": "0.0.38",
   "releaseDate": "2025-10-25",
   "changes": [
     "Enhanced barcode scanner with multi-orientation support (90°, 180°, 270°)",

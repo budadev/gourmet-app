@@ -38,10 +38,6 @@ async function getAvailableCameras() {
 
 // Try to decode barcode at multiple orientations (0°, 90°, 180°, 270°)
 async function tryDecodeWithRotations(video) {
-  if (!video.videoWidth || !video.videoHeight) {
-    return null;
-  }
-
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -54,7 +50,7 @@ async function tryDecodeWithRotations(video) {
 
   // Try decoding at original orientation first (fastest)
   try {
-    const result = await codeReader.decodeFromCanvas(canvas);
+    const result = await codeReader.decodeFromImageElement(video);
     if (result) return result;
   } catch (e) {
     // No barcode found at 0°, try other orientations
