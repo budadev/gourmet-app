@@ -1,11 +1,41 @@
 /* =============================
    Barcode Scanner (ZXing Integration)
+   — Primary: BrowserMultiFormatReader (fast, reliable for 0°/180°)
+   — Fallback: MultiFormatReader snapshot at 90°/270° (for vertical labels)
    ============================= */
 
-import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import {
+  BrowserMultiFormatReader,
+  MultiFormatReader,
+  DecodeHintType,
+  BarcodeFormat,
+  RGBLuminanceSource,
+  HybridBinarizer,
+  BinaryBitmap,
+  NotFoundException
+} from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
+/* ---------- Readers & Hints ---------- */
 const codeReader = new BrowserMultiFormatReader();
+
+const fallbackHints = new Map();
+fallbackHints.set(DecodeHintType.TRY_HARDER, true);
+fallbackHints.set(DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+  BarcodeFormat.CODE_128,
+  BarcodeFormat.CODE_39,
+  BarcodeFormat.ITF,
+  BarcodeFormat.QR_CODE
+]);
+
+const coreReader = new MultiFormatReader();
+coreReader.setHints(fallbackHints);
+
+/* ---------- State ---------- */
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
@@ -14,12 +44,114 @@ let preferredBackCameraId = null; // remembered back camera id after first succe
 const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
 try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
 
-/* ...existing code... */
+let fallbackInterval = null;       // snapshot-based 90°/270° decode
+let lastPrimaryHitAt = 0;          // throttle fallback when primary is hot
+let lastFallbackRunAt = 0;         // throttle fallback frequency
+let fallbackCooldownMs = 240;      // how often we try rotated snapshot (kept low-CPU)
+let fallbackIdleBeforeMs = 350;    // how long to wait since last primary attempt
 
+// One offscreen canvas for fallback decoding (keeps perf stable)
+const offCanvas = document.createElement('canvas');
+const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+/* ---------- Camera Focus Helper (unchanged) ---------- */
+async function applyAdvancedCameraSettings(track) {
+  // keep your existing focusing behavior if you had any external helper
+  // here we just periodically call applyConstraints for continuous focus
+  const interval = setInterval(async () => {
+    try {
+      await track.applyConstraints({
+        advanced: [{ focusMode: 'continuous' }]
+      });
+    } catch (_) {}
+  }, 1500);
+  return interval;
+}
+
+/* ---------- Fallback decoding from snapshot ---------- */
+function drawRotated(video, rotation) {
+  const vw = Math.max(1, video.videoWidth || 1280);
+  const vh = Math.max(1, video.videoHeight || 720);
+
+  // modest downscale to keep CPU low
+  const MAX_W = 1024;
+  const scale = Math.min(1, MAX_W / vw);
+  const sw = Math.round(vw * scale);
+  const sh = Math.round(vh * scale);
+
+  if (rotation === 90 || rotation === 270) {
+    offCanvas.width = sh;
+    offCanvas.height = sw;
+  } else {
+    offCanvas.width = sw;
+    offCanvas.height = sh;
+  }
+
+  offCtx.save();
+  switch (rotation) {
+    case 90:
+      offCtx.translate(offCanvas.width, 0);
+      offCtx.rotate(Math.PI / 2);
+      break;
+    case 180:
+      offCtx.translate(offCanvas.width, offCanvas.height);
+      offCtx.rotate(Math.PI);
+      break;
+    case 270:
+      offCtx.translate(0, offCanvas.height);
+      offCtx.rotate(3 * Math.PI / 2);
+      break;
+    default:
+      // 0°
+      break;
+  }
+  offCtx.drawImage(video, 0, 0, sw, sh);
+  offCtx.restore();
+}
+
+function decodeCanvas() {
+  const { width, height } = offCanvas;
+  if (!width || !height) return null;
+
+  const img = offCtx.getImageData(0, 0, width, height);
+  const lum = new RGBLuminanceSource(img.data, width, height);
+  const bitmap = new BinaryBitmap(new HybridBinarizer(lum));
+  try {
+    const res = coreReader.decodeWithState(bitmap);
+    return res?.getText?.() || null;
+  } catch (e) {
+    if (e instanceof NotFoundException) return null;
+    return null;
+  }
+}
+
+function tryFallbackAngles(video) {
+  // Only 90° and 270° — that’s what fixes "vertical" bottle labels.
+  drawRotated(video, 90);
+  let text = decodeCanvas();
+  if (text) return text;
+
+  drawRotated(video, 270);
+  text = decodeCanvas();
+  if (text) return text;
+
+  return null;
+}
+
+/* ---------- Original startCamera with minimal changes ---------- */
 async function startCamera(onScanComplete) {
   if (opening) return; // guard
   opening = true;
   const vid = el('video');
+
+  // iOS PWA autoplay friendliness
+  try {
+    vid.setAttribute('playsinline', 'true');
+    vid.setAttribute('webkit-playsinline', 'true');
+    vid.muted = true;
+    vid.autoplay = true;
+  } catch (_) {}
+
   let focusInterval = null;
   el('scanStatus').textContent = '📷 Initializing camera…';
   let triedBackSwitch = false;
@@ -56,59 +188,70 @@ async function startCamera(onScanComplete) {
       }
     } catch(_) {}
 
-    // Build constraints only referencing deviceId if we already know the back cam
     const constraints = { video: buildVideoConstraints() };
-    let decodeSucceeded = false;
+
+    // --- Primary fast decoder (kept exactly as your working approach) ---
     try {
       await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
+        // ZXing calls this frequently; err is common when no code yet
         if (res) {
+          lastPrimaryHitAt = performance.now();
           const code = res.getText();
-            el('scanStatus').textContent = `✅ ${code}`;
-            stopScan();
-            if (onScanComplete) await onScanComplete(code);
+          el('scanStatus').textContent = `✅ ${code}`;
+          stopScan();
+          if (onScanComplete) await onScanComplete(code);
         }
       });
-      decodeSucceeded = true;
     } catch (err) {
       if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
         if (preferredBackCameraId) {
           // Stored back camera no longer valid; clear and retry with environment
-            preferredBackCameraId = null;
-            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
-            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+          preferredBackCameraId = null;
+          try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+          el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
+          await codeReader.decodeFromConstraints(
+            { video: { facingMode: { ideal: 'environment' } } },
+            vid,
+            async (res) => {
               if (res) {
+                lastPrimaryHitAt = performance.now();
                 const code = res.getText();
                 el('scanStatus').textContent = `✅ ${code}`;
                 stopScan();
                 if (onScanComplete) await onScanComplete(code);
               }
-            });
-            decodeSucceeded = true;
-        } else if (!preferredBackCameraId) {
+            }
+          );
+        } else {
           // Retry minimal fallback (still prefer environment)
           el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
-            if (res) {
-              const code = res.getText();
-              el('scanStatus').textContent = `✅ ${code}`;
-              stopScan();
-              if (onScanComplete) await onScanComplete(code);
+          await codeReader.decodeFromConstraints(
+            { video: { facingMode: { ideal: 'environment' } } },
+            vid,
+            async (res) => {
+              if (res) {
+                lastPrimaryHitAt = performance.now();
+                const code = res.getText();
+                el('scanStatus').textContent = `✅ ${code}`;
+                stopScan();
+                if (onScanComplete) await onScanComplete(code);
+              }
             }
-          });
-          decodeSucceeded = true;
+          );
         }
       } else {
         throw err;
       }
     }
-    if (!decodeSucceeded) throw new Error('Could not start decoder');
 
     // Wait for readiness
     await new Promise(r => {
       if (vid.readyState >= vid.HAVE_METADATA) return r();
       vid.addEventListener('loadedmetadata', () => r(), { once: true });
     });
+
+    // iOS sometimes needs explicit play
+    try { await vid.play(); } catch (_) {}
 
     currentStream = vid.srcObject;
     if (currentStream) {
@@ -136,14 +279,23 @@ async function startCamera(onScanComplete) {
               try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
               vid.srcObject = null;
               el('scanStatus').textContent = '🔁 Switching to back camera…';
-              await codeReader.decodeFromConstraints({ video: { deviceId: { exact: preferredBackCameraId }, width: { ideal:1920,max:1920 }, height:{ ideal:1080,max:1080 }, focusMode:'continuous', advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } }, vid, async (res, err2) => {
-                if (res) {
-                  const code = res.getText();
-                  el('scanStatus').textContent = `✅ ${code}`;
-                  stopScan();
-                  if (onScanComplete) await onScanComplete(code);
+              await codeReader.decodeFromConstraints(
+                { video: { deviceId: { exact: preferredBackCameraId },
+                           width: { ideal:1920,max:1920 },
+                           height:{ ideal:1080,max:1080 },
+                           focusMode:'continuous',
+                           advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } },
+                vid,
+                async (res) => {
+                  if (res) {
+                    lastPrimaryHitAt = performance.now();
+                    const code = res.getText();
+                    el('scanStatus').textContent = `✅ ${code}`;
+                    stopScan();
+                    if (onScanComplete) await onScanComplete(code);
+                  }
                 }
-              });
+              );
               // Wait metadata again
               await new Promise(r2 => {
                 if (vid.readyState >= vid.HAVE_METADATA) return r2();
@@ -160,13 +312,34 @@ async function startCamera(onScanComplete) {
           try {
             const newTrack = currentStream.getVideoTracks()[0];
             if (newTrack) {
-              focusInterval = await applyAdvancedCameraSettings(newTrack);
+              const focusInterval = await applyAdvancedCameraSettings(newTrack);
               currentStream._focusInterval = focusInterval;
             }
           } catch(_) {}
         }
       }
     }
+
+    // ---- Rotated fallback loop (low CPU) ----
+    // Only runs if no primary hits recently, and only every ~240ms.
+    stopFallbackLoop(); // ensure clean start
+    fallbackInterval = setInterval(() => {
+      const now = performance.now();
+      if ((now - lastPrimaryHitAt) < fallbackIdleBeforeMs) return;      // primary is active
+      if ((now - lastFallbackRunAt) < fallbackCooldownMs) return;       // throttle
+      lastFallbackRunAt = now;
+
+      const video = el('video');
+      if (!video || !video.videoWidth || !video.videoHeight) return;
+      if (!el('scannerModal').classList.contains('active')) return;
+
+      const text = tryFallbackAngles(video);
+      if (text) {
+        el('scanStatus').textContent = `✅ ${text}`;
+        stopScan();
+        if (onScanComplete) onScanComplete(text);
+      }
+    }, 80); // small timer; internal throttles handle real cadence
   };
 
   try {
@@ -196,6 +369,7 @@ async function startCamera(onScanComplete) {
   }
 }
 
+/* ---------- Public API (unchanged) ---------- */
 export async function startScan(onScanComplete) {
   if (opening) return; // prevent double trigger
   el('scannerModal').classList.add('active');
@@ -206,6 +380,9 @@ export async function startScan(onScanComplete) {
 
 export function stopScan() {
   try { codeReader.reset(); } catch(_) {}
+  try { coreReader.reset(); } catch(_) {}
+  stopFallbackLoop();
+
   const vid = el('video');
   if (vid && vid.srcObject) {
     try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
@@ -214,6 +391,7 @@ export function stopScan() {
   if (currentStream) {
     if (currentStream._focusInterval) {
       clearInterval(currentStream._focusInterval);
+      currentStream._focusInterval = null;
     }
     try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
     currentStream = null;
@@ -225,4 +403,12 @@ export function stopScan() {
 
 export async function startScanForInput(onScanComplete) {
   await startScan(onScanComplete);
+}
+
+/* ---------- Utils ---------- */
+function stopFallbackLoop() {
+  if (fallbackInterval) {
+    clearInterval(fallbackInterval);
+    fallbackInterval = null;
+  }
 }
