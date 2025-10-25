@@ -1,5 +1,5 @@
 {
-  "version": "0.0.44",
+  "version": "0.0.43",
   "releaseDate": "2025-10-25",
   "changes": [
     "Improved camera permission handling with better user messaging",
@@ -11,8 +11,7 @@
     "Filter panel width now matches left menu (280px, max 85vw)",
     "FAB (Add button) now hides when any side menu is open",
     "Redesigned Filter UI with modern 2025 aesthetics",
-    "Scanner: Fast-start initialization (portrait) eliminating initial blank/small preview flicker",
-    "Scanner: Fixed callback not firing by starting decode immediately (removed premature metadata wait)",
-    "Scanner: Suppressed noisy 'No MultiFormat Readers...' errors and added format hints for more reliable detection"
+    "Scanner: Simplified fast-start camera initialization (portrait) eliminating initial blank + small preview flicker",
+    "Scanner: Restored reliable decode by waiting for video metadata before ZXing start"
   ]
 }
