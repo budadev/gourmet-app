@@ -41,43 +41,6 @@ function handleOrientationChange() {
   }, 300); // Wait 300ms for orientation change to complete
 }
 
-// Get the current device orientation rotation
-function getOrientationRotation() {
-  // Try modern screen.orientation API first
-  if (window.screen && window.screen.orientation) {
-    const angle = window.screen.orientation.angle;
-    return angle;
-  }
-
-  // Fallback to window.orientation (deprecated but still widely supported)
-  if (typeof window.orientation !== 'undefined') {
-    return window.orientation;
-  }
-
-  // Last resort: detect from window dimensions
-  return window.innerWidth > window.innerHeight ? 90 : 0;
-}
-
-// Apply CSS transform to video element to correct camera orientation
-function applyVideoOrientation(videoElement) {
-  const rotation = getOrientationRotation();
-
-  // Most mobile devices need no rotation in portrait (0°)
-  // But in landscape, the camera feed is rotated 90° relative to the screen
-  // We need to counter-rotate the video to match the UI orientation
-
-  if (rotation === 90 || rotation === -270) {
-    // Landscape right (counter-clockwise from portrait)
-    videoElement.style.transform = 'rotate(0deg)';
-  } else if (rotation === -90 || rotation === 270) {
-    // Landscape left (clockwise from portrait)
-    videoElement.style.transform = 'rotate(0deg)';
-  } else {
-    // Portrait (0° or 180°)
-    videoElement.style.transform = 'rotate(0deg)';
-  }
-}
-
 // Apply advanced camera settings for better autofocus
 async function applyAdvancedCameraSettings(track) {
   const capabilities = track.getCapabilities ? track.getCapabilities() : {};
@@ -225,19 +188,14 @@ async function startCamera(onScanComplete) {
       currentStream = null;
     }
 
-    // Detect current orientation to request appropriate aspect ratio
-    const isLandscape = window.innerWidth > window.innerHeight;
-
     // Enhanced camera constraints for better autofocus
     const constraints = {
       video: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
         facingMode: deviceId ? undefined : { ideal: 'environment' },
-        // Request resolution based on orientation to minimize black bars
-        width: { ideal: isLandscape ? 1920 : 1080 },
-        height: { ideal: isLandscape ? 1080 : 1920 },
-        // Try to match the screen aspect ratio
-        aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 },
+        // Request high resolution for better barcode detection
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
         // Request autofocus capability
         focusMode: { ideal: 'continuous' },
         // Advanced settings for iOS
@@ -293,12 +251,7 @@ async function startCamera(onScanComplete) {
     if (!orientationChangeHandler) {
       orientationChangeHandler = () => handleOrientationChange();
       window.addEventListener('orientationchange', orientationChangeHandler);
-      // Also listen to resize as a fallback for orientation changes
-      window.addEventListener('resize', orientationChangeHandler);
     }
-
-    // Apply initial video orientation
-    applyVideoOrientation(vid);
   } catch (e) {
     // Provide more helpful error messages
     let errorMsg = 'Camera error: ';
@@ -356,12 +309,8 @@ export function stopScan() {
   // Remove the orientation change event listener if it was set
   if (orientationChangeHandler) {
     window.removeEventListener('orientationchange', orientationChangeHandler);
-    window.removeEventListener('resize', orientationChangeHandler);
     orientationChangeHandler = null;
   }
-
-  // Clear the callback reference
-  currentOnScanComplete = null;
 }
 
 export async function startScanForInput(onScanComplete) {
