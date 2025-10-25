@@ -10,101 +10,11 @@ let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
 let opening = false; // prevent overlapping opens
+let preferredBackCameraId = null; // remembered back camera id after first successful environment capture
+const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
+try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
 
-async function getAvailableCameras() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const videoDevices = devices.filter(d => d.kind === 'videoinput');
-  videoDevices.sort((a, b) => {
-    const aBack = /back|rear|environment/i.test(a.label);
-    const bBack = /back|rear|environment/i.test(b.label);
-    if (aBack && !bBack) return -1;
-    if (!aBack && bBack) return 1;
-    return 0;
-  });
-  return videoDevices;
-}
-
-// Apply advanced camera settings for better autofocus
-async function applyAdvancedCameraSettings(track) {
-  const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-  const constraints = {};
-
-  // Enable continuous autofocus if supported
-  if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-    constraints.focusMode = 'continuous';
-  }
-
-  // Set focus distance to auto/infinity for barcode scanning
-  if (capabilities.focusDistance) {
-    // For barcode scanning, we want medium-range focus
-    const min = capabilities.focusDistance.min || 0;
-    const max = capabilities.focusDistance.max || 1;
-    constraints.focusDistance = (min + max) / 2;
-  }
-
-  // Enable advanced autofocus if available (iOS specific)
-  if (capabilities.advanced) {
-    constraints.advanced = [{ focusMode: 'continuous' }];
-  }
-
-  // Apply constraints if any were set
-  if (Object.keys(constraints).length > 0) {
-    try {
-      await track.applyConstraints(constraints);
-    } catch (e) {
-      console.log('Could not apply advanced camera settings:', e);
-    }
-  }
-
-  // For iOS, we need to periodically request focus
-  // This simulates the tap-to-focus behavior
-  return startContinuousFocus(track);
-}
-
-// Continuously request focus updates for iOS and other devices
-function startContinuousFocus(track) {
-  let focusInterval = null;
-
-  // On iOS and some Android devices, we need to manually trigger focus
-  const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
-  if (capabilities.focusMode || capabilities.focusDistance) {
-    focusInterval = setInterval(async () => {
-      try {
-        const constraints = {};
-
-        // Toggle focus mode to trigger refocus
-        if (capabilities.focusMode) {
-          const currentSettings = track.getSettings();
-          if (currentSettings.focusMode === 'continuous') {
-            constraints.focusMode = 'continuous';
-          } else if (capabilities.focusMode.includes('continuous')) {
-            constraints.focusMode = 'continuous';
-          }
-        }
-
-        // Periodically adjust focus distance slightly to trigger refocus
-        if (capabilities.focusDistance) {
-          const settings = track.getSettings();
-          const current = settings.focusDistance || 0.5;
-          const min = capabilities.focusDistance.min || 0;
-          const max = capabilities.focusDistance.max || 1;
-          // Oscillate slightly to trigger continuous focus
-          const offset = (Math.sin(Date.now() / 1000) * 0.05);
-          constraints.focusDistance = Math.max(min, Math.min(max, current + offset));
-        }
-
-        if (Object.keys(constraints).length > 0) {
-          await track.applyConstraints(constraints);
-        }
-      } catch (e) {
-        // Ignore errors during focus updates
-      }
-    }, 500); // Update focus every 500ms
-  }
-
-  return focusInterval;
-}
+/* ...existing code... */
 
 async function startCamera(onScanComplete) {
   if (opening) return; // guard
@@ -112,67 +22,89 @@ async function startCamera(onScanComplete) {
   const vid = el('video');
   let focusInterval = null;
   el('scanStatus').textContent = '📷 Initializing camera…';
-  if (navigator.vibrate) { try { navigator.vibrate(10); } catch(_) {} }
+  let triedBackSwitch = false;
 
-  try {
+  const buildVideoConstraints = () => {
+    const base = {
+      width: { ideal: 1920, max: 1920 },
+      height: { ideal: 1080, max: 1080 },
+      focusMode: 'continuous',
+      advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
+    };
+    if (preferredBackCameraId) {
+      return { ...base, deviceId: { exact: preferredBackCameraId } };
+    }
+    // First attempt: let browser pick environment
+    return { ...base, facingMode: { ideal: 'environment' } };
+  };
+
+  const runDecoder = async () => {
     try { codeReader.reset(); } catch(_) {}
-
-    // Clean previous stream
+    // Clean previous
     if (vid && vid.srcObject) {
       try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
       vid.srcObject = null;
     }
 
-    availableCameras = await navigator.mediaDevices.enumerateDevices();
-    availableCameras = availableCameras.filter(d=>d.kind==='videoinput');
-
-    const deviceId = availableCameras[currentCameraIndex]?.deviceId;
-
-    // Build constraints (single call via ZXing)
-    const constraints = {
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        facingMode: deviceId ? undefined : { ideal: 'environment' },
-        width: { ideal: 1920, max: 1920 },
-        height: { ideal: 1080, max: 1080 },
-        focusMode: 'continuous',
-        advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
+    // Validate stored preferred back camera still exists
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const vidsList = devs.filter(d=>d.kind==='videoinput');
+      if (preferredBackCameraId && !vidsList.some(d=>d.deviceId === preferredBackCameraId)) {
+        preferredBackCameraId = null;
+        try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
       }
-    };
+    } catch(_) {}
 
+    // Build constraints only referencing deviceId if we already know the back cam
+    const constraints = { video: buildVideoConstraints() };
     let decodeSucceeded = false;
     try {
       await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
         if (res) {
           const code = res.getText();
-          el('scanStatus').textContent = `✅ ${code}`;
-          stopScan();
-          if (onScanComplete) await onScanComplete(code);
+            el('scanStatus').textContent = `✅ ${code}`;
+            stopScan();
+            if (onScanComplete) await onScanComplete(code);
         }
       });
       decodeSucceeded = true;
     } catch (err) {
       if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        // Retry with relaxed constraints
-        el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-        const fallback = { video: { facingMode: { ideal: 'environment' } } };
-        await codeReader.decodeFromConstraints(fallback, vid, async (res, e2) => {
-          if (res) {
-            const code = res.getText();
-            el('scanStatus').textContent = `✅ ${code}`;
-            stopScan();
-            if (onScanComplete) await onScanComplete(code);
-          }
-        });
-        decodeSucceeded = true;
+        if (preferredBackCameraId) {
+          // Stored back camera no longer valid; clear and retry with environment
+            preferredBackCameraId = null;
+            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
+            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+              if (res) {
+                const code = res.getText();
+                el('scanStatus').textContent = `✅ ${code}`;
+                stopScan();
+                if (onScanComplete) await onScanComplete(code);
+              }
+            });
+            decodeSucceeded = true;
+        } else if (!preferredBackCameraId) {
+          // Retry minimal fallback (still prefer environment)
+          el('scanStatus').textContent = '🔄 Adjusting camera settings…';
+          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+            if (res) {
+              const code = res.getText();
+              el('scanStatus').textContent = `✅ ${code}`;
+              stopScan();
+              if (onScanComplete) await onScanComplete(code);
+            }
+          });
+          decodeSucceeded = true;
+        }
       } else {
         throw err;
       }
     }
-
     if (!decodeSucceeded) throw new Error('Could not start decoder');
 
-    // Wait for stream to attach
+    // Wait for readiness
     await new Promise(r => {
       if (vid.readyState >= vid.HAVE_METADATA) return r();
       vid.addEventListener('loadedmetadata', () => r(), { once: true });
@@ -182,13 +114,64 @@ async function startCamera(onScanComplete) {
     if (currentStream) {
       const track = currentStream.getVideoTracks()[0];
       if (track) {
-        try { focusInterval = await applyAdvancedCameraSettings(track); } catch (_) {}
-        currentStream._focusInterval = focusInterval;
+        const settings = track.getSettings();
+        // If we successfully got environment camera, remember it
+        if (settings && settings.deviceId && settings.facingMode === 'environment' && !preferredBackCameraId) {
+          preferredBackCameraId = settings.deviceId;
+          try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
+        }
+        // If we ended up on front/user camera and haven't switched yet, try to find environment and switch
+        if (settings && settings.facingMode && settings.facingMode !== 'environment' && !triedBackSwitch) {
+          triedBackSwitch = true;
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const vids = devices.filter(d=>d.kind==='videoinput');
+            // Prefer labels containing environment/back/rear OR facingMode heuristic
+            const env = vids.find(d => /back|rear|environment/i.test(d.label));
+            if (env && env.deviceId && env.deviceId !== settings.deviceId) {
+              preferredBackCameraId = env.deviceId;
+              try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
+              // Restart decoder with explicit back camera
+              try { codeReader.reset(); } catch(_) {}
+              try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
+              vid.srcObject = null;
+              el('scanStatus').textContent = '🔁 Switching to back camera…';
+              await codeReader.decodeFromConstraints({ video: { deviceId: { exact: preferredBackCameraId }, width: { ideal:1920,max:1920 }, height:{ ideal:1080,max:1080 }, focusMode:'continuous', advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } }, vid, async (res, err2) => {
+                if (res) {
+                  const code = res.getText();
+                  el('scanStatus').textContent = `✅ ${code}`;
+                  stopScan();
+                  if (onScanComplete) await onScanComplete(code);
+                }
+              });
+              // Wait metadata again
+              await new Promise(r2 => {
+                if (vid.readyState >= vid.HAVE_METADATA) return r2();
+                vid.addEventListener('loadedmetadata', () => r2(), { once: true });
+              });
+              currentStream = vid.srcObject;
+            }
+          } catch (switchErr) {
+            console.log('Back camera switch attempt failed:', switchErr);
+          }
+        }
+        // Apply advanced focusing
+        if (currentStream) {
+          try {
+            const newTrack = currentStream.getVideoTracks()[0];
+            if (newTrack) {
+              focusInterval = await applyAdvancedCameraSettings(newTrack);
+              currentStream._focusInterval = focusInterval;
+            }
+          } catch(_) {}
+        }
       }
     }
+  };
 
-    el('scanStatus').textContent = '📡 Point camera at barcode';
-    // Safety hint after 15s if still active
+  try {
+    await runDecoder();
+    el('scanStatus').textContent = 'Point camera at barcode';
     setTimeout(() => {
       if (el('scannerModal').classList.contains('active') && el('video').srcObject) {
         const txt = el('scanStatus').textContent || '';
@@ -200,18 +183,11 @@ async function startCamera(onScanComplete) {
   } catch(e) {
     let msg;
     switch(e.name) {
-      case 'NotAllowedError':
-        msg = '❌ Camera permission denied. Enable it in Settings > Safari > Camera to scan.';
-        break;
-      case 'NotFoundError':
-        msg = '📷 No camera available on this device.';
-        break;
+      case 'NotAllowedError': msg = '❌ Camera permission denied. Enable it in Settings > Safari > Camera to scan.'; break;
+      case 'NotFoundError': msg = '📷 No camera available on this device.'; break;
       case 'NotReadableError':
-      case 'TrackStartError':
-        msg = '⚠️ Camera is busy (used by another app). Close it and retry.';
-        break;
-      default:
-        msg = 'Camera error: ' + e.message;
+      case 'TrackStartError': msg = '⚠️ Camera is busy (used by another app). Close it and retry.'; break;
+      default: msg = 'Camera error: ' + e.message;
     }
     el('scanStatus').textContent = msg;
     setTimeout(stopScan, 4500);
