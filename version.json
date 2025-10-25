@@ -1,5 +1,5 @@
 {
-  "version": "0.0.40",
+  "version": "0.0.39",
   "releaseDate": "2025-10-25",
   "changes": [
     "Improved camera permission handling with better user messaging",
