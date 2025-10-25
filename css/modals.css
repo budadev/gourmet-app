@@ -122,24 +122,30 @@ body.no-scroll{overflow:hidden;touch-action:none;}
 /* Scanner modal needs higher z-index to appear above editor */
 #scannerModal{z-index:3000}
 
-/* Simplified video styles: immediate visibility (no opacity fade) for faster perceived start */
+/* Enhanced video styles for proper orientation handling */
 video{
     width:100%;
-    max-height:calc(100vh - 180px);
-    max-height:calc(100dvh - 180px);
+    max-height:calc(100vh - 180px); /* Ensure video doesn't overflow screen, accounting for header and status */
+    max-height:calc(100dvh - 180px); /* Use dynamic viewport height on supported browsers */
     border-radius:16px;
-    background:#000; /* show black placeholder instantly */
+    background:#000;
     box-shadow:var(--shadow-lg);
-    object-fit:cover;
+    object-fit:cover; /* Cover to fill available space and reduce black bars */
     display:block;
     transform-origin:center center;
-    transition:transform 0.3s ease; /* remove opacity transition */
-    opacity:1; /* always visible */
+    transition:transform 0.3s ease, opacity 0.3s ease; /* Smooth fade in */
+    opacity:0; /* Start hidden to prevent flash */
 }
 
+/* Show video once it's ready */
+video.ready {
+    opacity:1;
+}
+
+/* Rotate video based on device orientation to match camera view */
 @media (orientation: landscape) {
     video {
-        max-width:calc(100vw - 56px);
+        max-width:calc(100vw - 56px); /* Account for modal padding */
         height:auto;
         aspect-ratio:16/9;
     }
@@ -147,15 +153,16 @@ video{
 
 @media (orientation: portrait) {
     video {
-        aspect-ratio:3/4; /* maintain a stable portrait oriented frame */
+        aspect-ratio:3/4;
     }
 }
 
+/* Adjust video container in scanner modal for orientation changes */
 #scannerModal .modal-body {
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:flex-start;
-    overflow:hidden;
-    padding:12px 20px;
+    overflow:hidden; /* Prevent scrolling in scanner */
+    padding:12px 20px; /* Reduce padding to maximize video space */
 }
