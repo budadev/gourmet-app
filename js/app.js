@@ -4,7 +4,8 @@
 
 import { loadConfig } from './config.js';
 import { el, enhanceSelectInteractivity } from './utils.js';
-import { searchByText, findByBarcode, ensureDbReady } from './db.js';
+import { findByBarcode, ensureDbReady, getItemsByIds } from './db.js';
+import { buildSearchIndex, searchIndex_fast } from './searchIndex.js';
 import { setupSearch, setSearchValue } from './features/search.js';
 import { renderList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
@@ -21,7 +22,12 @@ import { needsPhotoMigration, showMigrationUI } from './photoMigration.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
-  let items = await searchByText(query);
+
+  // Use the fast search index to get matching IDs
+  const matchingIds = searchIndex_fast(query);
+
+  // Fetch only the matching items from the database
+  let items = await getItemsByIds(matchingIds);
 
   // Apply filters to the search results
   items = applyFilters(items);
@@ -38,6 +44,10 @@ async function refreshList() {
 async function initApp() {
   // Ensure database is ready before any operations
   await ensureDbReady();
+
+  // Build the search index from all items in the database
+  await buildSearchIndex();
+
   // Check if photo migration is needed
   if (await needsPhotoMigration()) {
     await showMigrationUI();
@@ -215,6 +225,8 @@ async function initApp() {
 
   // Listen for data import events to refresh the list
   window.addEventListener('data-imported', async () => {
+    // Rebuild the search index after import
+    await buildSearchIndex();
     await refreshList();
   });
 

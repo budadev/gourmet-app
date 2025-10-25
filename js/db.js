@@ -2,6 +2,8 @@
    IndexedDB Wrapper
    ============================= */
 
+import { updateSearchIndex, removeFromSearchIndex } from './searchIndex.js';
+
 const DB_NAME = 'gourmetapp-db';
 const STORE = 'items';
 const PLACES_STORE = 'places';
@@ -69,8 +71,15 @@ async function tx(mode = 'readonly', storeName = STORE) {
 export async function addItem(item) {
   const store = await tx('readwrite');
   return new Promise((res, rej) => {
-    const r = store.add({ ...item, createdAt: Date.now(), updatedAt: Date.now() });
-    r.onsuccess = () => res(r.result);
+    const itemWithTimestamps = { ...item, createdAt: Date.now(), updatedAt: Date.now() };
+    const r = store.add(itemWithTimestamps);
+    r.onsuccess = () => {
+      const newId = r.result;
+      const fullItem = { ...itemWithTimestamps, id: newId };
+      // Update search index with the new item
+      updateSearchIndex(fullItem);
+      res(newId);
+    };
     r.onerror = () => rej(r.error);
   });
 }
@@ -82,8 +91,13 @@ export async function updateItem(id, patch) {
     get.onsuccess = () => {
       const cur = get.result;
       if (!cur) return rej(new Error('Not found'));
-      const put = store.put({ ...cur, ...patch, updatedAt: Date.now() });
-      put.onsuccess = () => res(put.result);
+      const updatedItem = { ...cur, ...patch, updatedAt: Date.now() };
+      const put = store.put(updatedItem);
+      put.onsuccess = () => {
+        // Update search index with the modified item
+        updateSearchIndex(updatedItem);
+        res(put.result);
+      };
       put.onerror = () => rej(put.error);
     };
     get.onerror = () => rej(get.error);
@@ -94,7 +108,11 @@ export async function deleteItem(id) {
   const store = await tx('readwrite');
   return new Promise((res, rej) => {
     const r = store.delete(id);
-    r.onsuccess = () => res();
+    r.onsuccess = () => {
+      // Remove from search index
+      removeFromSearchIndex(id);
+      res();
+    };
     r.onerror = () => rej(r.error);
   });
 }
@@ -132,6 +150,34 @@ export async function findByBarcode(code) {
   });
 }
 
+/**
+ * Fast search by text using the search index
+ * Only fetches items that match from the database
+ * @param {Array<number>} ids - Array of item IDs to fetch
+ * @returns {Promise<Array>} Array of matching items
+ */
+export async function getItemsByIds(ids) {
+  if (!ids || ids.length === 0) return [];
+
+  const store = await tx('readonly');
+  const promises = ids.map(id => {
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null); // Return null for failed fetches
+    });
+  });
+
+  const results = await Promise.all(promises);
+  return results.filter(item => item !== null); // Filter out nulls
+}
+
+/**
+ * Legacy text search function - reads entire DB and filters
+ * NOTE: This is kept for backward compatibility but the app now uses
+ * the index-based approach (searchIndex.js + getItemsByIds) for better performance.
+ * Consider using searchIndex_fast() + getItemsByIds() instead.
+ */
 export async function searchByText(q) {
   q = (q || '').toLowerCase();
   const all = await listAll();

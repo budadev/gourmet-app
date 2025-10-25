@@ -3,7 +3,8 @@
    ============================= */
 
 import { escapeHtml, el } from '../utils.js';
-import { searchByText, listAll } from '../db.js';
+import { getItemsByIds } from '../db.js';
+import { searchIndex_fast } from '../searchIndex.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { addPairing, removePairing } from '../models/pairings.js';
 import { getTypeInfo } from '../config.js';
@@ -41,7 +42,12 @@ export function closePairingSelector() {
 
 export async function refreshPairingList() {
   const query = el('pairingSearchInput').value.trim();
-  const allItems = await searchByText(query);
+
+  // Use the fast search index to get matching IDs
+  const matchingIds = searchIndex_fast(query);
+
+  // Fetch only the matching items from the database
+  const allItems = await getItemsByIds(matchingIds);
 
   // Exclude current item being edited
   const availableItems = allItems.filter(item => item.id !== pairingSourceId);

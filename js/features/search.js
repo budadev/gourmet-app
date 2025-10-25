@@ -3,7 +3,8 @@
    ============================= */
 
 import { el } from '../utils.js';
-import { searchByText } from '../db.js';
+import { searchIndex_fast } from '../searchIndex.js';
+import { getItemsByIds } from '../db.js';
 
 export function setupSearch(onSearchResults) {
   const searchInput = el('searchInput');
@@ -21,7 +22,13 @@ export function setupSearch(onSearchResults) {
   searchInput.oninput = async () => {
     updateClearButton();
     const query = searchInput.value.trim();
-    const items = await searchByText(query);
+
+    // Use the fast search index to get matching IDs
+    const matchingIds = searchIndex_fast(query);
+
+    // Fetch only the matching items from the database
+    const items = await getItemsByIds(matchingIds);
+
     if (onSearchResults) onSearchResults(items);
   };
 
