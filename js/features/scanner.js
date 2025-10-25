@@ -9,8 +9,6 @@ const codeReader = new BrowserMultiFormatReader();
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
-let currentOnScanComplete = null; // Store callback for orientation change restart
-let orientationChangeHandler = null; // Store handler for cleanup
 
 async function getAvailableCameras() {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -23,22 +21,6 @@ async function getAvailableCameras() {
     return 0;
   });
   return videoDevices;
-}
-
-// Handle orientation changes by restarting the camera
-function handleOrientationChange() {
-  // Debounce orientation changes to avoid multiple restarts
-  if (handleOrientationChange.timeout) {
-    clearTimeout(handleOrientationChange.timeout);
-  }
-
-  handleOrientationChange.timeout = setTimeout(async () => {
-    // Only restart if scanner is currently active
-    if (el('scannerModal').classList.contains('active') && currentOnScanComplete) {
-      console.log('Orientation changed, restarting camera...');
-      await startCamera(currentOnScanComplete);
-    }
-  }, 300); // Wait 300ms for orientation change to complete
 }
 
 // Apply advanced camera settings for better autofocus
@@ -243,15 +225,6 @@ async function startCamera(onScanComplete) {
         if (onScanComplete) await onScanComplete(code);
       }
     });
-
-    // Store the onScanComplete callback for orientation change handling
-    currentOnScanComplete = onScanComplete;
-
-    // If not already set, add the orientation change event listener
-    if (!orientationChangeHandler) {
-      orientationChangeHandler = () => handleOrientationChange();
-      window.addEventListener('orientationchange', orientationChangeHandler);
-    }
   } catch (e) {
     // Provide more helpful error messages
     let errorMsg = 'Camera error: ';
@@ -305,12 +278,6 @@ export function stopScan() {
 
   el('scannerModal').classList.remove('active');
   el('scanStatus').textContent = '';
-
-  // Remove the orientation change event listener if it was set
-  if (orientationChangeHandler) {
-    window.removeEventListener('orientationchange', orientationChangeHandler);
-    orientationChangeHandler = null;
-  }
 }
 
 export async function startScanForInput(onScanComplete) {
