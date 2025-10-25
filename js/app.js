@@ -18,38 +18,6 @@ import { initSideMenu, openSideMenu, closeSideMenu } from './features/sideMenu.j
 import { initFilters, applyFilters, setFilterChangeCallback, openFilterPanel, closeFilterPanel } from './features/filters.js';
 import { initSwipeGestures } from './features/swipeGestures.js';
 
-// Lock screen orientation to portrait
-function lockOrientation() {
-  // Try to lock using Screen Orientation API
-  if (screen.orientation && screen.orientation.lock) {
-    screen.orientation.lock('portrait').catch(err => {
-      console.log('Screen orientation lock not supported:', err);
-    });
-  }
-
-  // Prevent orientation change events from affecting layout
-  window.addEventListener('orientationchange', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Force scroll to top to prevent layout shifts
-    window.scrollTo(0, 0);
-  }, { capture: true });
-
-  // Prevent resize events during orientation changes from causing issues
-  let resizeTimeout;
-  const originalHeight = window.innerHeight;
-  window.addEventListener('resize', (e) => {
-    // Debounce resize events during orientation changes
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      // If height changed significantly (orientation change), restore scroll
-      if (Math.abs(window.innerHeight - originalHeight) > 100) {
-        window.scrollTo(0, 0);
-      }
-    }, 100);
-  }, { passive: true });
-}
-
 async function refreshList() {
   const query = el('searchInput').value.trim();
   let items = await searchByText(query);
@@ -67,9 +35,6 @@ async function refreshList() {
 }
 
 async function initApp() {
-  // Lock orientation to portrait as early as possible
-  lockOrientation();
-
   // Load configuration
   await loadConfig();
 
