@@ -211,6 +211,9 @@ async function startCamera(onScanComplete) {
     vid.pause();
     vid.currentTime = 0;
 
+    // Remove ready class to hide video during setup
+    vid.classList.remove('ready');
+
     // Check if permission is already granted
     const hasPermission = await checkCameraPermission();
 
@@ -306,6 +309,12 @@ async function startCamera(onScanComplete) {
 
     // Apply initial video orientation
     applyVideoOrientation(vid);
+
+    // Add a small delay to ensure transform is applied, then show the video
+    // This prevents the flash of unstyled video
+    setTimeout(() => {
+      vid.classList.add('ready');
+    }, 100);
   } catch (e) {
     // Provide more helpful error messages
     let errorMsg = 'Camera error: ';
