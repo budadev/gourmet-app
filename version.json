@@ -1,15 +1,15 @@
 {
-  "version": "0.0.36",
+  "version": "0.0.37",
   "releaseDate": "2025-10-25",
   "changes": [
+    "Improved camera permission handling with better user messaging",
+    "Added helpful first-time info about iOS camera permission requirement",
+    "Enhanced error messages for camera access issues",
+    "Note: iOS requires camera permission each app restart (Safari limitation)",
     "iOS: Fixed filter menu header overlapping with camera island/notch",
     "iOS: Reduced bottom gap for Clear Filters button on mobile",
     "Filter panel width now matches left menu (280px, max 85vw)",
     "FAB (Add button) now hides when any side menu is open",
-    "Reduced height of rating filter components for better space efficiency",
-    "Place filter dropdown shows all places by default (scrollable list)",
-    "Place dropdown closes and input clears automatically after selecting a place",
-    "Fixed star rating filters - now properly updates when selecting ratings",
     "Redesigned Filter UI with modern 2025 aesthetics"
   ]
 }

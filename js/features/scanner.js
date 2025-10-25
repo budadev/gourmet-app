@@ -105,6 +105,29 @@ function startContinuousFocus(track) {
   return focusInterval;
 }
 
+async function checkCameraPermission() {
+  try {
+    // Check if permission is already granted
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    // If we get here, permission was granted
+    const tracks = stream.getTracks();
+    tracks.forEach(track => track.stop()); // Stop the track as we only check permission
+    return true;
+  } catch (e) {
+    // Permission denied or not available
+    return false;
+  }
+}
+
+function showPermissionInfo() {
+  // Show a one-time info message about camera permission
+  const infoShown = localStorage.getItem('cameraPermissionInfoShown');
+  if (!infoShown) {
+    el('scanStatus').textContent = '📷 This app requires camera access to scan barcodes. Please allow camera access in your browser settings.';
+    localStorage.setItem('cameraPermissionInfoShown', 'true');
+  }
+}
+
 async function startCamera(onScanComplete) {
   const vid = el('video');
   let focusInterval = null;
@@ -125,6 +148,14 @@ async function startCamera(onScanComplete) {
     // Pause the video and reset its state
     vid.pause();
     vid.currentTime = 0;
+
+    // Check if permission is already granted
+    const hasPermission = await checkCameraPermission();
+
+    // Show info message if first time and no permission yet
+    if (!hasPermission) {
+      showPermissionInfo();
+    }
 
     availableCameras = await getAvailableCameras();
     const deviceId = availableCameras[currentCameraIndex]?.deviceId;
@@ -195,8 +226,23 @@ async function startCamera(onScanComplete) {
       }
     });
   } catch (e) {
-    el('scanStatus').textContent = 'Camera error: ' + e.message;
-    setTimeout(stopScan, 3000);
+    // Provide more helpful error messages
+    let errorMsg = 'Camera error: ';
+
+    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+      errorMsg = '❌ Camera access denied. Please allow camera access in your browser settings.';
+      // Clear the "first time" flag so we can show the message again
+      localStorage.removeItem('cameraPermissionInfoShown');
+    } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+      errorMsg = '📷 No camera found on this device.';
+    } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+      errorMsg = '⚠️ Camera is being used by another app. Please close other apps and try again.';
+    } else {
+      errorMsg += e.message;
+    }
+
+    el('scanStatus').textContent = errorMsg;
+    setTimeout(stopScan, 4000);
   }
 }
 
