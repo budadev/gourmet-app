@@ -1,8 +1,8 @@
 /* =============================
-   Barcode Scanner (Simplified Fast Start Version)
+   Barcode Scanner (Orientation-Agnostic Fast Start Version)
    ============================= */
 
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType, MultiFormatReader, RGBLuminanceSource, BinaryBitmap, HybridBinarizer, Exception } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
 // Configure hints to focus on common linear + QR formats for faster, more reliable detection
@@ -20,19 +20,18 @@ try {
   hints.set(DecodeHintType.TRY_HARDER, true);
 } catch(_) { /* library guards */ }
 
-let codeReader = new BrowserMultiFormatReader(hints);
+let codeReader = new BrowserMultiFormatReader(hints); // kept for API parity (not used for streaming decode now)
+let mfReader = new MultiFormatReader();
+try { mfReader.setHints(hints); } catch(_) {}
+
 let availableCameras = [];
 let currentCameraIndex = 0;
 let currentOnScanComplete = null;
 let scanStarting = false; // prevent double starts
+let scanRaf = null; // requestAnimationFrame id
+let scanningActive = false;
 
-// NOTE: Previous implementation included advanced orientation handling,
-// manual getUserMedia stream management, continuous focus tweaking, and
-// restarting on orientation changes. This added noticeable startup delay
-// (opening a stream, then ZXing opening its own stream) and visual flicker.
-// For a smooth, fast open (esp. portrait-only usage) we drastically
-// simplify: single decodeFromVideoDevice call, no orientation transforms,
-// modest resolution request handled by library, immediate video visibility.
+/* Camera setup and management */
 
 async function getAvailableCameras() {
   try {
@@ -74,6 +73,86 @@ function showCameraError(e) {
 function resetReader() {
   try { codeReader.reset(); } catch(_) {}
   try { codeReader = new BrowserMultiFormatReader(hints); } catch(_) {}
+  try { mfReader = new MultiFormatReader(); mfReader.setHints(hints); } catch(_) {}
+}
+
+function stopScanLoop() {
+  scanningActive = false;
+  if (scanRaf) cancelAnimationFrame(scanRaf);
+  scanRaf = null;
+}
+
+/* Frame decoding */
+
+function attemptDecodeFrame(ctx, w, h, sx=0, sy=0, sw=w, sh=h) {
+  try {
+    const imgData = ctx.getImageData(sx, sy, sw, sh);
+    const luminance = new RGBLuminanceSource(imgData.data, sw, sh);
+    const bitmap = new BinaryBitmap(new HybridBinarizer(luminance));
+    return mfReader.decode(bitmap);
+  } catch (e) {
+    if (e instanceof Exception) return null;
+    return null;
+  }
+}
+
+function startScanLoop(video, onResult) {
+  const baseCanvas = document.createElement('canvas');
+  const rotCanvas = document.createElement('canvas');
+  const baseCtx = baseCanvas.getContext('2d');
+  const rotCtx = rotCanvas.getContext('2d');
+
+  // Target a manageable working resolution to reduce CPU (downscale if very large)
+  const targetMax = 720; // max longer side
+
+  scanningActive = true;
+  let lastTryTs = 0;
+
+  const loop = (ts) => {
+    if (!scanningActive) return;
+    scanRaf = requestAnimationFrame(loop);
+    // Throttle actual decode attempts (~ every 120ms) for performance
+    if (ts - lastTryTs < 120) return;
+    lastTryTs = ts;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+
+    // Compute scaling
+    let dw = vw;
+    let dh = vh;
+    const longer = Math.max(vw, vh);
+    if (longer > targetMax) {
+      const scale = targetMax / longer;
+      dw = Math.round(vw * scale);
+      dh = Math.round(vh * scale);
+    }
+
+    // Draw upright frame
+    baseCanvas.width = dw;
+    baseCanvas.height = dh;
+    try { baseCtx.drawImage(video, 0, 0, dw, dh); } catch(_) { return; }
+
+    // Attempt decode in natural orientation
+    let result = attemptDecodeFrame(baseCtx, dw, dh);
+    if (!result) {
+      // Prepare 90° rotated frame (clockwise)
+      rotCanvas.width = dh;
+      rotCanvas.height = dw;
+      rotCtx.save();
+      rotCtx.translate(dh / 2, dw / 2);
+      rotCtx.rotate(Math.PI / 2); // 90°
+      rotCtx.drawImage(baseCanvas, -dw / 2, -dh / 2, dw, dh);
+      rotCtx.restore();
+      result = attemptDecodeFrame(rotCtx, dh, dw);
+    }
+
+    if (result) {
+      onResult(result.getText());
+    }
+  };
+  scanRaf = requestAnimationFrame(loop);
 }
 
 async function startCamera(onScanComplete) {
@@ -85,57 +164,65 @@ async function startCamera(onScanComplete) {
   let handled = false;
 
   resetReader();
+  stopScanLoop();
 
   if (!availableCameras.length) {
     try { availableCameras = await getAvailableCameras(); } catch(_) {}
   }
   const deviceId = availableCameras[currentCameraIndex]?.deviceId;
+
+  const isPortrait = window.innerHeight >= window.innerWidth;
+  const constraints = {
+    video: {
+      deviceId: deviceId ? { exact: deviceId } : undefined,
+      facingMode: deviceId ? undefined : { ideal: 'environment' },
+      width: { ideal: isPortrait ? 1080 : 1920 },
+      height: { ideal: isPortrait ? 1920 : 1080 },
+      aspectRatio: { ideal: isPortrait ? 9/16 : 16/9 }
+    }
+  };
+
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch(e) {
+    showCameraError(e);
+    scanStarting = false;
+    return;
+  }
+  vid.srcObject = stream;
+  vid.playsInline = true;
+  vid.muted = true;
   vid.style.visibility = 'visible';
+
+  await new Promise(res => {
+    if (vid.readyState >= vid.HAVE_METADATA) return res();
+    const h = () => { vid.removeEventListener('loadedmetadata', h); res(); };
+    vid.addEventListener('loadedmetadata', h);
+    setTimeout(() => { vid.removeEventListener('loadedmetadata', h); res(); }, 800);
+  });
+
+  try { await vid.play(); } catch(_) {}
 
   const clearStartingStatus = () => {
     if (el('scanStatus').textContent.startsWith('Starting')) {
       el('scanStatus').textContent = '';
     }
   };
+  setTimeout(clearStartingStatus, 900);
 
-  try {
-    codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
-      if (res && !handled) {
-        handled = true;
-        clearStartingStatus();
-        const code = res.getText();
-        el('scanStatus').textContent = `Scanned: ${code}`;
-        try { if (currentOnScanComplete) await currentOnScanComplete(code); } finally { stopScan(); }
-      } else if (err) {
-        // Ignore normal continuous scan misses (NotFound) – different browsers name it differently
-        const msg = err?.message || '';
-        if (
-          msg.includes('No MultiFormat Readers were able to detect the code') ||
-          err.name === 'NotFoundException'
-        ) {
-          clearStartingStatus();
-          return; // silent
-        }
-        // Real camera error (permission / device) only show once while starting
-        if (el('scanStatus').textContent.startsWith('Starting')) {
-          showCameraError(err);
-        } else {
-          // Log to console for diagnostics without disturbing UI
-          console.debug('Scan error (ignored):', err);
-        }
-      } else {
-        // Neither res nor err (rare) – just clear starting message
-        clearStartingStatus();
-      }
-    });
-  } catch(e) {
-    showCameraError(e);
-  } finally {
-    scanStarting = false;
-  }
+  startScanLoop(vid, async (code) => {
+    if (handled) return;
+    handled = true;
+    el('scanStatus').textContent = `Scanned: ${code}`;
+    try {
+      if (currentOnScanComplete) await currentOnScanComplete(code);
+    } finally {
+      stopScan();
+    }
+  });
 
-  // Safety clear if no frame triggers within 1s
-  setTimeout(clearStartingStatus, 1000);
+  scanStarting = false;
 }
 
 export async function startScan(onScanComplete) {
@@ -145,11 +232,11 @@ export async function startScan(onScanComplete) {
 }
 
 export function stopScan() {
+  stopScanLoop();
   try { codeReader.reset(); } catch(_) {}
   el('scannerModal').classList.remove('active');
   el('scanStatus').textContent = '';
   currentOnScanComplete = null;
-  // Video element stream will be stopped by codeReader.reset(); ensure tracks ended
   const vid = el('video');
   if (vid && vid.srcObject) {
     vid.srcObject.getTracks().forEach(t => t.stop());
@@ -157,7 +244,6 @@ export function stopScan() {
   }
 }
 
-// Alias used elsewhere
 export async function startScanForInput(onScanComplete) {
   await startScan(onScanComplete);
 }
