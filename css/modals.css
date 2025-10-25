@@ -122,9 +122,23 @@ body.no-scroll{overflow:hidden;touch-action:none;}
 /* Scanner modal needs higher z-index to appear above editor */
 #scannerModal{z-index:3000}
 
+/* Enhanced video styles for proper orientation handling */
 video{
     width:100%;
+    max-height:calc(100vh - 180px); /* Ensure video doesn't overflow screen, accounting for header and status */
+    max-height:calc(100dvh - 180px); /* Use dynamic viewport height on supported browsers */
     border-radius:16px;
     background:#000;
     box-shadow:var(--shadow-lg);
+    object-fit:contain; /* Maintain aspect ratio without cropping */
+    display:block;
+}
+
+/* Adjust video container in scanner modal for orientation changes */
+#scannerModal .modal-body {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    overflow:hidden; /* Prevent scrolling in scanner */
 }
