@@ -17,7 +17,11 @@ hints.set(DecodeHintType.POSSIBLE_FORMATS, [
     BarcodeFormat.CODE_128
 ]);
 hints.set(DecodeHintType.ALSO_INVERTED, true);
+hints.set(DecodeHintType.TRY_ROTATED, true);
+hints.set(DecodeHintType.ASSUME_CODE_IS_CODE128, false); // Don't assume format to improve general detection
+hints.set(DecodeHintType.PURE_BARCODE, false); // Allow more flexible detection
 
+// Create a new reader with the updated hints
 const codeReader = new BrowserMultiFormatReader(hints);
 let currentStream = null;
 let availableCameras = [];
@@ -39,10 +43,15 @@ async function startCamera(onScanComplete) {
 
   const buildVideoConstraints = () => {
     const base = {
-      width: { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
+      width: { min: 720, ideal: 1280, max: 1920 },
+      height: { min: 480, ideal: 720, max: 1080 },
       focusMode: 'continuous',
-      advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
+      advanced: [
+        { focusMode: 'continuous' },
+        { focusDistance: 0.5 },
+        { exposureMode: 'continuous' },
+        { whiteBalanceMode: 'continuous' }
+      ]
     };
     if (preferredBackCameraId) {
       return { ...base, deviceId: { exact: preferredBackCameraId } };
