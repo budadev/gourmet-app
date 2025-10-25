@@ -31,9 +31,13 @@
   position:absolute;right:10px;top:50%;transform:translateY(-50%);
   background:transparent;border:none;box-shadow:none;width:36px;height:36px;padding:6px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;
-  transition:background var(--transition-fast) var(--ease), opacity var(--transition-fast) var(--ease), transform var(--transition-fast) var,--ease);
+  transition:background var(--transition-fast) var(--ease), opacity var(--transition-fast) var,--ease), transform var(--transition-fast) var,--ease);
+  z-index:10;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
 }
-.search-wrapper .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(20%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);}
+.search-wrapper .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(20%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);pointer-events:none;}
 .search-wrapper .barcode-btn:hover{background:var(--bg-secondary);}
 .search-wrapper .barcode-btn:hover img{opacity:1;filter:none;}
 .search-wrapper .barcode-btn:active{transform:scale(.9);}
@@ -47,8 +51,12 @@
   background:transparent;border:none;box-shadow:none;width:38px;height:38px;padding:6px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;
   transition:background var(--transition-fast) var,--ease), opacity var(--transition-fast) var,--ease), transform var(--transition-fast) var,--ease);
+  z-index:10;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
 }
-.input-with-barcode .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(25%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);}
+.input-with-barcode .barcode-btn img{width:22px;height:22px;opacity:.6;filter:grayscale(25%);transition:opacity var(--transition-fast) var,--ease), filter var(--transition-fast) var,--ease);pointer-events:none;}
 .input-with-barcode .barcode-btn:hover{background:var(--bg-secondary);}
 .input-with-barcode .barcode-btn:hover img{opacity:1;filter:none;}
 .input-with-barcode .barcode-btn:active{transform:scale(.9);}

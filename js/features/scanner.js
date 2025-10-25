@@ -106,15 +106,37 @@ function startContinuousFocus(track) {
 }
 
 async function startCamera(onScanComplete) {
-  const vid = el('preview');
+  const vid = el('video');
   let focusInterval = null;
 
   try {
+    // Completely reset and cleanup before starting new session
+    try {
+      codeReader.reset();
+    } catch (_) { }
+
+    // Stop and clear existing video stream
+    if (vid.srcObject) {
+      const tracks = vid.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      vid.srcObject = null;
+    }
+
+    // Pause the video and reset its state
+    vid.pause();
+    vid.currentTime = 0;
+
     availableCameras = await getAvailableCameras();
     const deviceId = availableCameras[currentCameraIndex]?.deviceId;
 
     if (currentStream) {
+      // Clear focus interval if it exists
+      if (currentStream._focusInterval) {
+        clearInterval(currentStream._focusInterval);
+        currentStream._focusInterval = null;
+      }
       currentStream.getTracks().forEach(t => t.stop());
+      currentStream = null;
     }
 
     // Enhanced camera constraints for better autofocus
@@ -136,8 +158,6 @@ async function startCamera(onScanComplete) {
     };
 
     currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-    vid.srcObject = currentStream;
-    await vid.play();
 
     // Apply advanced camera settings for continuous autofocus
     const videoTrack = currentStream.getVideoTracks()[0];
@@ -148,16 +168,34 @@ async function startCamera(onScanComplete) {
       currentStream._focusInterval = focusInterval;
     }
 
+    // Set video source
+    vid.srcObject = currentStream;
+
+    // Wait for video metadata to be loaded before starting decoder
+    await new Promise((resolve) => {
+      const handleLoadedMetadata = () => {
+        vid.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        resolve();
+      };
+
+      if (vid.readyState >= vid.HAVE_METADATA) {
+        resolve();
+      } else {
+        vid.addEventListener('loadedmetadata', handleLoadedMetadata);
+      }
+    });
+
+    // Use decodeFromVideoDevice which will handle video playback internally
     codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
       if (res) {
         const code = res.getText();
-        el('scanHint').textContent = `Scanned: ${code}`;
+        el('scanStatus').textContent = `Scanned: ${code}`;
         stopScan();
         if (onScanComplete) await onScanComplete(code);
       }
     });
   } catch (e) {
-    el('scanHint').textContent = 'Camera error: ' + e.message;
+    el('scanStatus').textContent = 'Camera error: ' + e.message;
     setTimeout(stopScan, 3000);
   }
 }
@@ -173,6 +211,14 @@ export function stopScan() {
     codeReader.reset();
   } catch (_) { }
 
+  // Clean up video element
+  const vid = el('video');
+  if (vid && vid.srcObject) {
+    const tracks = vid.srcObject.getTracks();
+    tracks.forEach(track => track.stop());
+    vid.srcObject = null;
+  }
+
   if (currentStream) {
     // Clear focus interval if it exists
     if (currentStream._focusInterval) {
@@ -185,7 +231,7 @@ export function stopScan() {
   }
 
   el('scannerModal').classList.remove('active');
-  el('scanHint').textContent = '';
+  el('scanStatus').textContent = '';
 }
 
 export async function startScanForInput(onScanComplete) {
