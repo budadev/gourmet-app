@@ -1,5 +1,5 @@
 {
-  "version": "0.0.43",
+  "version": "0.0.44",
   "releaseDate": "2025-10-25",
   "changes": [
     "Enhanced barcode scanner to detect barcodes rotated 90 degrees by enabling TRY_HARDER hint in ZXing and limiting to common 1D formats for better performance",
