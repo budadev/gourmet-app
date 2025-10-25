@@ -198,31 +198,6 @@ async function startCamera(onScanComplete) {
     let lastCodeTime = 0;
     const DEBOUNCE_MS = 1000; // Prevent duplicate scans within 1 second
 
-    // Optional: Draw detection boxes (helpful for debugging)
-    Quagga.onProcessed((result) => {
-      if (!isScanning) return;
-
-      const drawingCtx = Quagga.canvas.ctx.overlay;
-      const drawingCanvas = Quagga.canvas.dom.overlay;
-
-      if (result) {
-        if (result.boxes) {
-          drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-          // Draw detection boxes for debugging
-          result.boxes.filter(box => box !== result.box).forEach(box => {
-            Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "rgba(0, 255, 0, 0.5)", lineWidth: 2});
-          });
-        }
-
-        if (result.box) {
-          Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "rgba(0, 0, 255, 0.5)", lineWidth: 2});
-        }
-
-        if (result.codeResult && result.codeResult.code) {
-          Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'rgba(255, 0, 0, 0.5)', lineWidth: 3});
-        }
-      }
-    });
 
     Quagga.onDetected((result) => {
       if (!isScanning) return;
