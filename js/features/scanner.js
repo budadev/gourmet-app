@@ -5,15 +5,7 @@
 import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-import { DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
-
-// Configure hints for rotation handling
-const hints = new Map();
-hints.set(DecodeHintType.TRY_HARDER, true);
-hints.set(DecodeHintType.PURE_BARCODE, true);
-hints.set(DecodeHintType.TRY_ROTATED, true);
-
-const codeReader = new BrowserMultiFormatReader(hints);
+const codeReader = new BrowserMultiFormatReader();
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
