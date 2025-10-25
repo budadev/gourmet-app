@@ -2,16 +2,21 @@
    Barcode Scanner (ZXing Integration)
    ============================= */
 
-import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-import { DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
-
-// Configure hints for rotation handling
+// Configure hints for optimal barcode detection
 const hints = new Map();
 hints.set(DecodeHintType.TRY_HARDER, true);
-hints.set(DecodeHintType.PURE_BARCODE, true);
-hints.set(DecodeHintType.TRY_ROTATED, true);
+hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.CODE_128
+]);
+hints.set(DecodeHintType.ALSO_INVERTED, true);
 
 const codeReader = new BrowserMultiFormatReader(hints);
 let currentStream = null;
