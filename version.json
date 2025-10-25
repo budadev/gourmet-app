@@ -1,7 +1,10 @@
 {
-  "version": "0.0.37",
+  "version": "0.0.38",
   "releaseDate": "2025-10-25",
   "changes": [
+    "Enhanced barcode scanner with multi-orientation support (90°, 180°, 270°)",
+    "Scanner now detects barcodes rotated at any angle, not just aligned",
+    "Improved barcode detection with TRY_HARDER mode enabled",
     "Improved camera permission handling with better user messaging",
     "Added helpful first-time info about iOS camera permission requirement",
     "Enhanced error messages for camera access issues",
