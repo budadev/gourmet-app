@@ -1,222 +1,26 @@
 /* =============================
    Barcode Scanner (ZXing Integration)
-   — Primary: BrowserMultiFormatReader (fast, stable for 0°/180°)
-   — Fallback: MultiFormatReader snapshots at 90°/270° with multi-band/multi-binarizer
    ============================= */
 
-import {
-  BrowserMultiFormatReader,
-  MultiFormatReader,
-  DecodeHintType,
-  BarcodeFormat,
-  RGBLuminanceSource,
-  HybridBinarizer,
-  GlobalHistogramBinarizer,
-  BinaryBitmap,
-  InvertedLuminanceSource,
-  NotFoundException
-} from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-/* ---------- Readers & Hints ---------- */
 const codeReader = new BrowserMultiFormatReader();
-
-const hintMap = new Map();
-hintMap.set(DecodeHintType.TRY_HARDER, true);
-// broaden a bit; EAN-13 is typical for wine
-hintMap.set(DecodeHintType.POSSIBLE_FORMATS, [
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
-  BarcodeFormat.CODE_128,
-  BarcodeFormat.CODE_39,
-  BarcodeFormat.ITF,
-  BarcodeFormat.CODE_93,
-  BarcodeFormat.CODABAR,
-  BarcodeFormat.QR_CODE
-]);
-
-/* ---------- State ---------- */
 let currentStream = null;
+let availableCameras = [];
 let currentCameraIndex = 0;
-let opening = false;
-let preferredBackCameraId = null;
+let opening = false; // prevent overlapping opens
+let preferredBackCameraId = null; // remembered back camera id after first successful environment capture
 const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
 try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
 
-let fallbackInterval = null;
-let lastPrimaryHitAt = 0;
-let lastFallbackRunAt = 0;
-let fallbackCooldownMs = 120;   // max ~8fps for fallback sampling
-let fallbackIdleBeforeMs = 220; // wait this long since last primary hit
-let fallbackRotationPhase = 90; // 90 -> 270 -> 90 ...
+/* ...existing code... */
 
-// Offscreen canvas reused
-const offCanvas = document.createElement('canvas');
-const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
-offCtx.imageSmoothingEnabled = false;
-
-/* ---------- Camera helpers ---------- */
-async function maybeEnableTorch(track) {
-  try {
-    const caps = track.getCapabilities?.();
-    if (caps && 'torch' in caps && caps.torch) {
-      await track.applyConstraints({ advanced: [{ torch: true }] });
-      return true;
-    }
-  } catch (_) {}
-  return false;
-}
-
-async function applyAdvancedCameraSettings(track) {
-  const interval = setInterval(async () => {
-    try {
-      await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-    } catch (_) {}
-  }, 1500);
-  return interval;
-}
-
-/* ---------- Fallback: draw & decode at 90° / 270° ---------- */
-function drawRotated(video, rotation) {
-  const vw = Math.max(1, video.videoWidth || 1280);
-  const vh = Math.max(1, video.videoHeight || 720);
-
-  // keep good detail; iOS handles this fine
-  const MAX_W = 1440;
-  const scale = Math.min(1, MAX_W / vw);
-  const sw = Math.round(vw * scale);
-  const sh = Math.round(vh * scale);
-
-  if (rotation === 90 || rotation === 270) {
-    offCanvas.width = sh;
-    offCanvas.height = sw;
-  } else {
-    offCanvas.width = sw;
-    offCanvas.height = sh;
-  }
-
-  offCtx.save();
-  switch (rotation) {
-    case 90:
-      offCtx.translate(offCanvas.width, 0);
-      offCtx.rotate(Math.PI / 2);
-      break;
-    case 180:
-      offCtx.translate(offCanvas.width, offCanvas.height);
-      offCtx.rotate(Math.PI);
-      break;
-    case 270:
-      offCtx.translate(0, offCanvas.height);
-      offCtx.rotate(3 * Math.PI / 2);
-      break;
-    default:
-      break;
-  }
-  offCtx.drawImage(video, 0, 0, sw, sh);
-  offCtx.restore();
-}
-
-function bandROIs5() {
-  const cw = offCanvas.width;
-  const ch = offCanvas.height;
-
-  // 5 horizontal bands tuned for 1D barcodes
-  const pad = Math.floor(ch * 0.04);
-  const bandH = Math.floor(ch * 0.22);
-  const midY = Math.floor((ch - bandH) / 2);
-
-  return [
-    { x: 0, y: Math.max(pad, midY - Math.floor(bandH * 1.2)), w: cw, h: bandH },          // upper-mid
-    { x: 0, y: Math.max(pad, midY - Math.floor(bandH * 0.4)), w: cw, h: bandH },          // near-center top
-    { x: 0, y: midY,                                           w: cw, h: bandH },          // center
-    { x: 0, y: Math.min(ch - bandH - pad, midY + Math.floor(bandH * 0.4)), w: cw, h: bandH }, // near-center bottom
-    { x: 0, y: Math.min(ch - bandH - pad, midY + Math.floor(bandH * 1.2)), w: cw, h: bandH }  // lower-mid
-  ];
-}
-
-function buildLuminance(roi, inverted) {
-  const { x, y, w, h } = roi;
-  if (w <= 0 || h <= 0) return null;
-  const img = offCtx.getImageData(x, y, w, h);
-  const base = new RGBLuminanceSource(img.data, w, h);
-  return inverted ? new InvertedLuminanceSource(base) : base;
-}
-
-function tryDecodeWith(lum, useGlobal) {
-  const reader = new MultiFormatReader();  // fresh instance per attempt → clean state
-  reader.setHints(hintMap);
-  const bin = useGlobal ? new GlobalHistogramBinarizer(lum) : new HybridBinarizer(lum);
-  const bmp = new BinaryBitmap(bin);
-  try {
-    const res = reader.decodeWithState(bmp);
-    return res?.getText?.() || null;
-  } catch (e) {
-    if (e instanceof NotFoundException) return null;
-    return null;
-  }
-}
-
-function tryBandsThenFull(rotation) {
-  drawRotated(el('video'), rotation);
-
-  // 1) five bands: Hybrid → Global → Inverted Hybrid
-  const bands = bandROIs5();
-  for (let i = 0; i < bands.length; i++) {
-    const roi = bands[i];
-
-    // Hybrid
-    let lum = buildLuminance(roi, false);
-    if (lum) {
-      let t = tryDecodeWith(lum, false);
-      if (t) return t;
-    }
-
-    // Global
-    lum = buildLuminance(roi, false);
-    if (lum) {
-      let t = tryDecodeWith(lum, true);
-      if (t) return t;
-    }
-
-    // Inverted Hybrid
-    lum = buildLuminance(roi, true);
-    if (lum) {
-      let t = tryDecodeWith(lum, false);
-      if (t) return t;
-    }
-  }
-
-  // 2) Cheap full-frame as last try
-  const full = { x: 0, y: 0, w: offCanvas.width, h: offCanvas.height };
-  let lum = buildLuminance(full, false);
-  if (lum) {
-    let t = tryDecodeWith(lum, false);
-    if (t) return t;
-  }
-  lum = buildLuminance(full, true);
-  if (lum) {
-    let t = tryDecodeWith(lum, false);
-    if (t) return t;
-  }
-
-  return null;
-}
-
-/* ---------- Your original camera start with minimal changes ---------- */
 async function startCamera(onScanComplete) {
-  if (opening) return;
+  if (opening) return; // guard
   opening = true;
   const vid = el('video');
-
-  try {
-    vid.setAttribute('playsinline', 'true');
-    vid.setAttribute('webkit-playsinline', 'true');
-    vid.muted = true;
-    vid.autoplay = true;
-  } catch (_) {}
-
+  let focusInterval = null;
   el('scanStatus').textContent = '📷 Initializing camera…';
   let triedBackSwitch = false;
 
@@ -225,19 +29,24 @@ async function startCamera(onScanComplete) {
       width: { ideal: 1920, max: 1920 },
       height: { ideal: 1080, max: 1080 },
       focusMode: 'continuous',
-      advanced: [{ focusMode: 'continuous' }, { focusDistance: 0.5 }]
+      advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
     };
-    if (preferredBackCameraId) return { ...base, deviceId: { exact: preferredBackCameraId } };
+    if (preferredBackCameraId) {
+      return { ...base, deviceId: { exact: preferredBackCameraId } };
+    }
+    // First attempt: let browser pick environment
     return { ...base, facingMode: { ideal: 'environment' } };
   };
 
   const runDecoder = async () => {
     try { codeReader.reset(); } catch(_) {}
+    // Clean previous
     if (vid && vid.srcObject) {
       try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
       vid.srcObject = null;
     }
 
+    // Validate stored preferred back camera still exists
     try {
       const devs = await navigator.mediaDevices.enumerateDevices();
       const vidsList = devs.filter(d=>d.kind==='videoinput');
@@ -247,112 +56,130 @@ async function startCamera(onScanComplete) {
       }
     } catch(_) {}
 
+    // Build constraints only referencing deviceId if we already know the back cam
     const constraints = { video: buildVideoConstraints() };
-
+    let decodeSucceeded = false;
     try {
-      await codeReader.decodeFromConstraints(constraints, vid, async (res) => {
+      await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
         if (res) {
-          lastPrimaryHitAt = performance.now();
           const code = res.getText();
-          el('scanStatus').textContent = `✅ ${code}`;
-          stopScan();
-          if (onScanComplete) await onScanComplete(code);
+            el('scanStatus').textContent = `✅ ${code}`;
+            stopScan();
+            if (onScanComplete) await onScanComplete(code);
         }
       });
+      decodeSucceeded = true;
     } catch (err) {
       if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
         if (preferredBackCameraId) {
-          preferredBackCameraId = null;
-          try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-          el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
-          await codeReader.decodeFromConstraints(
-            { video: { facingMode: { ideal: 'environment' } } },
-            vid,
-            async (res) => {
+          // Stored back camera no longer valid; clear and retry with environment
+            preferredBackCameraId = null;
+            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
+            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
               if (res) {
-                lastPrimaryHitAt = performance.now();
                 const code = res.getText();
                 el('scanStatus').textContent = `✅ ${code}`;
                 stopScan();
                 if (onScanComplete) await onScanComplete(code);
               }
-            }
-          );
-        } else {
+            });
+            decodeSucceeded = true;
+        } else if (!preferredBackCameraId) {
+          // Retry minimal fallback (still prefer environment)
           el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-          await codeReader.decodeFromConstraints(
-            { video: { facingMode: { ideal: 'environment' } } },
-            vid,
-            async (res) => {
-              if (res) {
-                lastPrimaryHitAt = performance.now();
-                const code = res.getText();
-                el('scanStatus').textContent = `✅ ${code}`;
-                stopScan();
-                if (onScanComplete) await onScanComplete(code);
-              }
+          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+            if (res) {
+              const code = res.getText();
+              el('scanStatus').textContent = `✅ ${code}`;
+              stopScan();
+              if (onScanComplete) await onScanComplete(code);
             }
-          );
+          });
+          decodeSucceeded = true;
         }
       } else {
         throw err;
       }
     }
+    if (!decodeSucceeded) throw new Error('Could not start decoder');
 
+    // Wait for readiness
     await new Promise(r => {
       if (vid.readyState >= vid.HAVE_METADATA) return r();
       vid.addEventListener('loadedmetadata', () => r(), { once: true });
     });
 
-    try { await vid.play(); } catch (_) {}
-
     currentStream = vid.srcObject;
     if (currentStream) {
       const track = currentStream.getVideoTracks()[0];
       if (track) {
-        const settings = track.getSettings?.() || {};
-        if (settings.deviceId && settings.facingMode === 'environment' && !preferredBackCameraId) {
+        const settings = track.getSettings();
+        // If we successfully got environment camera, remember it
+        if (settings && settings.deviceId && settings.facingMode === 'environment' && !preferredBackCameraId) {
           preferredBackCameraId = settings.deviceId;
           try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
         }
-        // Try torch (best effort; ignore failures)
-        maybeEnableTorch(track);
-        // Continuous focus assist
-        try {
-          const f = await applyAdvancedCameraSettings(track);
-          currentStream._focusInterval = f;
-        } catch(_) {}
+        // If we ended up on front/user camera and haven't switched yet, try to find environment and switch
+        if (settings && settings.facingMode && settings.facingMode !== 'environment' && !triedBackSwitch) {
+          triedBackSwitch = true;
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const vids = devices.filter(d=>d.kind==='videoinput');
+            // Prefer labels containing environment/back/rear OR facingMode heuristic
+            const env = vids.find(d => /back|rear|environment/i.test(d.label));
+            if (env && env.deviceId && env.deviceId !== settings.deviceId) {
+              preferredBackCameraId = env.deviceId;
+              try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
+              // Restart decoder with explicit back camera
+              try { codeReader.reset(); } catch(_) {}
+              try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
+              vid.srcObject = null;
+              el('scanStatus').textContent = '🔁 Switching to back camera…';
+              await codeReader.decodeFromConstraints({ video: { deviceId: { exact: preferredBackCameraId }, width: { ideal:1920,max:1920 }, height:{ ideal:1080,max:1080 }, focusMode:'continuous', advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } }, vid, async (res, err2) => {
+                if (res) {
+                  const code = res.getText();
+                  el('scanStatus').textContent = `✅ ${code}`;
+                  stopScan();
+                  if (onScanComplete) await onScanComplete(code);
+                }
+              });
+              // Wait metadata again
+              await new Promise(r2 => {
+                if (vid.readyState >= vid.HAVE_METADATA) return r2();
+                vid.addEventListener('loadedmetadata', () => r2(), { once: true });
+              });
+              currentStream = vid.srcObject;
+            }
+          } catch (switchErr) {
+            console.log('Back camera switch attempt failed:', switchErr);
+          }
+        }
+        // Apply advanced focusing
+        if (currentStream) {
+          try {
+            const newTrack = currentStream.getVideoTracks()[0];
+            if (newTrack) {
+              focusInterval = await applyAdvancedCameraSettings(newTrack);
+              currentStream._focusInterval = focusInterval;
+            }
+          } catch(_) {}
+        }
       }
     }
-
-    // ---- Rotated fallback loop (alternating 90°/270°) ----
-    stopFallbackLoop();
-    fallbackRotationPhase = 90;
-    fallbackInterval = setInterval(() => {
-      const now = performance.now();
-      if ((now - lastPrimaryHitAt) < fallbackIdleBeforeMs) return; // primary likely active
-      if ((now - lastFallbackRunAt) < fallbackCooldownMs) return;  // throttle
-      lastFallbackRunAt = now;
-
-      const video = el('video');
-      if (!video || !video.videoWidth || !video.videoHeight) return;
-      if (!el('scannerModal').classList.contains('active')) return;
-
-      const rot = fallbackRotationPhase;
-      fallbackRotationPhase = (fallbackRotationPhase === 90) ? 270 : 90;
-
-      const text = tryBandsThenFull(rot);
-      if (text) {
-        el('scanStatus').textContent = `✅ ${text}`;
-        stopScan();
-        if (onScanComplete) onScanComplete(text);
-      }
-    }, 80);
   };
 
   try {
     await runDecoder();
     el('scanStatus').textContent = 'Point camera at barcode';
+    setTimeout(() => {
+      if (el('scannerModal').classList.contains('active') && el('video').srcObject) {
+        const txt = el('scanStatus').textContent || '';
+        if (txt.startsWith('📡')) {
+          el('scanStatus').textContent = '⌛ Still scanning… Move closer, steady the camera, or improve lighting';
+        }
+      }
+    }, 15000);
   } catch(e) {
     let msg;
     switch(e.name) {
@@ -369,18 +196,16 @@ async function startCamera(onScanComplete) {
   }
 }
 
-/* ---------- Public API ---------- */
 export async function startScan(onScanComplete) {
-  if (opening) return;
+  if (opening) return; // prevent double trigger
   el('scannerModal').classList.add('active');
   currentCameraIndex = 0;
+  // fire without awaiting so modal paints instantly
   startCamera(onScanComplete);
 }
 
 export function stopScan() {
   try { codeReader.reset(); } catch(_) {}
-  stopFallbackLoop();
-
   const vid = el('video');
   if (vid && vid.srcObject) {
     try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
@@ -389,7 +214,6 @@ export function stopScan() {
   if (currentStream) {
     if (currentStream._focusInterval) {
       clearInterval(currentStream._focusInterval);
-      currentStream._focusInterval = null;
     }
     try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
     currentStream = null;
@@ -401,12 +225,4 @@ export function stopScan() {
 
 export async function startScanForInput(onScanComplete) {
   await startScan(onScanComplete);
-}
-
-/* ---------- Utils ---------- */
-function stopFallbackLoop() {
-  if (fallbackInterval) {
-    clearInterval(fallbackInterval);
-    fallbackInterval = null;
-  }
 }
