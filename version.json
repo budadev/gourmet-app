@@ -1,8 +1,7 @@
 {
-  "version": "0.0.43",
+  "version": "0.0.42",
   "releaseDate": "2025-10-25",
   "changes": [
-    "Enhanced barcode scanner to detect barcodes rotated 90 degrees by enabling TRY_HARDER hint in ZXing and limiting to common 1D formats for better performance",
     "Added Filtering (Filtered / Unfiltered) field to Beer type",
     "Added new Beer item type (style, color, ABV, IBU, brewery, country, region) to item types configuration",
     "Disabled side menu / filter edge swipe gestures while any modal screen is open to prevent unintended interactions, and update version to 0.0.41",
