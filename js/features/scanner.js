@@ -2,23 +2,10 @@
    Barcode Scanner (ZXing Integration)
    ============================= */
 
-import { BrowserMultiFormatReader, DecodeHintType, MultiFormatReader, RGBLuminanceSource, BinaryBitmap, HybridBinarizer } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-// Primary streaming reader
 const codeReader = new BrowserMultiFormatReader();
-// Snapshot reader (used for rotated fallback decoding)
-const snapshotReader = new MultiFormatReader();
-
-// Hints increase robustness (TRY_HARDER lets ZXing internally attempt rotations for some formats)
-try {
-  const hints = new Map();
-  hints.set(DecodeHintType.TRY_HARDER, true);
-  hints.set(DecodeHintType.ALSO_INVERTED, true); // Sometimes dark-on-light vs light-on-dark
-  codeReader.setHints(hints);
-  snapshotReader.setHints(hints);
-} catch(_) {}
-
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
@@ -26,12 +13,6 @@ let opening = false; // prevent overlapping opens
 let preferredBackCameraId = null; // remembered back camera id after first successful environment capture
 const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
 try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
-
-// Interval id for rotation assist snapshot decoding
-let rotationAssistInterval = null;
-
-// Helper: apply advanced focus etc. (placeholder if existed earlier)
-async function applyAdvancedCameraSettings(track) { /* no-op placeholder if missing */ return null; }
 
 /* ...existing code... */
 
@@ -184,9 +165,6 @@ async function startCamera(onScanComplete) {
             }
           } catch(_) {}
         }
-
-        // Start rotation assist AFTER initial stream established
-        startRotationAssist(vid, onScanComplete);
       }
     }
   };
@@ -218,76 +196,6 @@ async function startCamera(onScanComplete) {
   }
 }
 
-// Rotation Assist: periodically snapshot the video, attempt 90° / 270° rotated decode for vertical barcodes (e.g., wine bottles held naturally while phone portrait)
-function startRotationAssist(videoEl, onScanComplete) {
-  if (rotationAssistInterval) clearInterval(rotationAssistInterval);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  let busy = false;
-  rotationAssistInterval = setInterval(async () => {
-    if (busy) return;
-    if (!videoEl || !videoEl.srcObject) { clearInterval(rotationAssistInterval); rotationAssistInterval = null; return; }
-    if (el('scanStatus').textContent.startsWith('✅')) { clearInterval(rotationAssistInterval); rotationAssistInterval = null; return; }
-    if (videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return;
-    busy = true;
-    try {
-      const w = videoEl.videoWidth;
-      const h = videoEl.videoHeight;
-      if (!w || !h) { busy = false; return; }
-      // First draw original orientation into canvas sized to video
-      canvas.width = w;
-      canvas.height = h;
-      ctx.save();
-      ctx.drawImage(videoEl, 0, 0, w, h);
-      ctx.restore();
-      // Extract image data for original (ZXing already trying this via streaming reader)
-      // Now test rotated 90° clockwise and counter-clockwise
-      const attemptRotations = [90, 270];
-      for (const angle of attemptRotations) {
-        const rw = angle % 180 === 0 ? w : h;
-        const rh = angle % 180 === 0 ? h : w;
-        // Resize canvas to rotated dimensions
-        canvas.width = rw;
-        canvas.height = rh;
-        ctx.save();
-        // Move origin to center then rotate
-        ctx.translate(rw/2, rh/2);
-        ctx.rotate(angle * Math.PI/180);
-        // Draw the video frame so that it fits after rotation
-        // When rotated 90/270, width/height swap
-        ctx.drawImage(videoEl, -w/2, -h/2, w, h);
-        ctx.restore();
-        const imgData = ctx.getImageData(0, 0, rw, rh);
-        const luminance = new RGBLuminanceSource(imgData.data, rw, rh);
-        const bitmap = new BinaryBitmap(new HybridBinarizer(luminance));
-        try {
-          const result = snapshotReader.decode(bitmap);
-          if (result && result.getText()) {
-            el('scanStatus').textContent = `✅ ${result.getText()} (rot ${angle}°)`;
-            stopScan();
-            if (onScanComplete) await onScanComplete(result.getText());
-            clearInterval(rotationAssistInterval);
-            rotationAssistInterval = null;
-            break;
-          }
-        } catch(inner) {
-          // Ignore not-found errors
-          if (inner && inner.name && inner.name !== 'NotFoundException') {
-            // console.debug('Rotation decode error', inner);
-          }
-        } finally {
-          try { snapshotReader.reset(); } catch(_) {}
-        }
-        if (!videoEl.srcObject) break;
-      }
-    } catch(err) {
-      // console.debug('Rotation assist failure', err);
-    } finally {
-      busy = false;
-    }
-  }, 800); // every 0.8s to limit CPU usage
-}
-
 export async function startScan(onScanComplete) {
   if (opening) return; // prevent double trigger
   el('scannerModal').classList.add('active');
@@ -298,8 +206,6 @@ export async function startScan(onScanComplete) {
 
 export function stopScan() {
   try { codeReader.reset(); } catch(_) {}
-  try { snapshotReader.reset(); } catch(_) {}
-  if (rotationAssistInterval) { clearInterval(rotationAssistInterval); rotationAssistInterval = null; }
   const vid = el('video');
   if (vid && vid.srcObject) {
     try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
