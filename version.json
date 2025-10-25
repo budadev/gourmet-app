@@ -1,17 +1,15 @@
 {
-  "version": "0.0.35",
+  "version": "0.0.36",
   "releaseDate": "2025-10-25",
   "changes": [
+    "iOS: Fixed filter menu header overlapping with camera island/notch",
+    "iOS: Reduced bottom gap for Clear Filters button on mobile",
     "Filter panel width now matches left menu (280px, max 85vw)",
     "FAB (Add button) now hides when any side menu is open",
+    "Reduced height of rating filter components for better space efficiency",
     "Place filter dropdown shows all places by default (scrollable list)",
     "Place dropdown closes and input clears automatically after selecting a place",
     "Fixed star rating filters - now properly updates when selecting ratings",
-    "Improved filter UI responsiveness and interaction",
-    "Redesigned Filter UI with modern 2025 aesthetics",
-    "Filter panel now slides from right (similar to hamburger menu)",
-    "Added multi-select dropdown for Type filter",
-    "Added searchable place selector with selected tags display",
-    "Clear All Filters button now only shows when filters are active"
+    "Redesigned Filter UI with modern 2025 aesthetics"
   ]
 }

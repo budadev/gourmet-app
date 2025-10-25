@@ -109,8 +109,8 @@
 
 /* Filter panel header */
 .filter-panel-header {
-  padding: 24px 24px 20px 24px;
-  padding-top: calc(24px + env(safe-area-inset-top));
+  padding: 20px 24px 20px 24px;
+  padding-top: calc(48px + env(safe-area-inset-top));
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   flex-shrink: 0;
@@ -631,7 +631,8 @@
   }
 
   .filter-panel-header {
-    padding: 20px 20px 16px 20px;
+    padding: 16px 20px 16px 20px;
+    padding-top: calc(40px + env(safe-area-inset-top));
   }
 
   .filter-panel-title {
@@ -644,5 +645,10 @@
 
   .filter-section {
     margin-bottom: 28px;
+  }
+
+  .filter-panel-footer {
+    padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 }
