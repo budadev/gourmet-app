@@ -1,5 +1,5 @@
 {
-  "version": "0.0.48",
+  "version": "0.0.49",
   "releaseDate": "2025-10-25",
   "changes": [
     "ADDED: About dialog now checks for updates when opened",

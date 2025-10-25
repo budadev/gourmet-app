@@ -113,7 +113,12 @@ function showUpdateBanner(newVersion, oldVersion, changes) {
   banner.innerHTML = `
     <div class="update-banner-content">
       <div class="update-banner-header">
-        <div class="update-icon">🎉</div>
+        <div class="update-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
         <div class="update-title">
           <strong>Update Available</strong>
           <span class="update-version">Version ${newVersion}</span>
@@ -164,7 +169,12 @@ async function applyUpdate(newVersion) {
   banner.innerHTML = `
     <div class="update-banner-content">
       <div class="update-banner-header">
-        <div class="update-icon">⏳</div>
+        <div class="update-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#007aff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: rotate 1s linear infinite;">
+            <circle cx="12" cy="12" r="10" opacity="0.25"/>
+            <path d="M12 2a10 10 0 0 1 10 10"/>
+          </svg>
+        </div>
         <div class="update-title">
           <strong>Updating...</strong>
           <span class="update-version">Please wait</span>
@@ -202,7 +212,11 @@ async function applyUpdate(newVersion) {
     banner.innerHTML = `
       <div class="update-banner-content">
         <div class="update-banner-header">
-          <div class="update-icon">✅</div>
+          <div class="update-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+          </div>
           <div class="update-title">
             <strong>Update Complete!</strong>
             <span class="update-version">Reloading app...</span>
@@ -225,7 +239,13 @@ async function applyUpdate(newVersion) {
     banner.innerHTML = `
       <div class="update-banner-content">
         <div class="update-banner-header">
-          <div class="update-icon">❌</div>
+          <div class="update-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+          </div>
           <div class="update-title">
             <strong>Update Failed</strong>
             <span class="update-version">Please try again</span>
