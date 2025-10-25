@@ -121,6 +121,18 @@ export async function showItemDetails(id, onEdit, onDelete) {
     };
   });
 
+  // Bind place badges to filter by that place
+  detailsContent.querySelectorAll('.place-badge.clickable').forEach(placeBadge => {
+    placeBadge.onclick = async () => {
+      const placeId = Number(placeBadge.getAttribute('data-place-id'));
+      // Close the details modal
+      closeModal('detailsModal');
+      // Apply the place filter (which clears other filters)
+      const { applyPlaceFilter } = await import('./filters.js');
+      await applyPlaceFilter(placeId);
+    };
+  });
+
   // Bind edit button
   el('editDetailsBtn').onclick = () => {
     closeModal('detailsModal');

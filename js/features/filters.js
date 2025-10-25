@@ -33,6 +33,24 @@ export function clearAllFilters() {
 }
 
 /**
+ * Apply a single place filter, clearing all other filters
+ */
+export async function applyPlaceFilter(placeId) {
+  // Clear all filters
+  clearAllFilters();
+
+  // Set the specific place filter
+  currentFilters.places = [placeId];
+
+  // Update the UI
+  await renderFilterPanel();
+  updateFilterButtonBadge();
+
+  // Trigger filter change to update the item list
+  triggerFilterChange();
+}
+
+/**
  * Apply current filters to a list of items
  */
 export function applyFilters(items) {

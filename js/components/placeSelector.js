@@ -215,7 +215,7 @@ async function renderSearchResults(results, query) {
 }
 
 /**
- * Render places in details view (read-only)
+ * Render places in details view (clickable to filter)
  */
 export async function renderPlacesInDetails(placeIds) {
   if (!placeIds || placeIds.length === 0) {
@@ -226,15 +226,13 @@ export async function renderPlacesInDetails(placeIds) {
   html += '<div class="detail-label">Places</div>';
   html += '<div class="detail-value">';
 
-  const places = [];
   for (const placeId of placeIds) {
     const place = await getPlaceById(placeId);
     if (place) {
-      places.push(place.name);
+      html += '<span class="place-badge clickable" data-place-id="' + placeId + '">📍 ' + escapeHtml(place.name) + '</span>';
     }
   }
 
-  html += places.map(name => '<span class="place-badge">📍 ' + escapeHtml(name) + '</span>').join(' ');
   html += '</div></div>';
 
   return html;
