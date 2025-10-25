@@ -1,27 +1,14 @@
 /* =============================
    Barcode Scanner (ZXing Integration)
-   Enhanced with multi-orientation support for rotated barcodes
    ============================= */
 
-import { BrowserMultiFormatReader, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-// Configure hints for better barcode detection including rotated barcodes
-const hints = new Map();
-hints.set(DecodeHintType.TRY_HARDER, true);
-hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-  // Support common barcode formats
-  'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E',
-  'CODE_128', 'CODE_39', 'CODE_93',
-  'ITF', 'CODABAR'
-]);
-
-const codeReader = new BrowserMultiFormatReader(hints);
+const codeReader = new BrowserMultiFormatReader();
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
-let scanningActive = false;
-let rotationScanInterval = null;
 
 async function getAvailableCameras() {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -34,110 +21,6 @@ async function getAvailableCameras() {
     return 0;
   });
   return videoDevices;
-}
-
-// Try to decode barcode at multiple orientations (0°, 90°, 180°, 270°)
-async function tryDecodeWithRotations(video) {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-
-  // Set canvas size to match video
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  // Draw current frame
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  // Try decoding at original orientation first (fastest)
-  try {
-    const result = await codeReader.decodeFromImageElement(video);
-    if (result) return result;
-  } catch (e) {
-    // No barcode found at 0°, try other orientations
-  }
-
-  // Try 90° rotation (most common case for vertical barcodes)
-  try {
-    const rotated90 = document.createElement('canvas');
-    const ctx90 = rotated90.getContext('2d');
-    rotated90.width = canvas.height;
-    rotated90.height = canvas.width;
-    ctx90.translate(rotated90.width / 2, rotated90.height / 2);
-    ctx90.rotate(90 * Math.PI / 180);
-    ctx90.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-    const result = await codeReader.decodeFromCanvas(rotated90);
-    if (result) return result;
-  } catch (e) {
-    // No barcode at 90°
-  }
-
-  // Try 270° rotation (-90°)
-  try {
-    const rotated270 = document.createElement('canvas');
-    const ctx270 = rotated270.getContext('2d');
-    rotated270.width = canvas.height;
-    rotated270.height = canvas.width;
-    ctx270.translate(rotated270.width / 2, rotated270.height / 2);
-    ctx270.rotate(270 * Math.PI / 180);
-    ctx270.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-    const result = await codeReader.decodeFromCanvas(rotated270);
-    if (result) return result;
-  } catch (e) {
-    // No barcode at 270°
-  }
-
-  // 180° is usually handled by ZXing automatically, but try it anyway
-  try {
-    const rotated180 = document.createElement('canvas');
-    const ctx180 = rotated180.getContext('2d');
-    rotated180.width = canvas.width;
-    rotated180.height = canvas.height;
-    ctx180.translate(rotated180.width / 2, rotated180.height / 2);
-    ctx180.rotate(180 * Math.PI / 180);
-    ctx180.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-    const result = await codeReader.decodeFromCanvas(rotated180);
-    if (result) return result;
-  } catch (e) {
-    // No barcode found at any orientation
-  }
-
-  return null;
-}
-
-// Start continuous scanning with rotation support
-function startRotationScanning(video, onScanComplete) {
-  scanningActive = true;
-
-  const scanFrame = async () => {
-    if (!scanningActive || !video.videoWidth) {
-      return;
-    }
-
-    try {
-      const result = await tryDecodeWithRotations(video);
-      if (result) {
-        const code = result.getText();
-        el('scanStatus').textContent = `Scanned: ${code}`;
-        scanningActive = false;
-        stopScan();
-        if (onScanComplete) await onScanComplete(code);
-        return;
-      }
-    } catch (e) {
-      // Continue scanning
-    }
-
-    // Schedule next scan attempt
-    if (scanningActive) {
-      rotationScanInterval = setTimeout(scanFrame, 100); // Try every 100ms
-    }
-  };
-
-  // Start the scanning loop
-  scanFrame();
 }
 
 // Apply advanced camera settings for better autofocus
@@ -333,11 +216,15 @@ async function startCamera(onScanComplete) {
       }
     });
 
-    // Make sure video is playing
-    await vid.play();
-
-    // Start rotation scanning with multi-orientation support
-    startRotationScanning(vid, onScanComplete);
+    // Use decodeFromVideoDevice which will handle video playback internally
+    codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
+      if (res) {
+        const code = res.getText();
+        el('scanStatus').textContent = `Scanned: ${code}`;
+        stopScan();
+        if (onScanComplete) await onScanComplete(code);
+      }
+    });
   } catch (e) {
     // Provide more helpful error messages
     let errorMsg = 'Camera error: ';
@@ -366,13 +253,6 @@ export async function startScan(onScanComplete) {
 }
 
 export function stopScan() {
-  // Stop rotation scanning
-  scanningActive = false;
-  if (rotationScanInterval) {
-    clearTimeout(rotationScanInterval);
-    rotationScanInterval = null;
-  }
-
   try {
     codeReader.reset();
   } catch (_) { }
