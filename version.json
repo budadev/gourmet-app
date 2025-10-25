@@ -1,19 +1,7 @@
 {
-  "version": "0.0.49",
+  "version": "0.1.0",
   "releaseDate": "2025-10-25",
   "changes": [
-    "ADDED: About dialog now checks for updates when opened",
-    "ADDED: Update status indicator in About dialog - shows if update is available or app is up to date",
-    "ADDED: 'Check for Details' button in About dialog to open update banner when new version is available",
-    "(Previous) FIXED: First barcode scan after app launch now works correctly - database is fully initialized before allowing scans",
-    "(Previous) Improved database initialization with ensureDbReady() to prevent race conditions",
-    "(Previous) App now guarantees database is ready before any operations can occur",
-    "(Previous) Removed debug visualization overlays from camera view for cleaner user experience",
-    "(Previous) Improved autofocus for close-up barcode scanning with continuous focus mode",
-    "(Previous) Replaced ZXing with Quagga2 - supports scanning barcodes at ANY rotation (0°, 90°, 180°, 270°)",
-    "(Previous) Wine bottles with rotated barcodes can be scanned in portrait mode",
-    "(Previous) Added support for multiple barcode formats: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39",
-    "(Previous) Added Beer item type with style, color, ABV, IBU, brewery, country, region",
-    "(Previous) Disabled side menu swipe gestures while modals are open"
+    "Beta version released with core features implemented - Ready for testing and feedback."
   ]
 }
