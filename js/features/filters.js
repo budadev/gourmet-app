@@ -11,7 +11,7 @@ import { renderStars, setupStarRating } from '../components/rating.js';
 let currentFilters = {
   types: [], // Array of selected type strings
   places: [], // Array of selected place IDs
-  minRating: 0.5,
+  minRating: 0,
   maxRating: 5
 };
 
@@ -27,7 +27,7 @@ export function clearAllFilters() {
   currentFilters = {
     types: [],
     places: [],
-    minRating: 0.5,
+    minRating: 0,
     maxRating: 5
   };
 }
@@ -133,17 +133,20 @@ export function closeFilterPanel() {
  */
 export async function updateFilterButtonBadge() {
   const badge = el('filterBadge');
+  const footer = el('filterPanelFooter');
   let count = 0;
 
   if (currentFilters.types.length > 0) count++;
   if (currentFilters.places.length > 0) count++;
-  if (currentFilters.minRating !== 0.5 || currentFilters.maxRating !== 5) count++;
+  if (currentFilters.minRating !== 0 || currentFilters.maxRating !== 5) count++;
 
   if (count > 0) {
     badge.textContent = count;
     badge.style.display = 'flex';
+    if (footer) footer.classList.add('active');
   } else {
     badge.style.display = 'none';
+    if (footer) footer.classList.remove('active');
   }
 }
 
@@ -165,6 +168,9 @@ async function renderFilterPanel() {
   // Render star rating selectors
   renderStarRating(minRatingContainer, currentFilters.minRating, 'min');
   renderStarRating(maxRatingContainer, currentFilters.maxRating, 'max');
+
+  // Update footer visibility
+  updateFilterButtonBadge();
 }
 
 /**
@@ -177,6 +183,21 @@ async function renderTypeMultiSelect(container) {
   const types = Object.keys(typeConfig);
 
   let html = '<div class="filter-multiselect">';
+  html += '<div class="filter-multiselect-dropdown" id="typeMultiselectDropdown">';
+
+  types.forEach(type => {
+    const info = typeConfig[type];
+    const checked = currentFilters.types.includes(type) ? 'checked' : '';
+    html += `
+      <label class="filter-multiselect-option">
+        <input type="checkbox" value="${type}" ${checked} data-filter-type="type">
+        <span class="filter-multiselect-option-label">${info.icon} ${info.label}</span>
+      </label>
+    `;
+  });
+
+  html += '</div>';
+
   html += '<div class="filter-multiselect-trigger" id="typeMultiselectTrigger">';
   html += '<span class="filter-multiselect-label">';
 
@@ -190,22 +211,7 @@ async function renderTypeMultiSelect(container) {
   }
 
   html += '</span>';
-  html += '</div>';
-
-  html += '<div class="filter-multiselect-dropdown" id="typeMultiselectDropdown">';
-
-  types.forEach(type => {
-    const info = typeConfig[type];
-    const checked = currentFilters.types.includes(type) ? 'checked' : '';
-    html += `
-      <label class="filter-multiselect-option">
-        <input type="checkbox" value="${type}" ${checked} data-filter-type="type">
-        <span class="filter-multiselect-option-label">${info.icon} ${info.label}</span>
-        <span class="filter-multiselect-check">✓</span>
-      </label>
-    `;
-  });
-
+  html += '<span class="filter-multiselect-arrow">▼</span>';
   html += '</div>';
   html += '</div>';
 
@@ -251,67 +257,160 @@ async function renderPlaceSearch(container) {
   if (!container) return;
 
   let html = '<div class="filter-place-search">';
-  html += '<input type="text" class="filter-place-input" id="filterPlaceInput" placeholder="Search places...">';
-  html += '<div class="filter-place-results" id="filterPlaceResults"></div>';
+  html += '<div class="filter-place-search-wrapper">';
+  html += '<input type="text" class="filter-place-input" id="filterPlaceInput" placeholder="Search places..." autocomplete="off">';
+  html += '<div class="filter-place-dropdown" id="filterPlaceDropdown"></div>';
+  html += '</div>';
+  html += '<div class="filter-selected-places" id="filterSelectedPlaces"></div>';
   html += '</div>';
 
   container.innerHTML = html;
 
   const input = el('filterPlaceInput');
-  const resultsContainer = el('filterPlaceResults');
+  const dropdown = el('filterPlaceDropdown');
 
-  // Show all places initially
-  await updatePlaceResults('');
+  // Render selected places
+  await renderSelectedPlaces();
 
   // Search on input
   let searchTimeout;
   input.oninput = async (e) => {
     clearTimeout(searchTimeout);
+    const query = e.target.value.trim();
+
+    if (!query) {
+      dropdown.classList.remove('active');
+      return;
+    }
+
     searchTimeout = setTimeout(async () => {
-      await updatePlaceResults(e.target.value.trim());
+      await showPlaceDropdown(query);
     }, 200);
   };
+
+  // Show dropdown on focus - show first 3 places if input is empty
+  input.onfocus = async (e) => {
+    const query = e.target.value.trim();
+    if (query) {
+      await showPlaceDropdown(query);
+    } else {
+      // Show all places from DB (no limit)
+      await showPlaceDropdown('');
+    }
+  };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.filter-place-search-wrapper')) {
+      dropdown.classList.remove('active');
+    }
+  });
 }
 
 /**
- * Update place search results
+ * Show place dropdown with search results
  */
-async function updatePlaceResults(query) {
-  const resultsContainer = el('filterPlaceResults');
-  if (!resultsContainer) return;
+async function showPlaceDropdown(query, limit = null) {
+  const dropdown = el('filterPlaceDropdown');
+  if (!dropdown) return;
 
-  const places = query ? await searchPlaces(query) : await getAllPlaces();
+  let places;
+  if (query) {
+    places = await searchPlaces(query);
+  } else {
+    // Get all places and limit if needed
+    places = await getAllPlaces();
+    if (limit && places.length > limit) {
+      places = places.slice(0, limit);
+    }
+  }
 
   if (places.length === 0) {
-    resultsContainer.innerHTML = '<div class="filter-empty-state">No places found</div>';
+    dropdown.innerHTML = '<div class="filter-empty-state">No places found</div>';
+    dropdown.classList.add('active');
     return;
   }
 
   let html = '';
   places.forEach(place => {
-    const checked = currentFilters.places.includes(place.id) ? 'checked' : '';
+    const isSelected = currentFilters.places.includes(place.id);
     html += `
-      <label class="filter-place-option">
-        <input type="checkbox" value="${place.id}" ${checked} data-filter-type="place">
-        <span class="filter-place-option-label">📍 ${place.name}</span>
-        <span class="filter-place-check">✓</span>
-      </label>
+      <div class="filter-place-dropdown-item ${isSelected ? 'selected' : ''}" data-place-id="${place.id}">
+        <span class="filter-place-dropdown-icon">📍</span>
+        <span class="filter-place-dropdown-name">${place.name}</span>
+        ${isSelected ? '<span class="filter-place-dropdown-check">✓</span>' : ''}
+      </div>
     `;
   });
 
-  resultsContainer.innerHTML = html;
+  dropdown.innerHTML = html;
+  dropdown.classList.add('active');
 
-  // Handle checkbox changes
-  resultsContainer.querySelectorAll('[data-filter-type="place"]').forEach(checkbox => {
-    checkbox.onchange = (e) => {
-      const placeId = Number(e.target.value);
-      if (e.target.checked) {
-        if (!currentFilters.places.includes(placeId)) {
-          currentFilters.places.push(placeId);
-        }
-      } else {
+  // Handle place selection
+  dropdown.querySelectorAll('.filter-place-dropdown-item').forEach(item => {
+    item.onclick = async () => {
+      const placeId = Number(item.getAttribute('data-place-id'));
+      const isSelected = currentFilters.places.includes(placeId);
+
+      if (isSelected) {
+        // Remove place
         currentFilters.places = currentFilters.places.filter(p => p !== placeId);
+      } else {
+        // Add place
+        currentFilters.places.push(placeId);
       }
+
+      await renderSelectedPlaces();
+      triggerFilterChange();
+
+      // Clear search input and close dropdown
+      const input = el('filterPlaceInput');
+      if (input) {
+        input.value = '';
+      }
+      dropdown.classList.remove('active');
+    };
+  });
+}
+
+/**
+ * Render selected places
+ */
+async function renderSelectedPlaces() {
+  const container = el('filterSelectedPlaces');
+  if (!container) return;
+
+  if (currentFilters.places.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let html = '<div class="filter-place-tags">';
+
+  for (const placeId of currentFilters.places) {
+    const { getPlaceById } = await import('../models/places.js');
+    const place = await getPlaceById(placeId);
+    if (place) {
+      html += `
+        <div class="filter-place-tag">
+          <span class="filter-place-tag-icon">📍</span>
+          <span class="filter-place-tag-name">${place.name}</span>
+          <button class="filter-place-tag-remove" data-place-id="${placeId}" type="button">×</button>
+        </div>
+      `;
+    }
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Handle remove buttons
+  container.querySelectorAll('.filter-place-tag-remove').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const placeId = Number(btn.getAttribute('data-place-id'));
+      currentFilters.places = currentFilters.places.filter(p => p !== placeId);
+      await renderSelectedPlaces();
       triggerFilterChange();
     };
   });
@@ -328,9 +427,9 @@ function renderStarRating(container, rating, type) {
   let html = '<div class="filter-star-rating">';
   html += `<div class="filter-range-label">`;
   html += `<span class="filter-range-label-text">${label}</span>`;
-  html += `<span class="filter-range-value">${rating}</span>`;
+  html += `<span class="filter-range-value" id="filterRating${type}">${rating}</span>`;
   html += `</div>`;
-  html += '<div class="filter-star-container">';
+  html += '<div class="filter-star-container" id="filterStarContainer${type}">';
   html += renderStars(rating, true);
   html += '</div>';
   html += '</div>';
@@ -340,25 +439,82 @@ function renderStarRating(container, rating, type) {
   // Setup star rating interaction
   const starContainer = container.querySelector('.star-rating');
   if (starContainer) {
-    setupStarRating(starContainer, rating);
+    const ratingController = setupStarRating(starContainer, rating);
 
-    // Listen for rating changes
+    // Store initial rating
+    let lastValidRating = rating;
+
+    // Listen for star clicks and changes
     const stars = starContainer.querySelectorAll('.star');
     stars.forEach(star => {
-      star.addEventListener('click', () => {
-        const newRating = parseFloat(star.getAttribute('data-value'));
+      star.addEventListener('mouseup', () => {
+        const newRating = ratingController.getValue();
 
-        if (type === 'min') {
-          if (newRating <= currentFilters.maxRating) {
+        // Validate rating constraints
+        let isValid = true;
+        if (type === 'min' && newRating > currentFilters.maxRating) {
+          isValid = false;
+        } else if (type === 'max' && newRating < currentFilters.minRating) {
+          isValid = false;
+        }
+
+        if (isValid) {
+          lastValidRating = newRating;
+          if (type === 'min') {
             currentFilters.minRating = newRating;
-            renderStarRating(container, newRating, type);
-            triggerFilterChange();
-          }
-        } else {
-          if (newRating >= currentFilters.minRating) {
+          } else {
             currentFilters.maxRating = newRating;
-            renderStarRating(container, newRating, type);
-            triggerFilterChange();
+          }
+
+          // Update the displayed value
+          const valueDisplay = container.querySelector('.filter-range-value');
+          if (valueDisplay) {
+            valueDisplay.textContent = newRating;
+          }
+
+          triggerFilterChange();
+        } else {
+          // Revert to last valid rating
+          ratingController.setValue(lastValidRating);
+          const valueDisplay = container.querySelector('.filter-range-value');
+          if (valueDisplay) {
+            valueDisplay.textContent = lastValidRating;
+          }
+        }
+      });
+
+      star.addEventListener('touchend', () => {
+        const newRating = ratingController.getValue();
+
+        // Validate rating constraints
+        let isValid = true;
+        if (type === 'min' && newRating > currentFilters.maxRating) {
+          isValid = false;
+        } else if (type === 'max' && newRating < currentFilters.minRating) {
+          isValid = false;
+        }
+
+        if (isValid) {
+          lastValidRating = newRating;
+          if (type === 'min') {
+            currentFilters.minRating = newRating;
+          } else {
+            currentFilters.maxRating = newRating;
+          }
+
+          // Update the displayed value
+          const valueDisplay = container.querySelector('.filter-range-value');
+          if (valueDisplay) {
+            valueDisplay.textContent = newRating;
+          }
+
+          triggerFilterChange();
+        } else {
+          // Revert to last valid rating
+          ratingController.setValue(lastValidRating);
+          const valueDisplay = container.querySelector('.filter-range-value');
+          if (valueDisplay) {
+            valueDisplay.textContent = lastValidRating;
           }
         }
       });

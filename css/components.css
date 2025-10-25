@@ -166,6 +166,14 @@ label{
 }
 .fab:active{transform:scale(0.95) rotate(90deg)}
 
+/* Hide FAB when side menus are open */
+.side-menu.active ~ .fab,
+.filter-panel.active ~ .fab {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
 /* Dynamic fields */
 .field-group{margin-bottom:16px}
 .field-group label{display:block;margin-bottom:6px}

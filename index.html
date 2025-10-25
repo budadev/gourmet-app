@@ -279,9 +279,6 @@ How to use:
     <div id="results" class="list"></div>
 </main>
 
-<!-- Floating add button -->
-<button class="fab" id="fabBtn" title="Add new item">+</button>
-
 <!-- Photo viewer modal -->
 <div id="photoModal" class="photo-modal">
     <button class="close-btn" id="closePhotoBtn">×</button>
@@ -295,13 +292,7 @@ How to use:
 <div class="filter-overlay" id="filterOverlay"></div>
 <div class="filter-panel" id="filterPanel">
     <div class="filter-panel-header">
-        <div class="filter-panel-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-            Filters
-        </div>
-        <button class="clear-filters-btn" id="clearFiltersBtn">Clear All</button>
+        <h2 class="filter-panel-title">Filter items</h2>
     </div>
     <div class="filter-panel-body">
         <!-- Type Filter -->
@@ -312,7 +303,7 @@ How to use:
 
         <!-- Places Filter -->
         <div class="filter-section">
-            <div class="filter-section-title">Where did you buy it?</div>
+            <div class="filter-section-title">Place</div>
             <div id="placeSearchContainer"></div>
         </div>
 
@@ -329,7 +320,19 @@ How to use:
             </div>
         </div>
     </div>
+    <div class="filter-panel-footer" id="filterPanelFooter">
+        <button class="clear-filters-btn" id="clearFiltersBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Clear All Filters
+        </button>
+    </div>
 </div>
+
+<!-- Floating add button -->
+<button class="fab" id="fabBtn" title="Add new item">+</button>
 
 <!-- Main Application JavaScript Module -->
 <script type="module" src="js/app.js"></script>

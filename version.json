@@ -1,18 +1,17 @@
 {
-  "version": "0.0.34",
-  "releaseDate": "2025-10-24",
+  "version": "0.0.35",
+  "releaseDate": "2025-10-25",
   "changes": [
+    "Filter panel width now matches left menu (280px, max 85vw)",
+    "FAB (Add button) now hides when any side menu is open",
+    "Place filter dropdown shows all places by default (scrollable list)",
+    "Place dropdown closes and input clears automatically after selecting a place",
+    "Fixed star rating filters - now properly updates when selecting ratings",
+    "Improved filter UI responsiveness and interaction",
     "Redesigned Filter UI with modern 2025 aesthetics",
     "Filter panel now slides from right (similar to hamburger menu)",
-    "Panel width reduced to 85vw/360px (doesn't cover entire screen)",
     "Added multi-select dropdown for Type filter",
-    "Added searchable place selector (shows all places by default)",
-    "Added star rating selectors for min/max rating (same as item editor)",
-    "Removed shadow artifact from home screen",
-    "Filter panel can be closed by clicking overlay",
-    "Enhanced Export: iOS installed PWA now opens native share sheet directly (AirDrop/Mail/Files) with JSON file attachment",
-    "Added 'Where did you buy it?' functionality with place tracking",
-    "Fixed iOS keyboard handling and scroll positioning",
-    "Pairing selector: Unpaired items now shown first; already paired items greyed out and labeled Good/Bad with color coding"
+    "Added searchable place selector with selected tags display",
+    "Clear All Filters button now only shows when filters are active"
   ]
 }
