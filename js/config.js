@@ -15,9 +15,10 @@ export async function loadConfig() {
     // Fallback configuration
     ITEM_TYPES_CONFIG = {
       wine: { label: 'Wine', icon: '🍷', fields: [] },
+      wine: { label: 'Beer', icon: '🍺', fields: [] },
       cheese: { label: 'Cheese', icon: '🧀', fields: [] },
       olives: { label: 'Olives', icon: '🫒', fields: [] },
-      ham: { label: 'Ham', icon: '🍖', fields: []}
+      ham: { label: 'Ham', icon: '🍖', fields: [] }
     };
     return ITEM_TYPES_CONFIG;
   }
@@ -30,4 +31,3 @@ export function getConfig() {
 export function getTypeInfo(typeKey) {
   return ITEM_TYPES_CONFIG[typeKey] || { label: typeKey, icon: '📦', fields: [] };
 }
-

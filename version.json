@@ -1,8 +1,10 @@
 {
-  "version": "0.0.41",
+  "version": "0.0.42",
   "releaseDate": "2025-10-25",
   "changes": [
-    "Disabled side menu / filter edge swipe gestures while any modal screen is open to prevent them from opening afterwards when returning home",
+    "Added Filtering (Filtered / Unfiltered) field to Beer type",
+    "Added new Beer item type (style, color, ABV, IBU, brewery, country, region) to item types configuration",
+    "Disabled side menu / filter edge swipe gestures while any modal screen is open to prevent unintended interactions, and update version to 0.0.41",
     "Barcode scanner now reliably keeps using the back (environment) camera across consecutive scans",
     "Remembers the detected back camera deviceId in localStorage and reuses it on future launches",
     "If the first attempt opens the front camera, the app auto-switches to a detected back/environment camera once available",

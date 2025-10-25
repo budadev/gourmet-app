@@ -6,7 +6,20 @@
       { "name": "color", "label": "Color", "type": "enum", "options": ["Red", "White", "Rosé", "Sparkling", "Dessert"] },
       { "name": "year", "label": "Vintage (Year)", "type": "number" },
       { "name": "country", "label": "Country", "type": "string" },
-      { "name": "region", "label": "Region/Appellation", "type": "string" }
+      { "name": "region", "label": "Region", "type": "string" }
+    ]
+  },
+
+  "beer": {
+    "label": "Beer",
+    "icon": "🍺",
+    "fields": [
+      { "name": "style", "label": "Style", "type": "enum", "options": ["Wheat","Lager","Pilsner","IPA","Pale Ale","Stout","Porter","Sour","Belgian","Brown Ale","Amber/Red","Other"] },
+      { "name": "abv", "label": "ABV (%)", "type": "number" },
+      { "name": "color", "label": "Color", "type": "enum", "options": ["Pale","Golden","Amber","Brown","Dark"] },
+      { "name": "filtered", "label": "Filtering", "type": "enum", "options": ["Filtered","Unfiltered"] },
+      { "name": "brewery", "label": "Brewery", "type": "string" },
+      { "name": "country", "label": "Country", "type": "string" }
     ]
   },
 
