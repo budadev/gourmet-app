@@ -2,10 +2,18 @@
    Barcode Scanner (ZXing Integration)
    ============================= */
 
-import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-const codeReader = new BrowserMultiFormatReader();
+const hints = new Map();
+hints.set(DecodeHintType.TRY_HARDER, true);
+hints.set(DecodeHintType.ALSO_INVERTED, true);
+hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.CODE_128,
+]);
+const codeReader = new BrowserMultiFormatReader(hints);
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
