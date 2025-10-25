@@ -78,7 +78,12 @@ async function startCamera(onScanComplete) {
         height: { min: 480, ideal: 720, max: 1080 },
         facingMode: selectedDeviceId ? undefined : 'environment',
         deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-        aspectRatio: { ideal: 16/9 }
+        aspectRatio: { ideal: 16/9 },
+        focusMode: { ideal: 'continuous' },
+        advanced: [
+          { focusMode: 'continuous' },
+          { focusDistance: { ideal: 0.5 } }
+        ]
       },
       area: { // scanning area
         top: '0%',
@@ -131,6 +136,61 @@ async function startCamera(onScanComplete) {
     const videoElement = document.querySelector('#interactive video');
     if (videoElement && videoElement.srcObject) {
       currentStream = videoElement.srcObject;
+
+      // Apply advanced camera settings for better autofocus
+      const track = currentStream.getVideoTracks()[0];
+      if (track) {
+        try {
+          const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+          const settings = {};
+
+          // Enable continuous autofocus if supported
+          if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            settings.focusMode = 'continuous';
+          }
+
+          // Set zoom if supported (slightly zoomed helps with focus)
+          if (capabilities.zoom) {
+            const minZoom = capabilities.zoom.min || 1;
+            const maxZoom = capabilities.zoom.max || 1;
+            if (maxZoom > minZoom) {
+              settings.zoom = Math.min(minZoom + (maxZoom - minZoom) * 0.1, maxZoom);
+            }
+          }
+
+          // Apply settings if we have any
+          if (Object.keys(settings).length > 0) {
+            track.applyConstraints({ advanced: [settings] }).catch(e => {
+              console.log('Could not apply advanced focus settings:', e);
+            });
+          }
+
+          // Periodic focus trigger for better close-up performance
+          const focusInterval = setInterval(() => {
+            if (!isScanning || !currentStream) {
+              clearInterval(focusInterval);
+              return;
+            }
+
+            const currentTrack = currentStream.getVideoTracks()[0];
+            if (currentTrack && currentTrack.getCapabilities) {
+              const caps = currentTrack.getCapabilities();
+              // Trigger focus by toggling focus mode (helps some cameras refocus)
+              if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                currentTrack.applyConstraints({
+                  advanced: [{ focusMode: 'continuous' }]
+                }).catch(() => {});
+              }
+            }
+          }, 2000); // Trigger every 2 seconds
+
+          // Store interval for cleanup
+          currentStream._focusInterval = focusInterval;
+
+        } catch (e) {
+          console.log('Error applying camera settings:', e);
+        }
+      }
     }
 
     // Set up barcode detection handler
@@ -230,6 +290,12 @@ export async function startScan(onScanComplete) {
 
 export function stopScan() {
   isScanning = false;
+
+  // Clear focus interval if it exists
+  if (currentStream && currentStream._focusInterval) {
+    clearInterval(currentStream._focusInterval);
+    currentStream._focusInterval = null;
+  }
 
   // Stop Quagga
   if (Quagga) {
