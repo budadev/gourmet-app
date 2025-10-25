@@ -2,14 +2,10 @@
    Barcode Scanner (ZXing Integration)
    ============================= */
 
-import { BrowserMultiFormatReader, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-// Configure decoder with hints for better rotation detection
-const hints = new Map();
-hints.set(DecodeHintType.TRY_HARDER, true); // Enable more thorough detection including rotations
-hints.set(DecodeHintType.POSSIBLE_FORMATS, []); // Allow all formats
-const codeReader = new BrowserMultiFormatReader(hints);
+const codeReader = new BrowserMultiFormatReader();
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
@@ -17,116 +13,6 @@ let opening = false; // prevent overlapping opens
 let preferredBackCameraId = null; // remembered back camera id after first successful environment capture
 const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
 try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
-
-/**
- * Helper function to detect barcode from video with manual rotation attempts
- * ZXing should handle rotations automatically, but this provides a fallback
- * for difficult orientations (especially 90° rotations on wine labels)
- */
-async function detectWithRotation(video) {
-  const canvas = el('canvas');
-  if (!canvas) return null;
-
-  const ctx = canvas.getContext('2d');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  // Try normal orientation first (ZXing handles 0° and 180° well)
-  try {
-    const result = await codeReader.decodeFromVideoElement(video);
-    if (result) return result;
-  } catch (e) {
-    // Continue to rotated attempts
-  }
-
-  // If normal detection failed, manually try 90° and 270° rotations
-  // This is especially helpful for wine bottle barcodes
-  const rotations = [90, 270];
-
-  for (const angle of rotations) {
-    try {
-      // Set canvas dimensions for rotated image
-      if (angle === 90 || angle === 270) {
-        canvas.width = video.videoHeight;
-        canvas.height = video.videoWidth;
-      }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-
-      // Apply rotation transformation
-      if (angle === 90) {
-        ctx.translate(canvas.width, 0);
-        ctx.rotate(Math.PI / 2);
-      } else if (angle === 270) {
-        ctx.translate(0, canvas.height);
-        ctx.rotate(-Math.PI / 2);
-      }
-
-      ctx.drawImage(video, 0, 0);
-      ctx.restore();
-
-      // Try to decode the rotated image
-      const result = await codeReader.decodeFromCanvas(canvas);
-      if (result) return result;
-    } catch (e) {
-      // Continue to next rotation
-    }
-  }
-
-  return null;
-}
-
-/**
- * Apply advanced camera settings for better barcode detection
- * Attempts to set continuous autofocus and optimal zoom
- */
-async function applyAdvancedCameraSettings(track) {
-  if (!track) return null;
-
-  try {
-    const capabilities = track.getCapabilities();
-    const constraints = {};
-
-    // Try to enable continuous autofocus
-    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-      constraints.focusMode = 'continuous';
-    }
-
-    // Set focus distance if supported (0.5 = medium distance, good for scanning)
-    if (capabilities.focusDistance) {
-      constraints.focusDistance = 0.5;
-    }
-
-    // Apply torch/flash if available (commented out - usually not needed)
-    // if (capabilities.torch) {
-    //   constraints.torch = false;
-    // }
-
-    if (Object.keys(constraints).length > 0) {
-      await track.applyConstraints({ advanced: [constraints] });
-    }
-
-    // Set up periodic refocus (helps with autofocus on some devices)
-    let focusInterval = null;
-    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-      focusInterval = setInterval(async () => {
-        try {
-          await track.applyConstraints({
-            advanced: [{ focusMode: 'continuous' }]
-          });
-        } catch (e) {
-          // Ignore errors during periodic refocus
-        }
-      }, 3000); // Refocus every 3 seconds
-    }
-
-    return focusInterval;
-  } catch (e) {
-    console.log('Could not apply advanced camera settings:', e);
-    return null;
-  }
-}
 
 /* ...existing code... */
 
@@ -172,77 +58,51 @@ async function startCamera(onScanComplete) {
 
     // Build constraints only referencing deviceId if we already know the back cam
     const constraints = { video: buildVideoConstraints() };
-    let stream = null;
-
-    // Get the camera stream
+    let decodeSucceeded = false;
     try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
+        if (res) {
+          const code = res.getText();
+            el('scanStatus').textContent = `✅ ${code}`;
+            stopScan();
+            if (onScanComplete) await onScanComplete(code);
+        }
+      });
+      decodeSucceeded = true;
     } catch (err) {
       if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
         if (preferredBackCameraId) {
           // Stored back camera no longer valid; clear and retry with environment
-          preferredBackCameraId = null;
-          try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-          el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
-        } else {
+            preferredBackCameraId = null;
+            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
+            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+              if (res) {
+                const code = res.getText();
+                el('scanStatus').textContent = `✅ ${code}`;
+                stopScan();
+                if (onScanComplete) await onScanComplete(code);
+              }
+            });
+            decodeSucceeded = true;
+        } else if (!preferredBackCameraId) {
           // Retry minimal fallback (still prefer environment)
           el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
+            if (res) {
+              const code = res.getText();
+              el('scanStatus').textContent = `✅ ${code}`;
+              stopScan();
+              if (onScanComplete) await onScanComplete(code);
+            }
+          });
+          decodeSucceeded = true;
         }
       } else {
         throw err;
       }
     }
-
-    if (!stream) throw new Error('Could not get camera stream');
-
-    vid.srcObject = stream;
-    currentStream = stream;
-
-    // Set up custom scanning loop with rotation support
-    let scanning = true;
-    let lastScanTime = 0;
-    const SCAN_INTERVAL = 250; // Try to scan every 250ms
-
-    const scanLoop = async (timestamp) => {
-      if (!scanning || !el('scannerModal').classList.contains('active')) {
-        return;
-      }
-
-      // Throttle scanning attempts
-      if (timestamp - lastScanTime >= SCAN_INTERVAL) {
-        lastScanTime = timestamp;
-
-        if (vid.readyState === vid.HAVE_ENOUGH_DATA) {
-          try {
-            // Try detection with automatic rotation support
-            const result = await detectWithRotation(vid);
-            if (result) {
-              const code = result.getText();
-              el('scanStatus').textContent = `✅ ${code}`;
-              scanning = false;
-              stopScan();
-              if (onScanComplete) await onScanComplete(code);
-              return;
-            }
-          } catch (e) {
-            // Continue scanning on error
-          }
-        }
-      }
-
-      if (scanning) {
-        requestAnimationFrame(scanLoop);
-      }
-    };
-
-    // Start the scanning loop
-    requestAnimationFrame(scanLoop);
-
-    // Store the scanning flag so we can stop it later
-    currentStream._scanning = () => scanning;
-    currentStream._stopScanning = () => { scanning = false; };
+    if (!decodeSucceeded) throw new Error('Could not start decoder');
 
     // Wait for readiness
     await new Promise(r => {
@@ -271,15 +131,25 @@ async function startCamera(onScanComplete) {
             if (env && env.deviceId && env.deviceId !== settings.deviceId) {
               preferredBackCameraId = env.deviceId;
               try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
-              // Restart with explicit back camera
+              // Restart decoder with explicit back camera
               try { codeReader.reset(); } catch(_) {}
-              if (currentStream._stopScanning) currentStream._stopScanning();
               try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
               vid.srcObject = null;
               el('scanStatus').textContent = '🔁 Switching to back camera…';
-
-              // Restart the decoder with the preferred camera
-              await runDecoder();
+              await codeReader.decodeFromConstraints({ video: { deviceId: { exact: preferredBackCameraId }, width: { ideal:1920,max:1920 }, height:{ ideal:1080,max:1080 }, focusMode:'continuous', advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } }, vid, async (res, err2) => {
+                if (res) {
+                  const code = res.getText();
+                  el('scanStatus').textContent = `✅ ${code}`;
+                  stopScan();
+                  if (onScanComplete) await onScanComplete(code);
+                }
+              });
+              // Wait metadata again
+              await new Promise(r2 => {
+                if (vid.readyState >= vid.HAVE_METADATA) return r2();
+                vid.addEventListener('loadedmetadata', () => r2(), { once: true });
+              });
+              currentStream = vid.srcObject;
             }
           } catch (switchErr) {
             console.log('Back camera switch attempt failed:', switchErr);
@@ -342,9 +212,6 @@ export function stopScan() {
     vid.srcObject = null;
   }
   if (currentStream) {
-    if (currentStream._stopScanning) {
-      currentStream._stopScanning();
-    }
     if (currentStream._focusInterval) {
       clearInterval(currentStream._focusInterval);
     }
