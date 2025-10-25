@@ -62,18 +62,25 @@ function getOrientationRotation() {
 function applyVideoOrientation(videoElement) {
   const rotation = getOrientationRotation();
 
-  // Most mobile devices need no rotation in portrait (0°)
-  // But in landscape, the camera feed is rotated 90° relative to the screen
-  // We need to counter-rotate the video to match the UI orientation
+  // Log for debugging
+  console.log('Applying video orientation, rotation angle:', rotation);
+
+  // The camera sensor outputs in its native orientation (usually portrait)
+  // When the device is in landscape, we need to rotate the video to match
 
   if (rotation === 90 || rotation === -270) {
-    // Landscape right (counter-clockwise from portrait)
-    videoElement.style.transform = 'rotate(0deg)';
+    // Landscape right (device rotated 90° clockwise from portrait)
+    // We need to rotate the video 90° clockwise to match
+    videoElement.style.transform = 'rotate(90deg)';
   } else if (rotation === -90 || rotation === 270) {
-    // Landscape left (clockwise from portrait)
-    videoElement.style.transform = 'rotate(0deg)';
+    // Landscape left (device rotated 90° counter-clockwise from portrait)
+    // We need to rotate the video 90° counter-clockwise to match
+    videoElement.style.transform = 'rotate(-90deg)';
+  } else if (rotation === 180) {
+    // Upside down portrait
+    videoElement.style.transform = 'rotate(180deg)';
   } else {
-    // Portrait (0° or 180°)
+    // Normal portrait (0°)
     videoElement.style.transform = 'rotate(0deg)';
   }
 }
