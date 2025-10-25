@@ -1,5 +1,5 @@
 {
-  "version": "0.0.41",
+  "version": "0.0.42",
   "releaseDate": "2025-10-25",
   "changes": [
     "Improved camera permission handling with better user messaging",
@@ -10,6 +10,7 @@
     "iOS: Reduced bottom gap for Clear Filters button on mobile",
     "Filter panel width now matches left menu (280px, max 85vw)",
     "FAB (Add button) now hides when any side menu is open",
-    "Redesigned Filter UI with modern 2025 aesthetics"
+    "Redesigned Filter UI with modern 2025 aesthetics",
+    "Scanner: Simplified fast-start camera initialization (portrait) eliminating initial blank + small preview flicker"
   ]
 }
