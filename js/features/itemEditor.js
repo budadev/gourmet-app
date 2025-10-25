@@ -3,10 +3,10 @@
    ============================= */
 
 import { escapeHtml, el, enhanceSelectInteractivity } from '../utils.js';
-import { addItem, updateItem, listAll } from '../db.js';
+import { addItem, updateItem, listAll, savePhoto, deletePhotosByItemId } from '../db.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { renderStars, setupStarRating } from '../components/rating.js';
-import { capturePhoto, selectPhoto, renderPhotoPreview, setPhotos, getPhotos, clearPhotos } from '../components/photos.js';
+import { capturePhoto, selectPhoto, renderPhotoPreview, setPhotos, getPhotos, clearPhotos, processPhotoForEditing, dataURLToBlob } from '../components/photos.js';
 import { getConfig, getTypeInfo } from '../config.js';
 import { addPairing, removePairing } from '../models/pairings.js';
 import { openPairingSelector, setCurrentPairings, getCurrentPairings } from './pairingSelector.js';
@@ -184,7 +184,8 @@ function renderEditorFields(selectedType, itemData = {}) {
   el('capturePhotoBtn').onclick = async () => {
     const dataURL = await capturePhoto();
     if (dataURL) {
-      setPhotos([...getPhotos(), dataURL]);
+      const photoObj = await processPhotoForEditing(dataURL);
+      setPhotos([...getPhotos(), photoObj]);
       renderPhotoPreview();
     }
   };
@@ -192,7 +193,8 @@ function renderEditorFields(selectedType, itemData = {}) {
   el('selectPhotoBtn').onclick = async () => {
     const dataURL = await selectPhoto();
     if (dataURL) {
-      setPhotos([...getPhotos(), dataURL]);
+      const photoObj = await processPhotoForEditing(dataURL);
+      setPhotos([...getPhotos(), photoObj]);
       renderPhotoPreview();
     }
   };
@@ -337,11 +339,68 @@ export async function saveItem() {
   }
 
   try {
+    let itemId = currentEditingId;
+
+    // Process photos: save full blobs to photos store, keep only IDs and thumbnails on item
+    const photoMetadata = [];
+    const photos = payload.photos || [];
+
+    for (const photo of photos) {
+      // If photo has fullDataURL, it's new and needs to be saved to the photos store
+      if (photo.fullDataURL) {
+        const blob = dataURLToBlob(photo.fullDataURL);
+        // For new items, we'll save photos after getting the item ID
+        photoMetadata.push({
+          id: photo.id,
+          thumbnail: photo.thumbnail,
+          blob: blob,
+          isNew: true
+        });
+      } else {
+        // Photo already exists in the store (from editing), just keep metadata
+        photoMetadata.push({
+          id: photo.id,
+          thumbnail: photo.thumbnail,
+          isNew: false
+        });
+      }
+    }
+
+    // Store only photo IDs and thumbnails on the item
+    payload.photos = photoMetadata.map(p => ({ id: p.id, thumbnail: p.thumbnail }));
+
     if (currentEditingId) {
+      // When updating, first delete old photos that are not in the new set
+      const oldItem = await import('../db.js').then(m => m.getItem(currentEditingId));
+      if (oldItem && oldItem.photos) {
+        const newPhotoIds = new Set(payload.photos.map(p => p.id));
+        const photosToDelete = oldItem.photos.filter(p => !newPhotoIds.has(p.id));
+        for (const photo of photosToDelete) {
+          await deletePhotosByItemId(currentEditingId).catch(e => console.error('Error deleting old photo:', e));
+        }
+      }
+
       await updateItem(currentEditingId, payload);
+
+      // Save new photo blobs
+      for (const photo of photoMetadata) {
+        if (photo.isNew) {
+          await savePhoto(photo.id, photo.blob, currentEditingId);
+        }
+      }
+
       setStatus('Item updated!');
     } else {
       const newItemId = await addItem(payload);
+      itemId = newItemId;
+
+      // Save photo blobs with the new item ID
+      for (const photo of photoMetadata) {
+        if (photo.isNew) {
+          await savePhoto(photo.id, photo.blob, newItemId);
+        }
+      }
+
       if (payload.pairings && (payload.pairings.good.length > 0 || payload.pairings.bad.length > 0)) {
         for (const targetId of payload.pairings.good) await addPairing(newItemId, targetId, 'good');
         for (const targetId of payload.pairings.bad) await addPairing(newItemId, targetId, 'bad');

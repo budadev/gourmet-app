@@ -3,10 +3,10 @@
    ============================= */
 
 import { escapeHtml, el, formatDate } from '../utils.js';
-import { getItem, deleteItem, listAll } from '../db.js';
+import { getItem, deleteItem, listAll, getPhoto, deletePhotosByItemId } from '../db.js';
 import { renderStars } from '../components/rating.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { showPhotoModal } from '../components/photos.js';
+import { showPhotoModal, blobToDataURL } from '../components/photos.js';
 import { getTypeInfo } from '../config.js';
 import { cleanupPairingsOnDelete } from '../models/pairings.js';
 import { renderPlacesInDetails } from '../components/placeSelector.js';
@@ -81,7 +81,7 @@ export async function showItemDetails(id, onEdit, onDelete) {
         <label>Photos</label>
         <div class="photo-gallery">
           ${item.photos.map((photo, index) => `
-            <img src="${photo}" alt="Photo ${index + 1}" data-photo-url="${photo}" class="photo-thumbnail" />
+            <img src="${photo.thumbnail}" alt="Photo ${index + 1}" data-photo-id="${photo.id}" class="photo-thumbnail" />
           `).join('')}
         </div>
       </div>
@@ -107,9 +107,29 @@ export async function showItemDetails(id, onEdit, onDelete) {
 
   // Bind photo thumbnails to show full screen
   detailsContent.querySelectorAll('.photo-thumbnail').forEach(img => {
-    img.onclick = () => {
-      const photoUrl = img.getAttribute('data-photo-url');
-      showPhotoModal(photoUrl, item.photos);
+    img.onclick = async () => {
+      const photoId = img.getAttribute('data-photo-id');
+      try {
+        // Load full photo from photos store
+        const photoBlob = await getPhoto(photoId);
+        if (photoBlob) {
+          const photoDataURL = await blobToDataURL(photoBlob);
+
+          // Load all full photos for navigation
+          const allPhotoDataURLs = await Promise.all(
+            item.photos.map(async (photo) => {
+              const blob = await getPhoto(photo.id);
+              return blob ? await blobToDataURL(blob) : photo.thumbnail;
+            })
+          );
+
+          showPhotoModal(photoDataURL, allPhotoDataURLs);
+        }
+      } catch (err) {
+        console.error('Error loading photo:', err);
+        // Fallback to thumbnail if full photo fails to load
+        showPhotoModal(img.src, [img.src]);
+      }
     };
   });
 
@@ -143,6 +163,10 @@ export async function showItemDetails(id, onEdit, onDelete) {
   el('deleteDetailsBtn').onclick = async () => {
     if (confirm(`Delete "${item.name}"?`)) {
       await cleanupPairingsOnDelete(id, item.pairings);
+      // Delete associated photos
+      if (item.photos && item.photos.length > 0) {
+        await deletePhotosByItemId(id);
+      }
       await deleteItem(id);
       // Invalidate place usage cache so filters & selectors pick up decreased usage
       invalidatePlaceUsageCache();

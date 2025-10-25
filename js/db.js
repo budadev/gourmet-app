@@ -5,6 +5,7 @@
 const DB_NAME = 'gourmetapp-db';
 const STORE = 'items';
 const PLACES_STORE = 'places';
+const PHOTOS_STORE = 'photos';
 
 let dbp = null;
 let dbInitialized = false;
@@ -13,7 +14,7 @@ function initDb() {
   if (dbp) return dbp;
 
   dbp = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2);
+    const req = indexedDB.open(DB_NAME, 3);
     req.onupgradeneeded = (event) => {
       const db = req.result;
       const oldVersion = event.oldVersion;
@@ -30,6 +31,12 @@ function initDb() {
       if (oldVersion < 2) {
         const placesStore = db.createObjectStore(PLACES_STORE, { keyPath: 'id', autoIncrement: true });
         placesStore.createIndex('by_name', 'name', { unique: false });
+      }
+
+      // Version 3: photos store
+      if (oldVersion < 3) {
+        const photosStore = db.createObjectStore(PHOTOS_STORE, { keyPath: 'id' });
+        photosStore.createIndex('by_itemId', 'itemId', { unique: false });
       }
     };
     req.onsuccess = () => {
@@ -190,3 +197,77 @@ export async function deletePlace(id) {
     r.onerror = () => rej(r.error);
   });
 }
+
+/* =============================
+   Photos Store Functions
+   ============================= */
+
+/**
+ * Save a photo blob to the photos store
+ * @param {string} id - Unique photo ID (e.g., UUID)
+ * @param {Blob} blob - Photo blob data
+ * @param {number} itemId - ID of the item this photo belongs to
+ * @returns {Promise<string>} Photo ID
+ */
+export async function savePhoto(id, blob, itemId) {
+  const store = await tx('readwrite', PHOTOS_STORE);
+  return new Promise((res, rej) => {
+    const r = store.put({ id, blob, itemId, createdAt: Date.now() });
+    r.onsuccess = () => res(id);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+/**
+ * Get a photo blob by ID
+ * @param {string} id - Photo ID
+ * @returns {Promise<Blob|null>} Photo blob or null if not found
+ */
+export async function getPhoto(id) {
+  const store = await tx('readonly', PHOTOS_STORE);
+  return new Promise((res, rej) => {
+    const r = store.get(id);
+    r.onsuccess = () => res(r.result ? r.result.blob : null);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+/**
+ * Get all photos for a specific item
+ * @param {number} itemId - Item ID
+ * @returns {Promise<Array>} Array of photo objects with id and blob
+ */
+export async function getPhotosByItemId(itemId) {
+  const store = await tx('readonly', PHOTOS_STORE);
+  return new Promise((res) => {
+    const idx = store.index('by_itemId');
+    const r = idx.getAll(itemId);
+    r.onsuccess = () => res(r.result || []);
+  });
+}
+
+/**
+ * Delete a photo by ID
+ * @param {string} id - Photo ID
+ * @returns {Promise<void>}
+ */
+export async function deletePhoto(id) {
+  const store = await tx('readwrite', PHOTOS_STORE);
+  return new Promise((res, rej) => {
+    const r = store.delete(id);
+    r.onsuccess = () => res();
+    r.onerror = () => rej(r.error);
+  });
+}
+
+/**
+ * Delete all photos for a specific item
+ * @param {number} itemId - Item ID
+ * @returns {Promise<void>}
+ */
+export async function deletePhotosByItemId(itemId) {
+  const photos = await getPhotosByItemId(itemId);
+  const promises = photos.map(photo => deletePhoto(photo.id));
+  await Promise.all(promises);
+}
+

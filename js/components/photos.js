@@ -3,6 +3,7 @@
    ============================= */
 
 import { el } from '../utils.js';
+import { savePhoto, getPhoto, deletePhoto } from '../db.js';
 
 let currentPhotos = [];
 let currentPhotoIndex = 0;
@@ -11,6 +12,70 @@ let controlsVisible = true;
 let touchStartY = 0;
 let touchStartX = 0;
 let isDragging = false;
+
+// Convert data URL to Blob
+export function dataURLToBlob(dataURL) {
+  const parts = dataURL.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
+// Convert Blob to data URL
+export function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Create thumbnail from data URL
+export async function createThumbnail(dataURL, maxWidth = 150, maxHeight = 150) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      // Calculate new dimensions maintaining aspect ratio
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to data URL with compression
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = reject;
+    img.src = dataURL;
+  });
+}
+
+// Generate unique photo ID
+export function generatePhotoId() {
+  return `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 // Convert file to base64 data URL
 async function fileToDataURL(file) {
@@ -82,7 +147,7 @@ export function renderPhotoPreview() {
 
   container.innerHTML = currentPhotos.map((photo, index) => `
     <div class="photo-preview-item">
-      <img src="${photo}" alt="Photo ${index + 1}" />
+      <img src="${photo.thumbnail}" alt="Photo ${index + 1}" />
       <button class="remove-photo" data-index="${index}" type="button">×</button>
     </div>
   `).join('');
@@ -307,6 +372,7 @@ export function initPhotoModal() {
 }
 
 // Photo state management
+// currentPhotos now stores objects like { id: 'photo_123', thumbnail: 'data:image/jpeg...' }
 export function getPhotos() {
   return currentPhotos;
 }
@@ -315,10 +381,25 @@ export function setPhotos(photos) {
   currentPhotos = Array.isArray(photos) ? [...photos] : [];
 }
 
-export function addPhoto(photoDataURL) {
-  currentPhotos.push(photoDataURL);
+export function addPhoto(photoObj) {
+  currentPhotos.push(photoObj);
 }
 
 export function clearPhotos() {
   currentPhotos = [];
 }
+
+/**
+ * Process a photo data URL and return a photo object with ID and thumbnail
+ * Does NOT save to IndexedDB (that happens on item save)
+ */
+export async function processPhotoForEditing(dataURL) {
+  const id = generatePhotoId();
+  const thumbnail = await createThumbnail(dataURL);
+  return {
+    id,
+    thumbnail,
+    fullDataURL: dataURL // Keep full version temporarily for editing session
+  };
+}
+

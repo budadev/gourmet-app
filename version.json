@@ -1,7 +1,8 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "releaseDate": "2025-10-25",
   "changes": [
-    "Beta version released with core features implemented - Ready for testing and feedback."
+    "Beta version released with core features implemented - Ready for testing and feedback.",
+    "Database optimizations for improved performance."
   ]
 }

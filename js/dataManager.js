@@ -2,7 +2,8 @@
    Data Import/Export Manager
    ============================= */
 
-import { listAll, addItem } from './db.js';
+import { listAll, addItem, savePhoto, getPhoto } from './db.js';
+import { dataURLToBlob, createThumbnail, generatePhotoId, blobToDataURL } from './components/photos.js';
 
 /**
  * Export all data from IndexedDB to a JSON file
@@ -12,12 +13,41 @@ export async function exportAllData() {
     // Get all items from the database
     const items = await listAll();
 
+    // For each item with photos, load the full photo data from the photos store
+    const itemsWithFullPhotos = await Promise.all(
+      items.map(async (item) => {
+        if (item.photos && Array.isArray(item.photos) && item.photos.length > 0) {
+          const fullPhotos = await Promise.all(
+            item.photos.map(async (photoMeta) => {
+              try {
+                const photoBlob = await getPhoto(photoMeta.id);
+                if (photoBlob) {
+                  return await blobToDataURL(photoBlob);
+                }
+                return null;
+              } catch (err) {
+                console.error(`Error loading photo ${photoMeta.id}:`, err);
+                return null;
+              }
+            })
+          );
+
+          // Filter out null values and return item with full photos
+          return {
+            ...item,
+            photos: fullPhotos.filter(p => p !== null)
+          };
+        }
+        return item;
+      })
+    );
+
     // Create export data structure
     const exportData = {
-      version: '1.0',
+      version: '2.0', // Update version to indicate new photo format support
       exportDate: new Date().toISOString(),
-      itemCount: items.length,
-      items: items
+      itemCount: itemsWithFullPhotos.length,
+      items: itemsWithFullPhotos
     };
 
     // Convert to JSON
@@ -40,7 +70,7 @@ export async function exportAllData() {
     // Clean up
     setTimeout(() => URL.revokeObjectURL(url), 100);
 
-    console.log(`Exported ${items.length} items to ${filename}`);
+    console.log(`Exported ${itemsWithFullPhotos.length} items to ${filename}`);
     return true;
   } catch (err) {
     console.error('Export failed:', err);
@@ -101,9 +131,42 @@ export async function importData() {
               continue;
             }
 
-            // Add item to database
-            await addItem(itemWithoutId);
-            itemsImported++;
+            // Process photos if they exist
+            if (itemWithoutId.photos && Array.isArray(itemWithoutId.photos) && itemWithoutId.photos.length > 0) {
+              const photoMetadata = [];
+
+              for (const photo of itemWithoutId.photos) {
+                // Check if photo is in old format (base64 string) or new format (object with id/thumbnail)
+                if (typeof photo === 'string') {
+                  // Old format: convert to new structure
+                  const photoId = generatePhotoId();
+                  const thumbnail = await createThumbnail(photo);
+                  photoMetadata.push({ id: photoId, thumbnail, dataURL: photo });
+                } else if (photo.id && photo.thumbnail) {
+                  // New format: keep as is (will need the full photo data if available)
+                  photoMetadata.push(photo);
+                }
+              }
+
+              itemWithoutId.photos = photoMetadata.map(p => ({ id: p.id, thumbnail: p.thumbnail }));
+
+              // Add item to database first to get new ID
+              const newItemId = await addItem(itemWithoutId);
+
+              // Save photo blobs to photos store
+              for (const photo of photoMetadata) {
+                if (photo.dataURL) {
+                  const blob = dataURLToBlob(photo.dataURL);
+                  await savePhoto(photo.id, blob, newItemId);
+                }
+              }
+
+              itemsImported++;
+            } else {
+              // No photos, just add the item
+              await addItem(itemWithoutId);
+              itemsImported++;
+            }
 
             // Add to set if it has a barcode
             if (item.barcode) {
