@@ -2,10 +2,14 @@
    Barcode Scanner (ZXing Integration)
    ============================= */
 
-import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
+import { BrowserMultiFormatReader, DecodeHintType } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-const codeReader = new BrowserMultiFormatReader();
+// Create hints to enable better rotation and decoding attempts
+const hints = new Map();
+hints.set(DecodeHintType.TRY_HARDER, true);
+
+const codeReader = new BrowserMultiFormatReader(hints);
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
