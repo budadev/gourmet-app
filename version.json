@@ -1,10 +1,13 @@
 {
-  "version": "0.0.47",
+  "version": "0.0.48",
   "releaseDate": "2025-10-25",
   "changes": [
-    "FIXED: First barcode scan after app launch now works correctly - database is fully initialized before allowing scans",
-    "Improved database initialization with ensureDbReady() to prevent race conditions",
-    "App now guarantees database is ready before any operations can occur",
+    "ADDED: About dialog now checks for updates when opened",
+    "ADDED: Update status indicator in About dialog - shows if update is available or app is up to date",
+    "ADDED: 'Check for Details' button in About dialog to open update banner when new version is available",
+    "(Previous) FIXED: First barcode scan after app launch now works correctly - database is fully initialized before allowing scans",
+    "(Previous) Improved database initialization with ensureDbReady() to prevent race conditions",
+    "(Previous) App now guarantees database is ready before any operations can occur",
     "(Previous) Removed debug visualization overlays from camera view for cleaner user experience",
     "(Previous) Improved autofocus for close-up barcode scanning with continuous focus mode",
     "(Previous) Replaced ZXing with Quagga2 - supports scanning barcodes at ANY rotation (0°, 90°, 180°, 270°)",

@@ -274,3 +274,55 @@ export async function forceUpdateCheck() {
   updateBannerShown = false;
   await checkForUpdates();
 }
+
+/**
+ * Check for updates and return version info (for About dialog)
+ * @returns {Promise<{hasUpdate: boolean, currentVersion: string, latestVersion: string, changes: Array}>}
+ */
+export async function checkUpdateStatus() {
+  try {
+    // Fetch the latest version info with cache busting
+    const response = await fetch(`./version.json?t=${Date.now()}`);
+    const versionInfo = await response.json();
+    const latestVersion = versionInfo.version;
+
+    // Get current version from localStorage
+    const currentVersion = localStorage.getItem(CURRENT_VERSION_KEY) || latestVersion;
+
+    // Check if there's a new version
+    const hasUpdate = latestVersion !== currentVersion;
+
+    return {
+      hasUpdate,
+      currentVersion,
+      latestVersion,
+      changes: versionInfo.changes || []
+    };
+  } catch (err) {
+    console.error('Error checking update status:', err);
+    const currentVersion = localStorage.getItem(CURRENT_VERSION_KEY) || 'Unknown';
+    return {
+      hasUpdate: false,
+      currentVersion,
+      latestVersion: currentVersion,
+      changes: []
+    };
+  }
+}
+
+/**
+ * Show update banner from external trigger (e.g., About dialog)
+ */
+export async function showUpdateBannerManually() {
+  const status = await checkUpdateStatus();
+  if (status.hasUpdate) {
+    // Remove any existing banner first
+    const existingBanner = document.getElementById('updateBanner');
+    if (existingBanner) {
+      existingBanner.remove();
+    }
+    updateBannerShown = false;
+    showUpdateBanner(status.latestVersion, status.currentVersion, status.changes);
+  }
+}
+

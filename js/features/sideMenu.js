@@ -4,6 +4,7 @@
 
 import { el } from '../utils.js';
 import { listAll, addItem } from '../db.js';
+import { checkUpdateStatus, showUpdateBannerManually } from '../updateManager.js';
 
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
@@ -220,6 +221,7 @@ function showAboutDialog() {
   const dialog = el('aboutDialog');
   dialog.classList.add('active');
 
+  // Fetch version and check for updates
   fetch(`./version.json?t=${Date.now()}`)
     .then(res => res.json())
     .then(data => {
@@ -230,6 +232,45 @@ function showAboutDialog() {
       el('aboutVersion').textContent = 'Version N/A';
       el('aboutReleaseDate').textContent = 'N/A';
     });
+
+  // Check for updates
+  checkUpdateStatus().then(status => {
+    const updateSection = el('aboutUpdateStatus');
+    const updateText = el('aboutUpdateText');
+    const updateButton = el('aboutUpdateButton');
+
+    if (status.hasUpdate) {
+      // Update available
+      updateText.textContent = `Update available! Version ${status.latestVersion}`;
+      updateButton.textContent = 'Check for Details';
+      updateButton.style.display = 'inline-block';
+      updateSection.classList.add('has-update');
+      updateSection.classList.remove('up-to-date');
+
+      // Remove old listener by cloning and replacing
+      const newButton = updateButton.cloneNode(true);
+      updateButton.parentNode.replaceChild(newButton, updateButton);
+
+      // Add click handler to show update banner
+      newButton.addEventListener('click', () => {
+        closeAboutDialog();
+        showUpdateBannerManually();
+      });
+    } else {
+      // Up to date
+      updateText.textContent = 'App is up to date';
+      updateButton.style.display = 'none';
+      updateSection.classList.add('up-to-date');
+      updateSection.classList.remove('has-update');
+    }
+  }).catch(err => {
+    console.error('Error checking update status:', err);
+    const updateSection = el('aboutUpdateStatus');
+    const updateText = el('aboutUpdateText');
+    const updateButton = el('aboutUpdateButton');
+    updateText.textContent = 'Unable to check for updates';
+    updateButton.style.display = 'none';
+  });
 
   document.body.style.overflow = 'hidden';
 }
