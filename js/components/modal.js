@@ -9,7 +9,9 @@ export function openModal(modalId) {
   modal.classList.add('active');
   document.body.classList.add('no-scroll');
   const content = modal.querySelector('.modal-content');
-  if (content) content.scrollTop = 0;
+  if (content) content.scrollTop = 0; // keep for compatibility
+  // Ensure any nested scroll containers (modal-body) also reset so reopening starts at top
+  modal.querySelectorAll('.modal-body').forEach(body => { body.scrollTop = 0; });
 }
 
 export function closeModal(modalId) {

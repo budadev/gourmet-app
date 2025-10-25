@@ -16,7 +16,21 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   const EDGE_THRESHOLD = 50; // Distance from edge to trigger swipe
   const VERTICAL_THRESHOLD = 50; // Maximum vertical movement allowed
 
+  // Helper: disable gestures when any modal is active (user not on home screen)
+  function gesturesDisabled() {
+    return !!document.querySelector('.modal.active');
+  }
+
+  function resetTracking() {
+    touchStartX = 0;
+    touchStartY = 0;
+    touchEndX = 0;
+    touchEndY = 0;
+    isSwiping = false;
+  }
+
   function handleTouchStart(e) {
+    if (gesturesDisabled()) return; // Ignore while modal open
     // Only capture single touch
     if (e.touches.length !== 1) return;
 
@@ -26,6 +40,7 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   }
 
   function handleTouchMove(e) {
+    if (gesturesDisabled()) { resetTracking(); return; }
     if (!touchStartX) return;
 
     touchEndX = e.touches[0].clientX;
@@ -41,22 +56,14 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   }
 
   function handleTouchEnd(e) {
-    if (!isSwiping) {
-      touchStartX = 0;
-      touchStartY = 0;
-      return;
-    }
+    if (gesturesDisabled()) { resetTracking(); return; }
+    if (!isSwiping) { resetTracking(); return; }
 
     const deltaX = touchEndX - touchStartX;
     const deltaY = Math.abs(touchEndY - touchStartY);
 
-    // Reset
     const startX = touchStartX;
-    touchStartX = 0;
-    touchStartY = 0;
-    touchEndX = 0;
-    touchEndY = 0;
-    isSwiping = false;
+    resetTracking();
 
     // Ignore if too much vertical movement
     if (deltaY > VERTICAL_THRESHOLD) return;
