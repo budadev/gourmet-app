@@ -1,193 +1,217 @@
 /* =============================
-   Barcode Scanner (ZXing Integration)
+   Barcode Scanner (Quagga2 Integration - Supports Rotated Barcodes)
    ============================= */
 
-import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/+esm';
 import { el } from '../utils.js';
 
-const codeReader = new BrowserMultiFormatReader();
+// Quagga2 will be loaded via script tag in HTML and available as window.Quagga
+let Quagga = null;
+
 let currentStream = null;
-let availableCameras = [];
-let currentCameraIndex = 0;
 let opening = false; // prevent overlapping opens
 let preferredBackCameraId = null; // remembered back camera id after first successful environment capture
+let isScanning = false;
 const BACK_CAM_KEY = 'gourmetapp_preferred_back_camera';
 try { preferredBackCameraId = localStorage.getItem(BACK_CAM_KEY) || null; } catch(_) {}
 
-/* ...existing code... */
+// Initialize Quagga reference from window object
+function initQuagga() {
+  if (!Quagga && window.Quagga) {
+    Quagga = window.Quagga;
+  }
+  return Quagga;
+}
+
 
 async function startCamera(onScanComplete) {
   if (opening) return; // guard
   opening = true;
-  const vid = el('video');
-  let focusInterval = null;
+  isScanning = true;
   el('scanStatus').textContent = '📷 Initializing camera…';
-  let triedBackSwitch = false;
 
-  const buildVideoConstraints = () => {
-    const base = {
-      width: { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
-      focusMode: 'continuous',
-      advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
-    };
-    if (preferredBackCameraId) {
-      return { ...base, deviceId: { exact: preferredBackCameraId } };
-    }
-    // First attempt: let browser pick environment
-    return { ...base, facingMode: { ideal: 'environment' } };
-  };
+  // Initialize Quagga reference
+  if (!initQuagga()) {
+    el('scanStatus').textContent = '❌ Barcode scanner library not loaded. Please refresh.';
+    setTimeout(stopScan, 3000);
+    opening = false;
+    return;
+  }
 
-  const runDecoder = async () => {
-    try { codeReader.reset(); } catch(_) {}
-    // Clean previous
-    if (vid && vid.srcObject) {
-      try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
-      vid.srcObject = null;
-    }
+  // Get available cameras and select back camera
+  let selectedDeviceId = preferredBackCameraId;
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
 
     // Validate stored preferred back camera still exists
-    try {
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      const vidsList = devs.filter(d=>d.kind==='videoinput');
-      if (preferredBackCameraId && !vidsList.some(d=>d.deviceId === preferredBackCameraId)) {
-        preferredBackCameraId = null;
-        try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-      }
-    } catch(_) {}
+    if (preferredBackCameraId && !videoDevices.some(d => d.deviceId === preferredBackCameraId)) {
+      preferredBackCameraId = null;
+      selectedDeviceId = null;
+      try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
+    }
 
-    // Build constraints only referencing deviceId if we already know the back cam
-    const constraints = { video: buildVideoConstraints() };
-    let decodeSucceeded = false;
-    try {
-      await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
-        if (res) {
-          const code = res.getText();
-            el('scanStatus').textContent = `✅ ${code}`;
-            stopScan();
-            if (onScanComplete) await onScanComplete(code);
-        }
-      });
-      decodeSucceeded = true;
-    } catch (err) {
-      if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        if (preferredBackCameraId) {
-          // Stored back camera no longer valid; clear and retry with environment
-            preferredBackCameraId = null;
-            try { localStorage.removeItem(BACK_CAM_KEY); } catch(_) {}
-            el('scanStatus').textContent = '🔄 Back camera changed, retrying…';
-            await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
-              if (res) {
-                const code = res.getText();
-                el('scanStatus').textContent = `✅ ${code}`;
-                stopScan();
-                if (onScanComplete) await onScanComplete(code);
-              }
-            });
-            decodeSucceeded = true;
-        } else if (!preferredBackCameraId) {
-          // Retry minimal fallback (still prefer environment)
-          el('scanStatus').textContent = '🔄 Adjusting camera settings…';
-          await codeReader.decodeFromConstraints({ video: { facingMode: { ideal: 'environment' } } }, vid, async (res, e2) => {
-            if (res) {
-              const code = res.getText();
-              el('scanStatus').textContent = `✅ ${code}`;
-              stopScan();
-              if (onScanComplete) await onScanComplete(code);
-            }
-          });
-          decodeSucceeded = true;
-        }
+    // If no preferred camera, try to find back camera
+    if (!selectedDeviceId && videoDevices.length > 0) {
+      const backCamera = videoDevices.find(d => /back|rear|environment/i.test(d.label));
+      if (backCamera) {
+        selectedDeviceId = backCamera.deviceId;
+      } else if (videoDevices.length > 1) {
+        // If multiple cameras and no back camera found, use the second one (usually back)
+        selectedDeviceId = videoDevices[1].deviceId;
       } else {
-        throw err;
+        selectedDeviceId = videoDevices[0].deviceId;
       }
     }
-    if (!decodeSucceeded) throw new Error('Could not start decoder');
+  } catch(e) {
+    console.log('Error enumerating devices:', e);
+  }
 
-    // Wait for readiness
-    await new Promise(r => {
-      if (vid.readyState >= vid.HAVE_METADATA) return r();
-      vid.addEventListener('loadedmetadata', () => r(), { once: true });
-    });
-
-    currentStream = vid.srcObject;
-    if (currentStream) {
-      const track = currentStream.getVideoTracks()[0];
-      if (track) {
-        const settings = track.getSettings();
-        // If we successfully got environment camera, remember it
-        if (settings && settings.deviceId && settings.facingMode === 'environment' && !preferredBackCameraId) {
-          preferredBackCameraId = settings.deviceId;
-          try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
-        }
-        // If we ended up on front/user camera and haven't switched yet, try to find environment and switch
-        if (settings && settings.facingMode && settings.facingMode !== 'environment' && !triedBackSwitch) {
-          triedBackSwitch = true;
-          try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const vids = devices.filter(d=>d.kind==='videoinput');
-            // Prefer labels containing environment/back/rear OR facingMode heuristic
-            const env = vids.find(d => /back|rear|environment/i.test(d.label));
-            if (env && env.deviceId && env.deviceId !== settings.deviceId) {
-              preferredBackCameraId = env.deviceId;
-              try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
-              // Restart decoder with explicit back camera
-              try { codeReader.reset(); } catch(_) {}
-              try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
-              vid.srcObject = null;
-              el('scanStatus').textContent = '🔁 Switching to back camera…';
-              await codeReader.decodeFromConstraints({ video: { deviceId: { exact: preferredBackCameraId }, width: { ideal:1920,max:1920 }, height:{ ideal:1080,max:1080 }, focusMode:'continuous', advanced:[{focusMode:'continuous'},{focusDistance:0.5}] } }, vid, async (res, err2) => {
-                if (res) {
-                  const code = res.getText();
-                  el('scanStatus').textContent = `✅ ${code}`;
-                  stopScan();
-                  if (onScanComplete) await onScanComplete(code);
-                }
-              });
-              // Wait metadata again
-              await new Promise(r2 => {
-                if (vid.readyState >= vid.HAVE_METADATA) return r2();
-                vid.addEventListener('loadedmetadata', () => r2(), { once: true });
-              });
-              currentStream = vid.srcObject;
-            }
-          } catch (switchErr) {
-            console.log('Back camera switch attempt failed:', switchErr);
-          }
-        }
-        // Apply advanced focusing
-        if (currentStream) {
-          try {
-            const newTrack = currentStream.getVideoTracks()[0];
-            if (newTrack) {
-              focusInterval = await applyAdvancedCameraSettings(newTrack);
-              currentStream._focusInterval = focusInterval;
-            }
-          } catch(_) {}
-        }
-      }
-    }
+  // Configure Quagga2
+  const config = {
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.querySelector('#interactive'), // Use the interactive container
+      constraints: {
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
+        facingMode: selectedDeviceId ? undefined : 'environment',
+        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+        aspectRatio: { ideal: 16/9 }
+      },
+      area: { // scanning area
+        top: '0%',
+        right: '0%',
+        left: '0%',
+        bottom: '0%'
+      },
+      singleChannel: false // use color processing
+    },
+    locator: {
+      patchSize: 'medium',
+      halfSample: true, // Reduce processing for better performance
+    },
+    numOfWorkers: 2, // Reduce workers for mobile
+    frequency: 10, // Scan 10 times per second
+    decoder: {
+      readers: [
+        'ean_reader',      // EAN-13, EAN-8 (most wine bottles)
+        'ean_8_reader',
+        'upc_reader',      // UPC-A, UPC-E
+        'upc_e_reader',
+        'code_128_reader', // Code 128
+        'code_39_reader',  // Code 39
+        'code_93_reader'
+      ],
+      multiple: false // Stop after first barcode found
+    },
+    locate: true
   };
 
   try {
-    await runDecoder();
-    el('scanStatus').textContent = 'Point camera at barcode';
+    await new Promise((resolve, reject) => {
+      Quagga.init(config, (err) => {
+        if (err) {
+          console.error('Quagga init error:', err);
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+
+    // Remember the camera we successfully opened
+    if (selectedDeviceId && !preferredBackCameraId) {
+      preferredBackCameraId = selectedDeviceId;
+      try { localStorage.setItem(BACK_CAM_KEY, preferredBackCameraId); } catch(_) {}
+    }
+
+    // Store the stream reference from the video element
+    const videoElement = document.querySelector('#interactive video');
+    if (videoElement && videoElement.srcObject) {
+      currentStream = videoElement.srcObject;
+    }
+
+    // Set up barcode detection handler
+    let lastCode = null;
+    let lastCodeTime = 0;
+    const DEBOUNCE_MS = 1000; // Prevent duplicate scans within 1 second
+
+    // Optional: Draw detection boxes (helpful for debugging)
+    Quagga.onProcessed((result) => {
+      if (!isScanning) return;
+
+      const drawingCtx = Quagga.canvas.ctx.overlay;
+      const drawingCanvas = Quagga.canvas.dom.overlay;
+
+      if (result) {
+        if (result.boxes) {
+          drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+          // Draw detection boxes for debugging
+          result.boxes.filter(box => box !== result.box).forEach(box => {
+            Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "rgba(0, 255, 0, 0.5)", lineWidth: 2});
+          });
+        }
+
+        if (result.box) {
+          Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "rgba(0, 0, 255, 0.5)", lineWidth: 2});
+        }
+
+        if (result.codeResult && result.codeResult.code) {
+          Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'rgba(255, 0, 0, 0.5)', lineWidth: 3});
+        }
+      }
+    });
+
+    Quagga.onDetected((result) => {
+      if (!isScanning) return;
+
+      const code = result.codeResult.code;
+      const now = Date.now();
+
+      // Debounce: ignore if same code detected within debounce period
+      if (code === lastCode && (now - lastCodeTime) < DEBOUNCE_MS) {
+        return;
+      }
+
+      lastCode = code;
+      lastCodeTime = now;
+
+      el('scanStatus').textContent = `✅ ${code}`;
+      stopScan();
+      if (onScanComplete) onScanComplete(code);
+    });
+
+    Quagga.start();
+    el('scanStatus').textContent = 'Point camera at barcode (any rotation OK)';
+
+    // Helpful message after delay
     setTimeout(() => {
-      if (el('scannerModal').classList.contains('active') && el('video').srcObject) {
+      if (el('scannerModal').classList.contains('active') && isScanning) {
         const txt = el('scanStatus').textContent || '';
-        if (txt.startsWith('📡')) {
+        if (!txt.startsWith('✅') && !txt.startsWith('❌')) {
           el('scanStatus').textContent = '⌛ Still scanning… Move closer, steady the camera, or improve lighting';
         }
       }
     }, 15000);
+
   } catch(e) {
     let msg;
     switch(e.name) {
-      case 'NotAllowedError': msg = '❌ Camera permission denied. Enable it in Settings > Safari > Camera to scan.'; break;
-      case 'NotFoundError': msg = '📷 No camera available on this device.'; break;
+      case 'NotAllowedError':
+        msg = '❌ Camera permission denied. Enable it in Settings > Safari > Camera to scan.';
+        break;
+      case 'NotFoundError':
+        msg = '📷 No camera available on this device.';
+        break;
       case 'NotReadableError':
-      case 'TrackStartError': msg = '⚠️ Camera is busy (used by another app). Close it and retry.'; break;
-      default: msg = 'Camera error: ' + e.message;
+      case 'TrackStartError':
+        msg = '⚠️ Camera is busy (used by another app). Close it and retry.';
+        break;
+      default:
+        msg = 'Camera error: ' + (e.message || e);
+        console.error('Camera error:', e);
     }
     el('scanStatus').textContent = msg;
     setTimeout(stopScan, 4500);
@@ -196,28 +220,55 @@ async function startCamera(onScanComplete) {
   }
 }
 
+
 export async function startScan(onScanComplete) {
   if (opening) return; // prevent double trigger
   el('scannerModal').classList.add('active');
-  currentCameraIndex = 0;
   // fire without awaiting so modal paints instantly
   startCamera(onScanComplete);
 }
 
 export function stopScan() {
-  try { codeReader.reset(); } catch(_) {}
-  const vid = el('video');
+  isScanning = false;
+
+  // Stop Quagga
+  if (Quagga) {
+    try {
+      Quagga.offDetected();
+      Quagga.offProcessed();
+      Quagga.stop();
+    } catch(e) {
+      console.log('Error stopping Quagga:', e);
+    }
+  }
+
+  // Clean up video stream from both possible locations
+  const vid = document.querySelector('#interactive video') || el('video');
   if (vid && vid.srcObject) {
-    try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
+    try {
+      vid.srcObject.getTracks().forEach(t => t.stop());
+    } catch(_) {}
     vid.srcObject = null;
   }
+
   if (currentStream) {
-    if (currentStream._focusInterval) {
-      clearInterval(currentStream._focusInterval);
-    }
-    try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
+    try {
+      currentStream.getTracks().forEach(t => t.stop());
+    } catch(_) {}
     currentStream = null;
   }
+
+  // Clean up any Quagga-generated canvases
+  const interactive = document.querySelector('#interactive');
+  if (interactive) {
+    const canvases = interactive.querySelectorAll('canvas');
+    canvases.forEach(canvas => {
+      if (!canvas.classList.contains('drawingBuffer')) {
+        canvas.remove();
+      }
+    });
+  }
+
   el('scannerModal').classList.remove('active');
   el('scanStatus').textContent = '';
   opening = false;

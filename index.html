@@ -202,7 +202,10 @@ How to use:
                 <h2>Scan Barcode</h2>
             </div>
             <div class="modal-body">
-                <video id="video" autoplay playsinline></video>
+                <div id="interactive" class="viewport" style="position: relative; width: 100%; max-width: 640px; margin: 0 auto;">
+                    <video id="video" autoplay playsinline style="width: 100%; height: auto;"></video>
+                    <canvas class="drawingBuffer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                </div>
                 <canvas id="canvas" style="display:none"></canvas>
                 <div id="scanStatus" class="muted" style="text-align:center;margin-top:12px"></div>
             </div>
@@ -333,6 +336,9 @@ How to use:
 
 <!-- Floating add button -->
 <button class="fab" id="fabBtn" title="Add new item">+</button>
+
+<!-- Quagga2 Barcode Scanner Library -->
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 
 <!-- Main Application JavaScript Module -->
 <script type="module" src="js/app.js"></script>

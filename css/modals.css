@@ -122,6 +122,33 @@ body.no-scroll{overflow:hidden;touch-action:none;}
 /* Scanner modal needs higher z-index to appear above editor */
 #scannerModal{z-index:3000}
 
+#interactive {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 16px;
+    background: #000;
+    box-shadow: var(--shadow-lg);
+}
+
+#interactive video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+#interactive canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#interactive canvas.drawingBuffer {
+    z-index: 1;
+}
+
 video{
     width:100%;
     border-radius:16px;

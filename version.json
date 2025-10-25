@@ -1,18 +1,16 @@
 {
-  "version": "0.0.42",
+  "version": "0.0.43",
   "releaseDate": "2025-10-25",
   "changes": [
-    "Added Filtering (Filtered / Unfiltered) field to Beer type",
-    "Added new Beer item type (style, color, ABV, IBU, brewery, country, region) to item types configuration",
-    "Disabled side menu / filter edge swipe gestures while any modal screen is open to prevent unintended interactions, and update version to 0.0.41",
-    "Barcode scanner now reliably keeps using the back (environment) camera across consecutive scans",
-    "Remembers the detected back camera deviceId in localStorage and reuses it on future launches",
-    "If the first attempt opens the front camera, the app auto-switches to a detected back/environment camera once available",
-    "Automatically clears stored camera if hardware list changes and gracefully retries",
-    "(Earlier) Added vibration feedback on scan start (where supported)",
-    "(Earlier) Fallback low-constraint camera start when high-res constraints not satisfied",
-    "(Earlier) Pointerdown gesture handling for faster, more reliable single-tap scan start on iOS",
-    "(Earlier) Overlap guards, status hints, and improved error messaging",
-    "(Earlier) Disabled state + aria-disabled during scan initiation to prevent double taps"
+    "MAJOR: Replaced ZXing with Quagga2 barcode scanner library - now supports scanning barcodes at ANY rotation angle (0°, 90°, 180°, 270°)",
+    "Wine bottles with rotated barcodes can now be scanned in portrait mode without rotating the phone",
+    "Improved barcode detection accuracy and performance on mobile devices",
+    "Added support for multiple barcode formats: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Codabar, and Interleaved 2 of 5",
+    "Enhanced scanning with multi-worker processing for faster detection",
+    "Added debounce protection to prevent duplicate scans within 1 second",
+    "(Previous) Added Filtering (Filtered / Unfiltered) field to Beer type",
+    "(Previous) Added new Beer item type (style, color, ABV, IBU, brewery, country, region)",
+    "(Previous) Disabled side menu / filter edge swipe gestures while modals are open",
+    "(Previous) Barcode scanner reliably uses back camera and remembers deviceId"
   ]
 }
