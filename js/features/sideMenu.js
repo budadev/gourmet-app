@@ -64,7 +64,7 @@ function toggleSideMenu() {
   }
 }
 
-function openSideMenu() {
+export function openSideMenu() {
   sideMenuOpen = true;
   el('sideMenuOverlay').classList.add('active');
   el('sideMenu').classList.add('active');
@@ -72,7 +72,7 @@ function openSideMenu() {
   document.body.style.overflow = 'hidden';
 }
 
-function closeSideMenu() {
+export function closeSideMenu() {
   sideMenuOpen = false;
   el('sideMenuOverlay').classList.remove('active');
   el('sideMenu').classList.remove('active');

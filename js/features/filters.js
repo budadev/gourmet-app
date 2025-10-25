@@ -108,6 +108,27 @@ export async function initFilters(onFilterChange) {
 }
 
 /**
+ * Open filter panel
+ */
+export async function openFilterPanel() {
+  const filterPanel = el('filterPanel');
+  const filterOverlay = el('filterOverlay');
+  await renderFilterPanel();
+  filterPanel.classList.add('active');
+  filterOverlay.classList.add('active');
+}
+
+/**
+ * Close filter panel
+ */
+export function closeFilterPanel() {
+  const filterPanel = el('filterPanel');
+  const filterOverlay = el('filterOverlay');
+  filterPanel.classList.remove('active');
+  filterOverlay.classList.remove('active');
+}
+
+/**
  * Update the filter button badge to show active filter count
  */
 export async function updateFilterButtonBadge() {

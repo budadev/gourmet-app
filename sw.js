@@ -2,7 +2,7 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const VERSION = '0.0.32';
+const VERSION = '0.0.33';
 const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`;
 
 const ASSETS = [
@@ -49,6 +49,7 @@ const ASSETS = [
   './js/features/scanner.js',
   './js/features/search.js',
   './js/features/sideMenu.js',
+  './js/features/swipeGestures.js',
   './js/models/pairings.js',
   './js/models/places.js',
   './js/external/openFoodFacts.js'
