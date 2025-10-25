@@ -129,35 +129,45 @@ function renderEditorFields(selectedType, itemData = {}) {
   // Setup barcode input scan button
   const barcodeInputScanBtn = el('barcodeInputScanBtn');
   if (barcodeInputScanBtn) {
-    barcodeInputScanBtn.onclick = async () => {
-      startScanForInput(async (code) => {
-        const barcodeInput = el('barcodeInput');
-        if (!barcodeInput) return;
+    let editorBarcodeScanning = false;
+    const triggerEditorScan = async () => {
+      if (editorBarcodeScanning) return;
+      editorBarcodeScanning = true;
+      barcodeInputScanBtn.classList.add('scanning');
+      barcodeInputScanBtn.setAttribute('aria-disabled','true');
+      try {
+        startScanForInput(async (code) => {
+          const barcodeInput = el('barcodeInput');
+          if (!barcodeInput) return;
 
-        // Check for existing items with this barcode
-        const { findByBarcode } = await import('../db.js');
-        const existingItems = await findByBarcode(code);
+          const { findByBarcode } = await import('../db.js');
+          const existingItems = await findByBarcode(code);
+          const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
 
-        // Filter out the current item being edited (if any)
-        const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
-
-        if (duplicates.length > 0) {
-          // Build warning message
-          const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
-          const message = duplicates.length === 1
-            ? `This barcode already exists for ${itemNames}. Are you sure you want to use it?`
-            : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to use it?`;
-
-          if (confirm(message)) {
-            barcodeInput.value = code;
-          }
-          // If user cancels, don't set the barcode
-        } else {
-          // No duplicates found, set the barcode
-          barcodeInput.value = code;
-        }
-      });
+            if (duplicates.length > 0) {
+              const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
+              const message = duplicates.length === 1
+                ? `This barcode already exists for ${itemNames}. Are you sure you want to use it?`
+                : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to use it?`;
+              if (confirm(message)) {
+                barcodeInput.value = code;
+              }
+            } else {
+              barcodeInput.value = code;
+            }
+        });
+      } finally {
+        setTimeout(() => {
+          editorBarcodeScanning = false;
+          barcodeInputScanBtn.classList.remove('scanning');
+          barcodeInputScanBtn.removeAttribute('aria-disabled');
+        }, 400);
+      }
     };
+    // Fast gesture capture
+    barcodeInputScanBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); triggerEditorScan(); }, { passive: false });
+    // Fallback for keyboard / non-pointer
+    barcodeInputScanBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); triggerEditorScan(); };
   }
 
   // Handle type change - update only dynamic fields instead of full re-render

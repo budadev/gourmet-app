@@ -9,6 +9,7 @@ const codeReader = new BrowserMultiFormatReader();
 let currentStream = null;
 let availableCameras = [];
 let currentCameraIndex = 0;
+let opening = false; // prevent overlapping opens
 
 async function getAvailableCameras() {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -105,183 +106,147 @@ function startContinuousFocus(track) {
   return focusInterval;
 }
 
-async function checkCameraPermission() {
-  try {
-    // Check if permission is already granted
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    // If we get here, permission was granted
-    const tracks = stream.getTracks();
-    tracks.forEach(track => track.stop()); // Stop the track as we only check permission
-    return true;
-  } catch (e) {
-    // Permission denied or not available
-    return false;
-  }
-}
-
-function showPermissionInfo() {
-  // Show a one-time info message about camera permission
-  const infoShown = localStorage.getItem('cameraPermissionInfoShown');
-  if (!infoShown) {
-    el('scanStatus').textContent = '📷 This app requires camera access to scan barcodes. Please allow camera access in your browser settings.';
-    localStorage.setItem('cameraPermissionInfoShown', 'true');
-  }
-}
-
 async function startCamera(onScanComplete) {
+  if (opening) return; // guard
+  opening = true;
   const vid = el('video');
   let focusInterval = null;
+  el('scanStatus').textContent = '📷 Initializing camera…';
+  if (navigator.vibrate) { try { navigator.vibrate(10); } catch(_) {} }
 
   try {
-    // Completely reset and cleanup before starting new session
-    try {
-      codeReader.reset();
-    } catch (_) { }
+    try { codeReader.reset(); } catch(_) {}
 
-    // Stop and clear existing video stream
-    if (vid.srcObject) {
-      const tracks = vid.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
+    // Clean previous stream
+    if (vid && vid.srcObject) {
+      try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
       vid.srcObject = null;
     }
 
-    // Pause the video and reset its state
-    vid.pause();
-    vid.currentTime = 0;
+    availableCameras = await navigator.mediaDevices.enumerateDevices();
+    availableCameras = availableCameras.filter(d=>d.kind==='videoinput');
 
-    // Check if permission is already granted
-    const hasPermission = await checkCameraPermission();
-
-    // Show info message if first time and no permission yet
-    if (!hasPermission) {
-      showPermissionInfo();
-    }
-
-    availableCameras = await getAvailableCameras();
     const deviceId = availableCameras[currentCameraIndex]?.deviceId;
 
-    if (currentStream) {
-      // Clear focus interval if it exists
-      if (currentStream._focusInterval) {
-        clearInterval(currentStream._focusInterval);
-        currentStream._focusInterval = null;
-      }
-      currentStream.getTracks().forEach(t => t.stop());
-      currentStream = null;
-    }
-
-    // Enhanced camera constraints for better autofocus
+    // Build constraints (single call via ZXing)
     const constraints = {
       video: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
         facingMode: deviceId ? undefined : { ideal: 'environment' },
-        // Request high resolution for better barcode detection
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        // Request autofocus capability
-        focusMode: { ideal: 'continuous' },
-        // Advanced settings for iOS
-        advanced: [
-          { focusMode: 'continuous' },
-          { focusDistance: 0.5 }
-        ]
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1080 },
+        focusMode: 'continuous',
+        advanced: [ { focusMode: 'continuous' }, { focusDistance: 0.5 } ]
       }
     };
 
-    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    // Apply advanced camera settings for continuous autofocus
-    const videoTrack = currentStream.getVideoTracks()[0];
-    if (videoTrack) {
-      focusInterval = await applyAdvancedCameraSettings(videoTrack);
-
-      // Store the interval so we can clear it later
-      currentStream._focusInterval = focusInterval;
-    }
-
-    // Set video source
-    vid.srcObject = currentStream;
-
-    // Wait for video metadata to be loaded before starting decoder
-    await new Promise((resolve) => {
-      const handleLoadedMetadata = () => {
-        vid.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        resolve();
-      };
-
-      if (vid.readyState >= vid.HAVE_METADATA) {
-        resolve();
+    let decodeSucceeded = false;
+    try {
+      await codeReader.decodeFromConstraints(constraints, vid, async (res, err) => {
+        if (res) {
+          const code = res.getText();
+          el('scanStatus').textContent = `✅ ${code}`;
+          stopScan();
+          if (onScanComplete) await onScanComplete(code);
+        }
+      });
+      decodeSucceeded = true;
+    } catch (err) {
+      if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        // Retry with relaxed constraints
+        el('scanStatus').textContent = '🔄 Adjusting camera settings…';
+        const fallback = { video: { facingMode: { ideal: 'environment' } } };
+        await codeReader.decodeFromConstraints(fallback, vid, async (res, e2) => {
+          if (res) {
+            const code = res.getText();
+            el('scanStatus').textContent = `✅ ${code}`;
+            stopScan();
+            if (onScanComplete) await onScanComplete(code);
+          }
+        });
+        decodeSucceeded = true;
       } else {
-        vid.addEventListener('loadedmetadata', handleLoadedMetadata);
+        throw err;
       }
-    });
-
-    // Use decodeFromVideoDevice which will handle video playback internally
-    codeReader.decodeFromVideoDevice(deviceId || undefined, vid, async (res, err) => {
-      if (res) {
-        const code = res.getText();
-        el('scanStatus').textContent = `Scanned: ${code}`;
-        stopScan();
-        if (onScanComplete) await onScanComplete(code);
-      }
-    });
-  } catch (e) {
-    // Provide more helpful error messages
-    let errorMsg = 'Camera error: ';
-
-    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-      errorMsg = '❌ Camera access denied. Please allow camera access in your browser settings.';
-      // Clear the "first time" flag so we can show the message again
-      localStorage.removeItem('cameraPermissionInfoShown');
-    } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
-      errorMsg = '📷 No camera found on this device.';
-    } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
-      errorMsg = '⚠️ Camera is being used by another app. Please close other apps and try again.';
-    } else {
-      errorMsg += e.message;
     }
 
-    el('scanStatus').textContent = errorMsg;
-    setTimeout(stopScan, 4000);
+    if (!decodeSucceeded) throw new Error('Could not start decoder');
+
+    // Wait for stream to attach
+    await new Promise(r => {
+      if (vid.readyState >= vid.HAVE_METADATA) return r();
+      vid.addEventListener('loadedmetadata', () => r(), { once: true });
+    });
+
+    currentStream = vid.srcObject;
+    if (currentStream) {
+      const track = currentStream.getVideoTracks()[0];
+      if (track) {
+        try { focusInterval = await applyAdvancedCameraSettings(track); } catch (_) {}
+        currentStream._focusInterval = focusInterval;
+      }
+    }
+
+    el('scanStatus').textContent = '📡 Point camera at barcode';
+    // Safety hint after 15s if still active
+    setTimeout(() => {
+      if (el('scannerModal').classList.contains('active') && el('video').srcObject) {
+        const txt = el('scanStatus').textContent || '';
+        if (txt.startsWith('📡')) {
+          el('scanStatus').textContent = '⌛ Still scanning… Move closer, steady the camera, or improve lighting';
+        }
+      }
+    }, 15000);
+  } catch(e) {
+    let msg;
+    switch(e.name) {
+      case 'NotAllowedError':
+        msg = '❌ Camera permission denied. Enable it in Settings > Safari > Camera to scan.';
+        break;
+      case 'NotFoundError':
+        msg = '📷 No camera available on this device.';
+        break;
+      case 'NotReadableError':
+      case 'TrackStartError':
+        msg = '⚠️ Camera is busy (used by another app). Close it and retry.';
+        break;
+      default:
+        msg = 'Camera error: ' + e.message;
+    }
+    el('scanStatus').textContent = msg;
+    setTimeout(stopScan, 4500);
+  } finally {
+    opening = false;
   }
 }
 
 export async function startScan(onScanComplete) {
+  if (opening) return; // prevent double trigger
   el('scannerModal').classList.add('active');
   currentCameraIndex = 0;
-  await startCamera(onScanComplete);
+  // fire without awaiting so modal paints instantly
+  startCamera(onScanComplete);
 }
 
 export function stopScan() {
-  try {
-    codeReader.reset();
-  } catch (_) { }
-
-  // Clean up video element
+  try { codeReader.reset(); } catch(_) {}
   const vid = el('video');
   if (vid && vid.srcObject) {
-    const tracks = vid.srcObject.getTracks();
-    tracks.forEach(track => track.stop());
+    try { vid.srcObject.getTracks().forEach(t=>t.stop()); } catch(_) {}
     vid.srcObject = null;
   }
-
   if (currentStream) {
-    // Clear focus interval if it exists
     if (currentStream._focusInterval) {
       clearInterval(currentStream._focusInterval);
-      currentStream._focusInterval = null;
     }
-
-    currentStream.getTracks().forEach(t => t.stop());
+    try { currentStream.getTracks().forEach(t=>t.stop()); } catch(_) {}
     currentStream = null;
   }
-
   el('scannerModal').classList.remove('active');
   el('scanStatus').textContent = '';
+  opening = false;
 }
 
 export async function startScanForInput(onScanComplete) {
-  el('scannerModal').classList.add('active');
-  currentCameraIndex = 0;
-  await startCamera(onScanComplete);
+  await startScan(onScanComplete);
 }
