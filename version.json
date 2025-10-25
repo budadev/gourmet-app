@@ -1,5 +1,5 @@
 {
-  "version": "0.0.39",
+  "version": "0.0.40",
   "releaseDate": "2025-10-25",
   "changes": [
     "Barcode scanner now reliably keeps using the back (environment) camera across consecutive scans",

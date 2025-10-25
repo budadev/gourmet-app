@@ -12,7 +12,7 @@ import { addPairing, removePairing } from '../models/pairings.js';
 import { openPairingSelector, setCurrentPairings, getCurrentPairings } from './pairingSelector.js';
 import { startScanForInput } from './scanner.js';
 import { renderPlaceSelector } from '../components/placeSelector.js';
-import { setCurrentPlaces, getCurrentPlaces } from '../models/places.js';
+import { setCurrentPlaces, getCurrentPlaces, invalidatePlaceUsageCache } from '../models/places.js';
 
 let currentEditingId = null;
 let starRatingController = null;
@@ -346,11 +346,12 @@ export async function saveItem() {
         for (const targetId of payload.pairings.good) await addPairing(newItemId, targetId, 'good');
         for (const targetId of payload.pairings.bad) await addPairing(newItemId, targetId, 'bad');
       }
-      // Clear any active search so the newly added item is visible immediately
       const searchInput = el('searchInput');
       if (searchInput) searchInput.value = '';
       setStatus('Item added!');
     }
+    // Invalidate place usage cache so filters & selectors reflect new usage ordering
+    invalidatePlaceUsageCache();
     // Immediately refresh list (via callback) and close editor without delay
     if (window.__editorOnSave) window.__editorOnSave();
     closeEditor();

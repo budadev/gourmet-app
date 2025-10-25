@@ -10,6 +10,7 @@ import { showPhotoModal } from '../components/photos.js';
 import { getTypeInfo } from '../config.js';
 import { cleanupPairingsOnDelete } from '../models/pairings.js';
 import { renderPlacesInDetails } from '../components/placeSelector.js';
+import { invalidatePlaceUsageCache } from '../models/places.js';
 
 export async function showItemDetails(id, onEdit, onDelete) {
   const item = await getItem(id);
@@ -131,6 +132,8 @@ export async function showItemDetails(id, onEdit, onDelete) {
     if (confirm(`Delete "${item.name}"?`)) {
       await cleanupPairingsOnDelete(id, item.pairings);
       await deleteItem(id);
+      // Invalidate place usage cache so filters & selectors pick up decreased usage
+      invalidatePlaceUsageCache();
       closeModal('detailsModal');
       if (onDelete) onDelete();
     }
