@@ -130,8 +130,25 @@ video{
     border-radius:16px;
     background:#000;
     box-shadow:var(--shadow-lg);
-    object-fit:contain; /* Maintain aspect ratio without cropping */
+    object-fit:cover; /* Cover to fill available space and reduce black bars */
     display:block;
+    transform-origin:center center;
+    transition:transform 0.3s ease;
+}
+
+/* Rotate video based on device orientation to match camera view */
+@media (orientation: landscape) {
+    video {
+        max-width:calc(100vw - 56px); /* Account for modal padding */
+        height:auto;
+        aspect-ratio:16/9;
+    }
+}
+
+@media (orientation: portrait) {
+    video {
+        aspect-ratio:3/4;
+    }
 }
 
 /* Adjust video container in scanner modal for orientation changes */
@@ -141,4 +158,5 @@ video{
     align-items:center;
     justify-content:flex-start;
     overflow:hidden; /* Prevent scrolling in scanner */
+    padding:12px 20px; /* Reduce padding to maximize video space */
 }
