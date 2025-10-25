@@ -4,19 +4,7 @@
 
 *{box-sizing:border-box}
 
-/* Lock orientation to portrait */
-@media screen and (orientation: landscape) {
-    html {
-        transform: rotate(-90deg);
-        transform-origin: left top;
-        width: 100vh;
-        height: 100vw;
-        overflow-x: hidden;
-        position: absolute;
-        top: 100%;
-        left: 0;
-    }
-}
+/* Removed orientation lock due to layout issues */
 
 html{
     overflow-x:hidden;
