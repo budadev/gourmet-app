@@ -18,7 +18,6 @@ import { initUpdateManager } from './updateManager.js';
 import { initSideMenu, openSideMenu, closeSideMenu } from './features/sideMenu.js';
 import { initFilters, applyFilters, setFilterChangeCallback, openFilterPanel, closeFilterPanel } from './features/filters.js';
 import { initSwipeGestures } from './features/swipeGestures.js';
-import { needsPhotoMigration, showMigrationUI } from './photoMigration.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -47,12 +46,6 @@ async function initApp() {
 
   // Build the search index from all items in the database
   await buildSearchIndex();
-
-  // Check if photo migration is needed
-  if (await needsPhotoMigration()) {
-    await showMigrationUI();
-  }
-
 
   // Load configuration
   await loadConfig();

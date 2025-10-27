@@ -77,16 +77,6 @@ export function generatePhotoId() {
   return `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Convert file to base64 data URL
-async function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 // Capture photo using camera
 export async function capturePhoto() {
   return new Promise((resolve, reject) => {
@@ -402,4 +392,3 @@ export async function processPhotoForEditing(dataURL) {
     fullDataURL: dataURL // Keep full version temporarily for editing session
   };
 }
-

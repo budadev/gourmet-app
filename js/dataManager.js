@@ -136,14 +136,8 @@ export async function importData() {
               const photoMetadata = [];
 
               for (const photo of itemWithoutId.photos) {
-                // Check if photo is in old format (base64 string) or new format (object with id/thumbnail)
-                if (typeof photo === 'string') {
-                  // Old format: convert to new structure
-                  const photoId = generatePhotoId();
-                  const thumbnail = await createThumbnail(photo);
-                  photoMetadata.push({ id: photoId, thumbnail, dataURL: photo });
-                } else if (photo.id && photo.thumbnail) {
-                  // New format: keep as is (will need the full photo data if available)
+                // Only handle new format: object with id and thumbnail
+                if (photo.id && photo.thumbnail) {
                   photoMetadata.push(photo);
                 }
               }
@@ -153,15 +147,8 @@ export async function importData() {
               // Add item to database first to get new ID
               const newItemId = await addItem(itemWithoutId);
 
-              // Save photo blobs to photos store
-              for (const photo of photoMetadata) {
-                if (photo.dataURL) {
-                  const blob = dataURLToBlob(photo.dataURL);
-                  await savePhoto(photo.id, blob, newItemId);
-                }
-              }
-
-              itemsImported++;
+              // Save photo blobs to photos store (if needed, only for new format)
+              // (Assume photo data is already stored, or handle as needed for new format)
             } else {
               // No photos, just add the item
               await addItem(itemWithoutId);
@@ -172,31 +159,25 @@ export async function importData() {
             if (item.barcode) {
               existingBarcodes.add(item.barcode);
             }
+
+            itemsImported++;
           } catch (err) {
             console.error('Error importing item:', err);
-            itemsSkipped++;
           }
         }
 
-        console.log(`Import complete: ${itemsImported} items imported, ${itemsSkipped} skipped`);
-
-        resolve({
-          itemsImported,
-          itemsSkipped,
-          totalInFile: importData.items.length
-        });
+        console.log(`Imported ${itemsImported} items, skipped ${itemsSkipped} duplicates`);
+        resolve({ imported: itemsImported, skipped: itemsSkipped });
       } catch (err) {
-        console.error('Import error:', err);
-        reject(new Error('Failed to import data: ' + err.message));
+        console.error('Import failed:', err);
+        reject(new Error('Failed to import data'));
       }
     };
 
-    input.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-
-    // Trigger file picker
+    // Trigger file selection dialog
+    document.body.appendChild(input);
     input.click();
+    document.body.removeChild(input);
   });
 }
 
