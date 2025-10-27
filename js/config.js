@@ -4,6 +4,11 @@
 
 let ITEM_TYPES_CONFIG = {};
 
+// MapTiler / OpenMapTiles API key for Bright style
+// Get a free key from https://www.maptiler.com/cloud/ (free tier available).
+// Paste it here, or set it programmatically before init. Leave empty to fallback to OSM.
+export const MAPTILER_API_KEY = 'wV8Y5oQjlhRfFIG6of6y';
+
 export async function loadConfig() {
   try {
     const response = await fetch('./item-types-config.json');

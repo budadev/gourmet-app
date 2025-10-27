@@ -244,6 +244,22 @@ export async function deletePlace(id) {
   });
 }
 
+export async function updatePlace(id, patch) {
+  const store = await tx('readwrite', PLACES_STORE);
+  const get = store.get(id);
+  return new Promise((res, rej) => {
+    get.onsuccess = () => {
+      const cur = get.result;
+      if (!cur) return rej(new Error('Not found'));
+      const updatedPlace = { ...cur, ...patch, updatedAt: Date.now() };
+      const put = store.put(updatedPlace);
+      put.onsuccess = () => res(put.result);
+      put.onerror = () => rej(put.error);
+    };
+    get.onerror = () => rej(get.error);
+  });
+}
+
 /* =============================
    Photos Store Functions
    ============================= */
@@ -316,4 +332,3 @@ export async function deletePhotosByItemId(itemId) {
   const promises = photos.map(photo => deletePhoto(photo.id));
   await Promise.all(promises);
 }
-

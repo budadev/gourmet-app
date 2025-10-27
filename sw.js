@@ -2,7 +2,7 @@
 // File: sw.js (Service Worker)
 // Enhanced offline cache with network-first fallback for better iPhone offline support
 // =============================
-const VERSION = '0.1.5';
+const VERSION = '0.1.6';
 const CACHE = `gourmetapp-v${VERSION.replace(/\./g, '-')}`;
 
 const ASSETS = [
@@ -53,7 +53,8 @@ const ASSETS = [
   './js/features/swipeGestures.js',
   './js/models/pairings.js',
   './js/models/places.js',
-  './js/external/openFoodFacts.js'
+  './js/external/openFoodFacts.js',
+  // Note: external map library (Google Maps) is loaded at runtime from index.html and is not cached here
 ];
 
 self.addEventListener('install', e => {
