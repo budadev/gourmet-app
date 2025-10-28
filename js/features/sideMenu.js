@@ -663,6 +663,87 @@ export function showPlaceMergeModal(selectedPlaces) {
   setupMergePlaceMap();
 }
 
+// New: wire up dropdown input handlers (show/filter/select)
+(function setupMergeDropdownHandlers(){
+  if (!mergePlaceNameInput || !mergePlaceNameList || !mergePlaceNameDropdown) return;
+
+  function showList() {
+    // Re-render list to ensure it's fresh
+    renderMergePlaceNameList();
+    if (mergePlaceNameList.children.length > 0) {
+      mergePlaceNameList.classList.add('active');
+    } else {
+      mergePlaceNameList.classList.remove('active');
+    }
+  }
+
+  mergePlaceNameInput.addEventListener('input', (e) => {
+    const q = e.target.value.trim();
+    const qLower = q.toLowerCase();
+    mergePlaceName = e.target.value;
+
+    // If no source items, only offer create-new when user typed something
+    if (!mergeSelectedPlaces || mergeSelectedPlaces.length === 0) {
+      if (q) {
+        mergePlaceNameList.innerHTML = `<div class="dropdown-item" data-name="${mergePlaceName}">Create new: ${mergePlaceName}</div>`;
+        mergePlaceNameList.classList.add('active');
+      } else {
+        mergePlaceNameList.innerHTML = '';
+        mergePlaceNameList.classList.remove('active');
+      }
+      return;
+    }
+
+    // Determine exact match (hide create-new if exact match exists)
+    const exactMatch = q && mergeSelectedPlaces.some(p => (p.name || '').toLowerCase() === qLower);
+
+    // Build list of substring matches
+    const matches = q ? mergeSelectedPlaces.filter(p => (p.name || '').toLowerCase().includes(qLower)) : mergeSelectedPlaces.slice();
+
+    // Construct HTML: create-new (if applicable) should always be on top
+    let html = '';
+    if (q && !exactMatch) {
+      // Offer create-new first when typed text is not an exact match
+      html += `<div class="dropdown-item create-new" data-name="${mergePlaceName}">Create new: ${mergePlaceName}</div>`;
+    }
+
+    // Append matching existing names (if any)
+    if (matches.length > 0) {
+      html += matches.map(p => `<div class="dropdown-item" data-name="${p.name}">${p.name}</div>`).join('');
+    }
+
+    if (html) {
+      mergePlaceNameList.innerHTML = html;
+      mergePlaceNameList.classList.add('active');
+    } else {
+      // No html means no matches and no create-new (e.g., empty query)
+      mergePlaceNameList.innerHTML = '';
+      mergePlaceNameList.classList.remove('active');
+    }
+  });
+
+  mergePlaceNameInput.addEventListener('focus', (e) => {
+    // show list on focus if there are items
+    showList();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('#mergePlaceNameDropdown')) {
+      mergePlaceNameList.classList.remove('active');
+    }
+  });
+
+  // Delegate clicks on dropdown items
+  mergePlaceNameList.addEventListener('click', (e) => {
+    const item = e.target.closest && e.target.closest('.dropdown-item');
+    if (!item) return;
+    const name = item.dataset.name;
+    mergePlaceNameInput.value = name;
+    mergePlaceName = name;
+    mergePlaceNameList.classList.remove('active');
+  });
+})();
+
 async function setupMergePlaceMap() {
   // Clean up previous map instance and markers
   if (mergePlaceMapInstance && mergePlaceMapInstance.remove) {
