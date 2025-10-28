@@ -327,23 +327,26 @@ function closeConfigurations() {
   const modal = el('configurationsModal');
   modal.classList.remove('active');
   document.documentElement.style.overflow = '';
-  document.body.style.overflow = '';
+  // SVG marker for Leaflet (solid pin, transparent head dot using evenodd fill rule)
 }
 
 async function showPlaces() {
   const modal = el('placesModal');
   const content = el('placesContent');
 
-  // Reset merge mode state
-  el('placesFooter').style.display = 'none';
-
-  // Load places
-  const places = await getAllPlaces();
-  const usageCounts = await getPlacesUsageMap();
-
-  let currentPlaces = places; // Keep original for filtering
+  // Explicitly reset merge mode state on navigation
   let isMergeMode = false;
   let selectedPlaceId = null;
+  let selectedMergeIds = new Set();
+  if (el('placesFooter')) el('placesFooter').style.display = 'none';
+  if (el('mergePlacesBtn')) {
+    el('mergePlacesBtn').textContent = 'Merge 0 items';
+    el('mergePlacesBtn').disabled = true;
+  }
+
+  const usageCounts = await getPlacesUsageMap();
+  let allPlaces = await getAllPlaces(); // Store the full list for search
+  let currentPlaces = allPlaces;
 
   function renderPlaces(filteredPlaces) {
     if (filteredPlaces.length === 0) {
@@ -352,17 +355,18 @@ async function showPlaces() {
       const placesHTML = filteredPlaces.map((place, index) => `
         <div class="places-list-item">
           <div class="places-list-item-content">
-            <div class="places-list-item-name">${place.name}</div>
+            <div class="places-list-item-header">
+              <div class="places-list-item-name">${place.name}</div>
+              ${isMergeMode
+                ? `<div class="places-list-item-menu-btn" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;"><input type="checkbox" class="place-checkbox" data-place-id="${place.id}" ${selectedMergeIds.has(place.id) ? 'checked' : ''} /></div>`
+                : `<button class="places-list-item-menu-btn" data-place-id="${place.id}" data-index="${index}" aria-label="Menu">⋯</button>`}
+            </div>
             <div class="places-list-item-usage">Used in ${usageCounts[place.id] || 0} items</div>
-          </div>
-          ${isMergeMode ?
-            `<input type="checkbox" class="place-checkbox" data-place-id="${place.id}" ${place.id === selectedPlaceId ? 'checked' : ''}>` :
-            `<button class="places-list-item-menu-btn" data-place-id="${place.id}" data-index="${index}" aria-label="Menu">⋯</button>
             <div class="places-list-item-menu" id="menu-${index}" style="display: none;">
               <button class="places-menu-option" data-action="merge" data-place-id="${place.id}">Merge place...</button>
               <button class="places-menu-option" data-action="edit" data-place-id="${place.id}">Edit</button>
-            </div>`
-          }
+            </div>
+          </div>
         </div>
       `).join('');
       content.innerHTML = `<div class="places-list">${placesHTML}</div>`;
@@ -450,33 +454,35 @@ async function showPlaces() {
   }
 
   function updateMergeButton() {
-    const checkedBoxes = content.querySelectorAll('.place-checkbox:checked');
-    const count = checkedBoxes.length;
-    if (count === 0) {
-      exitMergeMode();
-    } else {
-      const btn = el('mergePlacesBtn');
+    const checkboxes = content.querySelectorAll('.place-checkbox:checked');
+    selectedMergeIds = new Set(Array.from(checkboxes).map(cb => parseInt(cb.dataset.placeId)));
+    const count = selectedMergeIds.size;
+    const btn = el('mergePlacesBtn');
+    if (btn) {
       btn.textContent = `Merge ${count} items`;
       btn.disabled = count < 2;
+    }
+    if (count === 0) {
+      exitMergeMode();
     }
   }
 
   function exitMergeMode() {
     isMergeMode = false;
     selectedPlaceId = null;
+    selectedMergeIds = new Set();
     el('placesFooter').style.display = 'none';
     renderPlaces(currentPlaces);
-    // adjust modal-body padding when footer hidden
     updateModalBodyPadding();
   }
 
   function enterMergeMode(placeId) {
     isMergeMode = true;
     selectedPlaceId = parseInt(placeId); // Ensure it's a number
+    selectedMergeIds = new Set([selectedPlaceId]);
     el('placesFooter').style.display = 'block';
     renderPlaces(currentPlaces);
     updateMergeButton();
-    // adjust modal-body padding to make room for footer
     updateModalBodyPadding();
   }
 
@@ -506,14 +512,13 @@ async function showPlaces() {
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
 
-  // Ensure modal-body padding accounts for whether footer is visible initially
   updateModalBodyPadding();
 
   // Add search functionality
   const searchInput = el('placesSearchInput');
   searchInput.addEventListener('input', () => {
     const query = searchInput.value.toLowerCase();
-    const filteredPlaces = places.filter(place => place.name.toLowerCase().includes(query));
+    const filteredPlaces = allPlaces.filter(place => place.name.toLowerCase().includes(query));
     currentPlaces = filteredPlaces;
     renderPlaces(filteredPlaces);
   });
@@ -648,7 +653,6 @@ async function showPlaceEditor(placeId) {
     // Initialize Leaflet map (use slightly lower initial zoom to reduce tile requests)
     map = L.map(mapElement, { center: [lat, lng], zoom: 12, zoomControl: true });
 
-    // Determine tile URL: prefer MapTiler Bright if API key provided, otherwise fallback to Esri/OSM
     // Load MAPTILER_API_KEY from config module
     let apiKey = '';
     try {
@@ -658,58 +662,16 @@ async function showPlaceEditor(placeId) {
       apiKey = '';
     }
 
-    let tileUrl = '';
-    let attribution = '';
+    // Only MapTiler is supported now
+    if (!apiKey || apiKey.length <= 8) {
+      el('placeMapLoading').textContent = 'MapTiler API key not configured. Add MAPTILER_API_KEY in js/config.js.';
+      el('placeMapLoading').style.display = 'block';
+      el('placeMap').style.display = 'none';
+      return;
+    }
 
-    if (apiKey && apiKey.length > 8) {
-      // MapTiler Bright raster tiles (MapTiler Cloud)
-      // Use the documented raster endpoint. If you experience 403s, check the key and HTTP referrer restrictions in your MapTiler account.
-      tileUrl = `https://api.maptiler.com/maps/bright/{z}/{x}/{y}.png?key=${apiKey}`;
-      attribution = '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap contributors';
-    } else {
-      // Fallback to Esri World_Street_Map (no key required for light use)
-      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-      attribution = 'Tiles &copy; Esri &mdash; Sources: Esri, HERE, Garmin, NGA, USGS, Intermap, INCREMENT P, NRCan, METI, TomTom, and other contributors';
-    }
-    // Provider state for diagnostics and manual switching
-    let currentProvider = (apiKey && apiKey.length > 8) ? 'MapTiler' : 'Esri';
-    const providerBadgeEl = document.getElementById('placeMapProviderBadge');
-    function updateProviderBadge() {
-      if (!providerBadgeEl) return;
-      providerBadgeEl.textContent = currentProvider;
-      providerBadgeEl.style.opacity = '0.85';
-      providerBadgeEl.style.padding = '4px 8px';
-      providerBadgeEl.style.background = 'var(--bg-secondary)';
-      providerBadgeEl.style.borderRadius = '999px';
-      providerBadgeEl.style.fontWeight = '600';
-      providerBadgeEl.style.cursor = 'pointer';
-    }
-    updateProviderBadge();
-
-    // Allow user to click the badge to manually toggle provider (useful when automatic switching misfires)
-    if (providerBadgeEl) {
-      providerBadgeEl.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        if (currentProvider === 'MapTiler') {
-          // switch to Esri
-          addEsriFallback();
-          currentProvider = 'Esri';
-        } else {
-          // attempt to switch back to MapTiler if key present
-          if (apiKey && apiKey.length > 8) {
-            try { if (window._currentTileLayer) window._currentTileLayer.remove(); } catch (e) {}
-            const mtLayer = L.tileLayer(`https://api.maptiler.com/maps/bright/{z}/{x}/{y}.png?key=${apiKey}`, { attribution, maxZoom: 19, errorTileUrl: errorTile });
-            mtLayer.addTo(map);
-            window._currentTileLayer = mtLayer;
-            currentProvider = 'MapTiler';
-            showNotification('Switched to MapTiler (manual).', 'info');
-          } else {
-            showNotification('MapTiler key not configured. Add MAPTILER_API_KEY in js/config.js to use MapTiler.', 'warning');
-          }
-        }
-        updateProviderBadge();
-      });
-    }
+    const tileUrl = `https://api.maptiler.com/maps/bright/{z}/{x}/{y}.png?key=${apiKey}`;
+    const attribution = '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap contributors';
 
     // Provide a friendly error tile (small SVG) so tiles that fail are visually consistent instead of large grey blocks.
     const errorTile = 'data:image/svg+xml;utf8,' + encodeURIComponent(`<?xml version="1.0" encoding="UTF-8"?><svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' font-size='13' fill='#9ca3af' text-anchor='middle' dominant-baseline='central'>Tile unavailable</text></svg>`);
@@ -721,43 +683,11 @@ async function showPlaceEditor(placeId) {
       tileSize: 256,
       detectRetina: false,
       errorTileUrl: errorTile,
-      // Performance-oriented options to reduce bandwidth & jitter on slow connections
-      updateWhenIdle: true,       // wait until idle to update tiles
-      updateWhenZooming: false,   // don't update tiles continuously while zooming
-      reuseTiles: true,           // reuse tiles to reduce redraws
-      keepBuffer: 1,              // number of extra rows/cols to keep beyond view
-      crossOrigin: true           // request CORS headers (MapTiler supports CORS)
-    });
-
-    // Add basic resilience: if many tiles error (often due to API key restrictions), fall back to Esri
-    let tileErrorCount = 0;
-    const TILE_ERROR_THRESHOLD = 8;
-    const resetTimerMs = 8000;
-
-    function addEsriFallback() {
-      try {
-        tileLayer.remove();
-      } catch (e) {}
-      const esriUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
-      const esriAttr = 'Tiles &copy; Esri &mdash; Sources: Esri, HERE, Garmin, NGA, USGS, Intermap, INCREMENT P, NRCan, METI, TomTom, and other contributors';
-      const esriLayer = L.tileLayer(esriUrl, { attribution: esriAttr, maxZoom: 19, errorTileUrl: errorTile });
-      esriLayer.addTo(map);
-      // Ensure map reflows in modal and show map area immediately
-      try { map.invalidateSize(); } catch (e) {}
-      el('placeMapLoading').style.display = 'none';
-      el('placeMap').style.display = 'block';
-      showNotification('Switched to fallback map provider (Esri). If you intended to use MapTiler, check your API key and referrer restrictions.', 'warning');
-    }
-
-    tileLayer.on('tileerror', (err) => {
-      tileErrorCount++;
-      // reset counter after a while
-      clearTimeout(tileLayer._tileErrorResetTimer);
-      tileLayer._tileErrorResetTimer = setTimeout(() => { tileErrorCount = 0; }, resetTimerMs);
-      if (tileErrorCount >= TILE_ERROR_THRESHOLD) {
-        console.warn('[Places] Map tile errors exceeded threshold, switching to fallback provider.');
-        addEsriFallback();
-      }
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      reuseTiles: true,
+      keepBuffer: 1,
+      crossOrigin: true
     });
 
     // When tiles finish loading, show the map area and ensure correct sizing inside modal
@@ -769,12 +699,26 @@ async function showPlaceEditor(placeId) {
 
     tileLayer.addTo(map);
 
-    // SVG marker for Leaflet
-    const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns='http://www.w3.org/2000/svg' width='28' height='40' viewBox='0 0 28 40'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0' stop-color='%238b5cf6'/><stop offset='1' stop-color='%2310b981'/></linearGradient></defs><path d='M14 0C8 0 4 4.5 4 9.5 4 16 14 34 14 34s10-18 10-24.5C24 4.5 20 0 14 0z' fill='url(%23g)'/><circle cx='14' cy='10' r='4.5' fill='white' opacity='0.95'/></svg>`;
+    // SVG marker for Leaflet (solid pin, transparent head dot using mask)
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns='http://www.w3.org/2000/svg' width='32' height='44' viewBox='0 0 32 44'>
+      <defs>
+        <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
+          <stop offset='0%' stop-color='#ff3b30'/>
+          <stop offset='100%' stop-color='#c80000'/>
+        </linearGradient>
+        <mask id='dotMask'>
+          <rect width='32' height='44' fill='white'/>
+          <circle cx='16' cy='14' r='6' fill='black'/>
+        </mask>
+      </defs>
+      <path d='M16 2C9 2 4 7 4 14c0 9 12 28 12 28s12-19 12-28c0-7-5-12-12-12z' fill='url(%23pinGradient)' stroke='#222' stroke-width='2' mask='url(%23dotMask)'/>
+      <circle cx='16' cy='14' r='6' fill='none' stroke='#222' stroke-width='2'/>
+    </svg>`;
     const icon = L.icon({
       iconUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
-      iconSize: [28, 40],
-      iconAnchor: [14, 40]
+      iconSize: [32, 44],
+      iconAnchor: [16, 44]
     });
 
     window.marker = L.marker([lat, lng], { icon }).addTo(map);

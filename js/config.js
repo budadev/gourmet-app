@@ -20,7 +20,7 @@ export async function loadConfig() {
     // Fallback configuration
     ITEM_TYPES_CONFIG = {
       wine: { label: 'Wine', icon: '🍷', fields: [] },
-      wine: { label: 'Beer', icon: '🍺', fields: [] },
+      beer: { label: 'Beer', icon: '🍺', fields: [] },
       cheese: { label: 'Cheese', icon: '🧀', fields: [] },
       olives: { label: 'Olives', icon: '🫒', fields: [] },
       ham: { label: 'Ham', icon: '🍖', fields: [] }
