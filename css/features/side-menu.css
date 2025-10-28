@@ -340,3 +340,33 @@
     opacity: 0;
     pointer-events: none;
 }
+
+/* Dropdown for merge place name */
+.merge-place-dropdown-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+  margin-top: 2px;
+}
+.merge-place-dropdown-list.active {
+  display: block;
+}
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text);
+  transition: background 0.2s;
+}
+.dropdown-item:hover, .dropdown-item:focus {
+  background: var(--bg-secondary);
+}

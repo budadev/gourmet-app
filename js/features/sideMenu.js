@@ -625,19 +625,71 @@ function closePlaces() {
 const placeMergeModal = document.getElementById('placeMergeModal');
 const backPlaceMergeBtn = document.getElementById('backPlaceMergeBtn');
 const mergePlaceBtn = document.getElementById('mergePlaceBtn');
+const mergePlaceNameInput = document.getElementById('mergePlaceNameInput');
+const mergePlaceNameList = document.getElementById('mergePlaceNameList');
+const mergePlaceNameDropdown = document.getElementById('mergePlaceNameDropdown');
 
-function showPlaceMergeModal() {
-  // Hide places modal for navigation effect
-  const placesModal = document.getElementById('placesModal');
-  if (placesModal) placesModal.classList.remove('active');
-  placeMergeModal.classList.add('active'); // Use 'active' instead of 'open'
+let mergeSelectedPlaces = [];
+let mergePlaceName = '';
+
+// Call this when opening the merge modal, passing the selected place objects
+export function showPlaceMergeModal(selectedPlaces) {
+  mergeSelectedPlaces = selectedPlaces || [];
+  // Populate dropdown list
+  renderMergePlaceNameList();
+  // Set default value (first selected name or empty)
+  mergePlaceNameInput.value = mergeSelectedPlaces[0]?.name || '';
+  mergePlaceName = mergePlaceNameInput.value;
+  // Remove direct style manipulation, rely on .active class for visibility
+  mergePlaceNameList.classList.remove('active');
+  placeMergeModal.classList.add('active');
 }
+
+function renderMergePlaceNameList() {
+  if (!mergeSelectedPlaces.length) {
+    mergePlaceNameList.innerHTML = '';
+    return;
+  }
+  mergePlaceNameList.innerHTML = mergeSelectedPlaces.map(place =>
+    `<div class="dropdown-item" data-name="${place.name}">${place.name}</div>`
+  ).join('');
+}
+
+// Dropdown show/hide logic
+mergePlaceNameInput.addEventListener('focus', () => {
+  if (mergeSelectedPlaces.length) {
+    mergePlaceNameList.classList.add('active');
+  }
+});
+mergePlaceNameInput.addEventListener('input', (e) => {
+  mergePlaceName = e.target.value;
+  // Optionally filter dropdown items
+  const val = mergePlaceName.toLowerCase();
+  Array.from(mergePlaceNameList.children).forEach(item => {
+    item.style.display = item.dataset.name.toLowerCase().includes(val) ? '' : 'none';
+  });
+  mergePlaceNameList.classList.add('active');
+});
+document.addEventListener('click', (e) => {
+  if (!mergePlaceNameDropdown.contains(e.target)) {
+    mergePlaceNameList.classList.remove('active');
+  }
+});
+mergePlaceNameList.addEventListener('mousedown', (e) => {
+  const item = e.target.closest('.dropdown-item');
+  if (item) {
+    mergePlaceNameInput.value = item.dataset.name;
+    mergePlaceName = item.dataset.name;
+    mergePlaceNameList.classList.remove('active');
+    e.preventDefault();
+  }
+});
 
 function closePlaceMergeModal() {
   // Show places modal again when closing merge modal
   const placesModal = document.getElementById('placesModal');
   if (placesModal) placesModal.classList.add('active');
-  placeMergeModal.classList.remove('active'); // Use 'active' instead of 'open'
+  placeMergeModal.classList.remove('active');
 }
 
 if (backPlaceMergeBtn) {
@@ -653,12 +705,27 @@ if (mergePlaceBtn) {
 // === Hook up to merge flow ===
 const mergePlacesBtn = document.getElementById('mergePlacesBtn');
 if (mergePlacesBtn) {
-  mergePlacesBtn.addEventListener('click', (event) => {
+  mergePlacesBtn.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     // Only show modal if more than one place is selected
     if (selectedMergeIds && selectedMergeIds.size > 1) {
-      showPlaceMergeModal();
+      let allPlaces = [];
+      if (typeof currentPlaces !== 'undefined' && currentPlaces.length) {
+        allPlaces = currentPlaces;
+      } else {
+        // Fallback: fetch all places from DB
+        try {
+          const { getAllPlaces } = await import('../models/places.js');
+          allPlaces = await getAllPlaces();
+        } catch (err) {
+          allPlaces = [];
+        }
+      }
+      // Get selected place objects
+      const selectedPlaces = allPlaces.filter(p => selectedMergeIds.has(p.id));
+      console.debug('[Merge] Selected places for merge:', selectedPlaces);
+      showPlaceMergeModal(selectedPlaces);
     }
   });
 }

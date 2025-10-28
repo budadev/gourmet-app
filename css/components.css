@@ -11,7 +11,7 @@
     font-size:14px;
     font-weight:600;
     letter-spacing:.3px;
-    transition:background var(--transition) var(--ease), box-shadow var(--transition-fast) var(--ease), transform var(--transition-fast) var(--ease);
+    transition:background var(--transition) var(--ease), box-shadow var(--transition-fast) var(--ease), transform var(--transition-fast) var,--ease);
     box-shadow:var(--shadow-sm);
 }
 
@@ -96,7 +96,7 @@ input,select,textarea{
     padding:14px 16px;
     font-size:15px;
     box-shadow:inset 0 1px 2px rgba(0,0,0,.04);
-    transition: border var(--transition-fast) var(--ease), background var(--transition-fast) var(--ease), box-shadow var(--transition-fast) var(--ease);
+    transition: border var(--transition-fast) var(--ease), background var(--transition-fast) var,--ease), box-shadow var(--transition-fast) var,--ease);
     font-family:inherit;
     /* Add touch-action optimization for interactive form elements to reduce iOS 300ms ghost tap */
     touch-action:manipulation;
@@ -188,7 +188,7 @@ label{
   border-radius:999px;
   cursor:pointer;
   backdrop-filter:blur(8px);
-  transition:background var(--transition-fast) var(--ease), color var(--transition-fast) var(--ease), box-shadow var(--transition-fast) var(--ease), transform var(--transition-fast) var(--ease);
+  transition:background var(--transition-fast) var,--ease), color var(--transition-fast) var,--ease), box-shadow var(--transition-fast) var,--ease), transform var(--transition-fast) var,--ease);
   box-shadow:var(--shadow-sm);
 }
 .icon-btn:hover{background:var(--card-hover);color:var(--text);box-shadow:var(--shadow);}
@@ -210,7 +210,7 @@ label{
     border:1px solid var(--border);
     border-radius:var(--radius-lg);
     box-shadow:var(--shadow-sm);
-    transition:background var(--transition) var(--ease), border-color var(--transition) var(--ease), box-shadow var(--transition) var(--ease), transform var(--transition) var,--ease);
+    transition:background var(--transition) var,--ease), border-color var(--transition) var,--ease), box-shadow var(--transition) var,--ease), transform var(--transition) var,--ease);
     cursor:pointer;
     position:relative;
     overflow:hidden;
@@ -306,4 +306,67 @@ label{
 .switch input[type="checkbox"]:focus + .switch-slider {
   outline: 2px solid rgba(59,130,246,0.18);
   outline-offset: 4px;
+}
+
+/* Dropdown editable input for merge places */
+.dropdown-editable {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-editable .input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border);
+  padding: 12px 14px;
+  font-size: 16px;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.dropdown-editable .input:focus {
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 0 0 2px var(--primary-light, #dbeafe);
+}
+
+.dropdown-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 1000;
+  background: var(--card, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-top: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  display: none;
+}
+
+.dropdown-list.active {
+  display: block;
+}
+
+.dropdown-item {
+  padding: 12px 16px;
+  font-size: 16px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover, .dropdown-item:active {
+  background: var(--primary-light, #f3f4f6);
+  color: var(--primary, #3b82f6);
 }
