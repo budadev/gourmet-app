@@ -392,6 +392,15 @@ How to use:
                         <div class="merge-place-dropdown-list" id="mergePlaceNameList"></div>
                     </div>
                 </div>
+                <!-- Location/Map Section for Merge -->
+                <div class="form-group">
+                    <label>Location</label>
+                    <div id="mergePlaceMapContainer" style="display: none; margin-bottom: 10px;">
+                        <div id="mergePlaceMapLoading" style="padding: 20px; text-align: center; color: var(--text-muted);">Loading map...</div>
+                        <div id="mergePlaceMap" style="height: 250px; width: 100%; display: none; border-radius: 8px;"></div>
+                    </div>
+                    <div id="mergePlaceLocationHint" class="muted" style="font-size: 0.95em; margin-top: 4px;"></div>
+                </div>
                 <!-- Placeholder for merge UI -->
                 <div class="muted" style="text-align: center; padding: 40px 20px;">Select places to merge and confirm.</div>
             </div>

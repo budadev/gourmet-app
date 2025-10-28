@@ -628,22 +628,16 @@ const mergePlaceBtn = document.getElementById('mergePlaceBtn');
 const mergePlaceNameInput = document.getElementById('mergePlaceNameInput');
 const mergePlaceNameList = document.getElementById('mergePlaceNameList');
 const mergePlaceNameDropdown = document.getElementById('mergePlaceNameDropdown');
+const mergePlaceMapContainer = document.getElementById('mergePlaceMapContainer');
+const mergePlaceMapLoading = document.getElementById('mergePlaceMapLoading');
+const mergePlaceMap = document.getElementById('mergePlaceMap');
+const mergePlaceLocationHint = document.getElementById('mergePlaceLocationHint');
 
 let mergeSelectedPlaces = [];
 let mergePlaceName = '';
-
-// Call this when opening the merge modal, passing the selected place objects
-export function showPlaceMergeModal(selectedPlaces) {
-  mergeSelectedPlaces = selectedPlaces || [];
-  // Populate dropdown list
-  renderMergePlaceNameList();
-  // Set default value (first selected name or empty)
-  mergePlaceNameInput.value = mergeSelectedPlaces[0]?.name || '';
-  mergePlaceName = mergePlaceNameInput.value;
-  // Remove direct style manipulation, rely on .active class for visibility
-  mergePlaceNameList.classList.remove('active');
-  placeMergeModal.classList.add('active');
-}
+let mergePlaceSelectedCoords = null;
+let mergePlaceMapInstance = null;
+let mergePlaceMarkers = [];
 
 function renderMergePlaceNameList() {
   if (!mergeSelectedPlaces.length) {
@@ -655,35 +649,172 @@ function renderMergePlaceNameList() {
   ).join('');
 }
 
-// Dropdown show/hide logic
-mergePlaceNameInput.addEventListener('focus', () => {
-  if (mergeSelectedPlaces.length) {
-    mergePlaceNameList.classList.add('active');
+export function showPlaceMergeModal(selectedPlaces) {
+  mergeSelectedPlaces = selectedPlaces || [];
+  // Populate dropdown list
+  renderMergePlaceNameList();
+  // Set default value (first selected name or empty)
+  mergePlaceNameInput.value = mergeSelectedPlaces[0]?.name || '';
+  mergePlaceName = mergePlaceNameInput.value;
+  mergePlaceNameList.classList.remove('active');
+  placeMergeModal.classList.add('active');
+
+  // Location logic
+  setupMergePlaceMap();
+}
+
+async function setupMergePlaceMap() {
+  // Clean up previous map instance and markers
+  if (mergePlaceMapInstance && mergePlaceMapInstance.remove) {
+    mergePlaceMapInstance.remove();
+    mergePlaceMapInstance = null;
   }
-});
-mergePlaceNameInput.addEventListener('input', (e) => {
-  mergePlaceName = e.target.value;
-  // Optionally filter dropdown items
-  const val = mergePlaceName.toLowerCase();
-  Array.from(mergePlaceNameList.children).forEach(item => {
-    item.style.display = item.dataset.name.toLowerCase().includes(val) ? '' : 'none';
+  mergePlaceMarkers.forEach(m => m.remove && m.remove());
+  mergePlaceMarkers = [];
+  mergePlaceSelectedCoords = null;
+
+  // Check if any selected places have coordinates
+  const placesWithCoords = mergeSelectedPlaces.filter(p => p.coordinates && typeof p.coordinates.lat === 'number' && typeof p.coordinates.lng === 'number');
+  const hasAnyCoords = placesWithCoords.length > 0;
+
+  // Show map container
+  mergePlaceMapContainer.style.display = 'block';
+  mergePlaceMapLoading.style.display = 'block';
+  mergePlaceMap.style.display = 'none';
+  mergePlaceLocationHint.textContent = '';
+
+  // Ensure Leaflet is available
+  if (typeof L === 'undefined') {
+    mergePlaceMapLoading.textContent = 'Map library unavailable.';
+    return;
+  }
+
+  // Load MAPTILER_API_KEY from config module
+  let apiKey = '';
+  try {
+    const cfg = await import('../config.js');
+    apiKey = cfg.MAPTILER_API_KEY || '';
+  } catch (err) {
+    apiKey = '';
+  }
+  if (!apiKey || apiKey.length <= 8) {
+    mergePlaceMapLoading.textContent = 'MapTiler API key not configured. Add MAPTILER_API_KEY in js/config.js.';
+    return;
+  }
+
+  // Determine map center
+  let center = [51.505, -0.09];
+  if (hasAnyCoords) {
+    // Center on the first place with coordinates
+    center = [placesWithCoords[0].coordinates.lat, placesWithCoords[0].coordinates.lng];
+  }
+
+  // Initialize map
+  mergePlaceMapInstance = L.map(mergePlaceMap, { center, zoom: 12, zoomControl: true });
+  const tileUrl = `https://api.maptiler.com/maps/bright/{z}/{x}/{y}.png?key=${apiKey}`;
+  const attribution = '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap contributors';
+  const errorTile = 'data:image/svg+xml;utf8,' + encodeURIComponent(`<?xml version="1.0" encoding="UTF-8"?><svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' font-size='13' fill='#9ca3af' text-anchor='middle' dominant-baseline='central'>Tile unavailable</text></svg>`);
+  const tileLayer = L.tileLayer(tileUrl, {
+    attribution,
+    maxZoom: 19,
+    tileSize: 256,
+    detectRetina: false,
+    errorTileUrl: errorTile,
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    reuseTiles: true,
+    keepBuffer: 1,
+    crossOrigin: true
   });
-  mergePlaceNameList.classList.add('active');
-});
-document.addEventListener('click', (e) => {
-  if (!mergePlaceNameDropdown.contains(e.target)) {
-    mergePlaceNameList.classList.remove('active');
+  tileLayer.on('load', () => {
+    try { mergePlaceMapInstance.invalidateSize(); } catch (e) {}
+    mergePlaceMapLoading.style.display = 'none';
+    mergePlaceMap.style.display = 'block';
+  });
+  tileLayer.addTo(mergePlaceMapInstance);
+
+  // SVG marker for Leaflet (red pin)
+  function getMarkerIcon(selected) {
+    const color = selected ? '#2dd4bf' : '#ff3b30';
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns='http://www.w3.org/2000/svg' width='32' height='44' viewBox='0 0 32 44'>
+      <defs>
+        <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
+          <stop offset='0%' stop-color='${color}'/>
+          <stop offset='100%' stop-color='#c80000'/>
+        </linearGradient>
+        <mask id='dotMask'>
+          <rect width='32' height='44' fill='white'/>
+          <circle cx='16' cy='14' r='6' fill='black'/>
+        </mask>
+      </defs>
+      <path d='M16 2C9 2 4 7 4 14c0 9 12 28 12 28s12-19 12-28c0-7-5-12-12-12z' fill='url(%23pinGradient)' stroke='#222' stroke-width='2' mask='url(%23dotMask)'/>
+      <circle cx='16' cy='14' r='6' fill='none' stroke='#222' stroke-width='2'/>
+    </svg>`;
+    return L.icon({
+      iconUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+      iconSize: [32, 44],
+      iconAnchor: [16, 44]
+    });
   }
-});
-mergePlaceNameList.addEventListener('mousedown', (e) => {
-  const item = e.target.closest('.dropdown-item');
-  if (item) {
-    mergePlaceNameInput.value = item.dataset.name;
-    mergePlaceName = item.dataset.name;
-    mergePlaceNameList.classList.remove('active');
-    e.preventDefault();
+
+  if (!hasAnyCoords) {
+    // No places have coordinates: allow user to pick a location (single marker, draggable)
+    mergePlaceLocationHint.textContent = 'Set a location for the merged place (optional).';
+    // Try to use geolocation for initial center
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          mergePlaceMapInstance.setView([lat, lng], 13);
+          addDraggableMarker([lat, lng]);
+        },
+        () => {
+          addDraggableMarker(center);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      addDraggableMarker(center);
+    }
+  } else {
+    // One or more places have coordinates: show all pins, allow user to select one
+    mergePlaceLocationHint.textContent = 'Select a location for the merged place by clicking a pin.';
+    placesWithCoords.forEach((place, idx) => {
+      const marker = L.marker([place.coordinates.lat, place.coordinates.lng], {
+        icon: getMarkerIcon(false),
+        title: place.name
+      }).addTo(mergePlaceMapInstance);
+      marker.on('click', () => {
+        // Deselect all markers
+        mergePlaceMarkers.forEach(m => m.setIcon(getMarkerIcon(false)));
+        marker.setIcon(getMarkerIcon(true));
+        mergePlaceSelectedCoords = { lat: place.coordinates.lat, lng: place.coordinates.lng };
+      });
+      mergePlaceMarkers.push(marker);
+      // Select the first marker by default
+      if (idx === 0) {
+        marker.setIcon(getMarkerIcon(true));
+        mergePlaceSelectedCoords = { lat: place.coordinates.lat, lng: place.coordinates.lng };
+      }
+    });
   }
-});
+
+  function addDraggableMarker(latlng) {
+    const marker = L.marker(latlng, { draggable: true, icon: getMarkerIcon(true) }).addTo(mergePlaceMapInstance);
+    mergePlaceMarkers.push(marker);
+    mergePlaceSelectedCoords = { lat: latlng[0], lng: latlng[1] };
+    marker.on('dragend', (e) => {
+      const pos = e.target.getLatLng();
+      mergePlaceSelectedCoords = { lat: pos.lat, lng: pos.lng };
+    });
+    mergePlaceMapInstance.on('click', (e) => {
+      marker.setLatLng(e.latlng);
+      mergePlaceSelectedCoords = { lat: e.latlng.lat, lng: e.latlng.lng };
+    });
+  }
+}
 
 function closePlaceMergeModal() {
   // Show places modal again when closing merge modal
