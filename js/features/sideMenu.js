@@ -10,6 +10,11 @@ import { getAllPlaces, getPlacesUsageMap } from '../models/places.js';
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
 
+// Place merge mode state (must be global for merge modal and handlers)
+let isMergeMode = false;
+let selectedPlaceId = null;
+let selectedMergeIds = new Set();
+
 export function initSideMenu() {
   const hamburgerBtn = el('hamburgerBtn');
   const overlay = el('sideMenuOverlay');
@@ -331,13 +336,14 @@ function closeConfigurations() {
 }
 
 async function showPlaces() {
+  // Reset merge mode state every time Places modal is opened
+  isMergeMode = false;
+  selectedPlaceId = null;
+  selectedMergeIds = new Set();
+
   const modal = el('placesModal');
   const content = el('placesContent');
 
-  // Explicitly reset merge mode state on navigation
-  let isMergeMode = false;
-  let selectedPlaceId = null;
-  let selectedMergeIds = new Set();
   if (el('placesFooter')) el('placesFooter').style.display = 'none';
   if (el('mergePlacesBtn')) {
     el('mergePlacesBtn').textContent = 'Merge 0 items';
@@ -613,6 +619,48 @@ function closePlaces() {
     document.removeEventListener('click', window._placesMenuCaptureHandler, true);
     delete window._placesMenuCaptureHandler;
   }
+}
+
+// === Merge Places Modal Logic ===
+const placeMergeModal = document.getElementById('placeMergeModal');
+const backPlaceMergeBtn = document.getElementById('backPlaceMergeBtn');
+const mergePlaceBtn = document.getElementById('mergePlaceBtn');
+
+function showPlaceMergeModal() {
+  // Hide places modal for navigation effect
+  const placesModal = document.getElementById('placesModal');
+  if (placesModal) placesModal.classList.remove('active');
+  placeMergeModal.classList.add('active'); // Use 'active' instead of 'open'
+}
+
+function closePlaceMergeModal() {
+  // Show places modal again when closing merge modal
+  const placesModal = document.getElementById('placesModal');
+  if (placesModal) placesModal.classList.add('active');
+  placeMergeModal.classList.remove('active'); // Use 'active' instead of 'open'
+}
+
+if (backPlaceMergeBtn) {
+  backPlaceMergeBtn.addEventListener('click', closePlaceMergeModal);
+}
+if (mergePlaceBtn) {
+  mergePlaceBtn.addEventListener('click', () => {
+    // For now, just close the modal. Merge logic will be added later.
+    closePlaceMergeModal();
+  });
+}
+
+// === Hook up to merge flow ===
+const mergePlacesBtn = document.getElementById('mergePlacesBtn');
+if (mergePlacesBtn) {
+  mergePlacesBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only show modal if more than one place is selected
+    if (selectedMergeIds && selectedMergeIds.size > 1) {
+      showPlaceMergeModal();
+    }
+  });
 }
 
 async function showPlaceEditor(placeId) {
