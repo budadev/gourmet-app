@@ -507,14 +507,17 @@
 }
 
 .inline-place-actions {
-  display: flex;
-  gap: 6px;
-  margin-left: 6px;
+  display: block; /* actions are stacked */
 }
 
-.inline-place-save.btn.primary {
-  padding: 6px 10px;
-  font-size: 13px;
+.inline-place-actions .inline-place-save.btn.primary {
+  width: 100%;
+  display: block;
+  padding: 12px 18px;
+  font-size: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  border-radius: 12px;
 }
 
 .inline-place-cancel.btn {
@@ -527,6 +530,11 @@
 
 .inline-place-editor input:focus {
   border-color: var(--primary);
+}
+
+/* Hide the coordinate debug line below the map (kept in DOM for accessibility/debug but hidden visually) */
+.inline-place-coords {
+  display: none;
 }
 
 /* Backdrop for inline editor: darken background and center the popup */
@@ -586,6 +594,8 @@
   width:100%;
   display:block;
   margin-top:0; /* spacing handled by container gap */
+  margin-bottom: 8px;
+  position: relative; /* allow absolute children */
 }
 
 .inline-place-map{
@@ -596,10 +606,59 @@
   display:block;
 }
 
-/* Ensure buttons don't show odd white outline on some browsers */
-.inline-place-backdrop .inline-place-editor .btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(59,130,246,0.18);
+/* Center-to-user button inside inline map */
+.inline-place-center-btn {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 14001;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--border-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.inline-place-center-btn:active {
+  transform: translateY(1px) scale(.99);
+}
+
+.inline-place-center-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inline-place-center-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.8;
+}
+
+/* Loading state: hide icon and show spinner */
+.inline-place-center-btn.loading svg { display: none; }
+.inline-place-center-btn.loading { background: rgba(255,255,255,0.98); }
+.inline-place-center-btn.loading::after {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid rgba(0,0,0,0.12);
+  border-top-color: var(--primary);
+  animation: inline-place-spinner 0.9s linear infinite;
+  display: block;
+}
+
+@keyframes inline-place-spinner {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width:480px){

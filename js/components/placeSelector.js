@@ -6,6 +6,30 @@ import { escapeHtml, el } from '../utils.js';
 import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
 import { createMap } from './map.js';
 
+// Local cache key for last user location
+const LAST_LOCATION_KEY = 'gourmet_last_location_v1';
+
+function getLastLocation() {
+  try {
+    const raw = localStorage.getItem(LAST_LOCATION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') return { lat: parsed.lat, lng: parsed.lng };
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function setLastLocation(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return;
+  try {
+    localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({ lat, lng, ts: Date.now() }));
+  } catch (e) {
+    // ignore storage errors (privacy mode etc.)
+  }
+}
+
 let placeSearchTimeout = null;
 
 /**
@@ -101,9 +125,8 @@ function openInlinePlaceEditor(tagEl, placeId) {
     '<div class="inline-place-map" style="width:100%;height:220px;display:none;border-radius:10px;overflow:hidden"></div>' +
     '</div>' +
     '<div class="inline-place-coords" style="font-size:12px;color:var(--text-secondary);min-height:18px;margin-top:4px"></div>' +
-    '<div class="inline-place-actions" style="display:flex;gap:8px;justify-content:flex-start">' +
+    '<div class="inline-place-actions" style="display:block;margin-top:8px">' +
     '<button class="inline-place-save btn primary">Save</button>' +
-    '<button class="inline-place-cancel btn">Cancel</button>' +
     '</div>';
 
   backdrop.appendChild(popup);
@@ -138,6 +161,22 @@ function openInlinePlaceEditor(tagEl, placeId) {
     }
   }, 60);
 
+  // Add center-to-user button into the map wrapper
+  const centerBtn = document.createElement('button');
+  centerBtn.className = 'inline-place-center-btn disabled';
+  centerBtn.type = 'button';
+  centerBtn.title = 'Center to your location';
+  // Target / crosshair icon (similar to Google Maps 'my location' target)
+  centerBtn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;">' +
+    '<circle cx="12" cy="12" r="7" stroke="var(--primary)" stroke-width="1.6" fill="none"/>' +
+    '<circle cx="12" cy="12" r="2.2" fill="var(--primary)" />' +
+    '<path d="M12 3v2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round" />' +
+    '<path d="M12 21v-2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round" />' +
+    '<path d="M3 12h2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round" />' +
+    '<path d="M21 12h-2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round" />' +
+    '</svg>';
+  mapWrapper.appendChild(centerBtn);
+
   // If user clicks the loading area, initialize map (lazy load)
   mapLoading.addEventListener('click', () => {
     if (!mapInstance) {
@@ -159,7 +198,57 @@ function openInlinePlaceEditor(tagEl, placeId) {
         return;
       }
 
-      mapInstance = await createMap(mapEl, { center: existingCoords ? [existingCoords.lat, existingCoords.lng] : undefined, zoom: 12 });
+      // Use cached last user location as initial center when no place coordinates
+      const lastLoc = !existingCoords ? getLastLocation() : null;
+      const initialCenter = existingCoords ? [existingCoords.lat, existingCoords.lng] : (lastLoc ? [lastLoc.lat, lastLoc.lng] : undefined);
+      mapInstance = await createMap(mapEl, { center: initialCenter, zoom: 12 });
+
+      // After creating the map, enable/disable the center button based on geolocation availability
+      const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
+      if (geoAvailable) {
+        centerBtn.classList.remove('disabled');
+      } else {
+        centerBtn.classList.add('disabled');
+      }
+
+      // Wire center button (attempt to get current position and center map)
+      const centerToUser = (opts = {}) => {
+        if (!geoAvailable) return Promise.reject(new Error('Geolocation unavailable'));
+        return new Promise((resolve, reject) => {
+          let handled = false;
+          const success = (pos) => { handled = true; resolve(pos); };
+          const failure = (err) => { handled = true; reject(err); };
+          try {
+            navigator.geolocation.getCurrentPosition(success, failure, { enableHighAccuracy: true, timeout: 10000 });
+          } catch (e) { reject(e); }
+          // fallback timeout
+          setTimeout(() => { if (!handled) reject(new Error('Geolocation timeout')); }, 11000);
+        }).then((position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          try { mapInstance.map.setView([lat, lng], opts.zoom || 13); } catch (e) {}
+          // Save to cache
+          setLastLocation(lat, lng);
+          return { lat, lng };
+        });
+      };
+
+      centerBtn.onclick = (e) => {
+        // don't start another request if one is in progress or geolocation is unavailable
+        if (centerBtn.classList.contains('disabled') || centerBtn.classList.contains('loading')) return;
+        // show spinner
+        centerBtn.classList.add('loading');
+        // perform geolocation and center the map only (do not move marker or update selectedCoords)
+        centerToUser().then(({lat,lng}) => {
+          // centerToUser already set the view; do not modify any markers or selected coordinates here
+        }).catch((err) => {
+          // permission denied or error — disable center button to avoid repeated prompts
+          try { console.warn('Geolocation error', err); } catch (e) {}
+          centerBtn.classList.add('disabled');
+        }).finally(() => {
+          centerBtn.classList.remove('loading');
+        });
+      };
 
       // Wait for tiles to load (or fallback via timeout inside createMap)
       try {
@@ -176,6 +265,30 @@ function openInlinePlaceEditor(tagEl, placeId) {
         selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
         // center map
         try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
+      } else {
+        // No coordinates selected yet: try to center to user's location automatically
+        if (navigator && navigator.geolocation) {
+          try {
+            // show loading spinner on center button while requesting permission/position
+            try { centerBtn.classList.add('loading'); } catch (e) {}
+            navigator.geolocation.getCurrentPosition((pos) => {
+              try { centerBtn.classList.remove('loading'); } catch (e) {}
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
+              // cache last known location
+              try { setLastLocation(lat, lng); } catch (e) {}
+            }, (err) => {
+               try { centerBtn.classList.remove('loading'); } catch (e) {}
+               // ignore if user denies; disable the button to avoid repeated prompts
+               try { centerBtn.classList.add('disabled'); } catch (e) {}
+               try { console.debug('geolocation init denied or failed', err); } catch (e) {}
+             }, { enableHighAccuracy: true, timeout: 10000 });
+          } catch (e) {
+            try { centerBtn.classList.remove('loading'); } catch (err) {}
+            // ignore
+          }
+        }
       }
 
       // allow clicking to set marker — explicitly set the marker here and update selectedCoords
@@ -273,7 +386,6 @@ function openInlinePlaceEditor(tagEl, placeId) {
 
   // Handlers
   const saveBtn = popup.querySelector('.inline-place-save');
-  const cancelBtn = popup.querySelector('.inline-place-cancel');
 
   // Cleanup utility
   const cleanup = () => {
@@ -313,10 +425,6 @@ function openInlinePlaceEditor(tagEl, placeId) {
     } catch (err) {
       console.error('Failed to update place', err);
     }
-  });
-
-  cancelBtn.addEventListener('click', () => {
-    cleanup();
   });
 
   // Close when clicking on backdrop (outside popup)
