@@ -2,7 +2,7 @@
    Places Management
    ============================= */
 
-import { addPlace, getPlace, searchPlacesByText, listAllPlaces, listAll } from '../db.js';
+import { addPlace, getPlace, searchPlacesByText, listAllPlaces, listAll, updatePlace as dbUpdatePlace } from '../db.js';
 
 let currentPlaces = []; // Current places selected for an item
 
@@ -121,6 +121,13 @@ export async function getAllPlaces() {
  */
 export async function getPlaceById(id) {
   return await getPlace(id);
+}
+
+// New: expose a wrapper to update a place and invalidate caches
+export async function updatePlace(id, patch) {
+  const res = await dbUpdatePlace(id, patch);
+  invalidatePlaceUsageCache();
+  return res;
 }
 
 // Provide explicit export for usage counts if needed elsewhere (not used now)

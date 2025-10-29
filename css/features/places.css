@@ -480,3 +480,123 @@
   outline: 2px solid var(--primary, #2563eb);
   outline-offset: 2px;
 }
+
+/* Inline place editor popup */
+.inline-place-editor {
+  min-width: 220px;
+  max-width: 320px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-light);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-place-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.inline-place-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.inline-place-save.btn.primary {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.inline-place-cancel.btn {
+  padding: 6px 8px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+}
+
+.inline-place-editor input:focus {
+  border-color: var(--primary);
+}
+
+/* Backdrop for inline editor: darken background and center the popup */
+.inline-place-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72); /* slightly stronger */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 14000; /* ensure above other overlays */
+  padding: 20px; /* spacing on small screens */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure the editor itself is centered and doesn't stretch full width */
+.inline-place-backdrop .inline-place-editor {
+  position: relative; /* keeps it centered inside backdrop */
+  max-width: 560px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 16px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-radius: 14px;
+  background: var(--card); /* use solid surface color */
+  color: var(--text-primary);
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.6);
+}
+
+.inline-place-backdrop .inline-place-editor .inline-place-input {
+  padding: 10px 12px;
+  font-size: 15px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 10px;
+}
+
+.inline-place-backdrop .inline-place-editor .inline-place-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-place-backdrop .inline-place-editor .inline-place-save.btn.primary {
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.inline-place-backdrop .inline-place-editor .inline-place-cancel.btn {
+  padding: 7px 12px;
+  font-size: 14px;
+}
+
+/* Ensure buttons don't show odd white outline on some browsers */
+.inline-place-backdrop .inline-place-editor .btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.18);
+}
+
+@media (max-width:480px){
+  .inline-place-backdrop .inline-place-editor{
+    padding: 12px;
+    gap: 8px;
+  }
+  .inline-place-backdrop .inline-place-editor .inline-place-input{
+    font-size: 14px;
+  }
+}

@@ -3,7 +3,7 @@
    ============================= */
 
 import { escapeHtml, el } from '../utils.js';
-import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById } from '../models/places.js';
+import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
 
 let placeSearchTimeout = null;
 
@@ -48,9 +48,9 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   for (const placeId of placeIds) {
     const place = await getPlaceById(placeId);
     if (place) {
-      html += '<div class="place-tag">';
-      html += '<span class="place-tag-icon">📍</span>';
-      html += '<span class="place-tag-name">' + escapeHtml(place.name) + '</span>';
+      html += '<div class="place-tag" data-place-id="' + placeId + '">';
+      html += '<span class="place-tag-icon" data-action="edit">📍</span>';
+      html += '<span class="place-tag-name" data-action="edit">' + escapeHtml(place.name) + '</span>';
       html += '<button class="place-tag-remove" data-place-id="' + placeId + '" type="button">×</button>';
       html += '</div>';
     }
@@ -66,6 +66,119 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
       await renderSelectedPlaces();
     };
   });
+
+  // Add click listeners for editing place label
+  container.querySelectorAll('.place-tag [data-action="edit"]').forEach(elm => {
+    elm.addEventListener('click', async (ev) => {
+      const tag = ev.target.closest('.place-tag');
+      if (!tag) return;
+      const placeId = Number(tag.getAttribute('data-place-id'));
+      openInlinePlaceEditor(tag, placeId);
+    });
+  });
+}
+
+/**
+ * Open a small inline editor popup next to the place tag to edit its label
+ */
+function openInlinePlaceEditor(tagEl, placeId) {
+  // Remove any existing backdrop/editor
+  const existingBackdrop = document.querySelector('.inline-place-backdrop');
+  if (existingBackdrop) existingBackdrop.remove();
+
+  // Create backdrop that darkens background and centers the popup
+  const backdrop = document.createElement('div');
+  backdrop.className = 'inline-place-backdrop';
+
+  const popup = document.createElement('div');
+  popup.className = 'inline-place-editor';
+  popup.setAttribute('data-place-id', placeId);
+  popup.innerHTML = '<input type="text" class="inline-place-input" />' +
+                    '<div class="inline-place-actions">' +
+                    '<button class="inline-place-save btn primary">Save</button>' +
+                    '<button class="inline-place-cancel btn">Cancel</button>' +
+                    '</div>';
+
+  backdrop.appendChild(popup);
+  document.body.appendChild(backdrop);
+
+  // Ensure popup is above the backdrop
+  popup.style.position = 'relative';
+  popup.style.zIndex = 10002;
+
+  // Prefill input with current name
+  const input = popup.querySelector('.inline-place-input');
+  getPlaceById(placeId).then(place => {
+    if (place && input) input.value = place.name || '';
+    // Auto-focus the input (small timeout to ensure element is in DOM)
+    setTimeout(() => {
+      if (input) input.focus();
+      // Move cursor to end
+      if (input && typeof input.setSelectionRange === 'function') {
+        const len = input.value ? input.value.length : 0;
+        input.setSelectionRange(len, len);
+      }
+    }, 10);
+  });
+
+  // Prevent background scroll while backdrop is open
+  const previousBodyNoScroll = document.body.classList.contains('no-scroll');
+  document.body.classList.add('no-scroll');
+
+  // Handlers
+  const saveBtn = popup.querySelector('.inline-place-save');
+  const cancelBtn = popup.querySelector('.inline-place-cancel');
+
+  // Cleanup utility
+  const cleanup = () => {
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    document.removeEventListener('keydown', keydownHandler);
+    if (input) input.removeEventListener('keydown', inputKeyHandler);
+    // Restore previous no-scroll state
+    if (!previousBodyNoScroll) document.body.classList.remove('no-scroll');
+  };
+
+  // Enter to save on input
+  const inputKeyHandler = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveBtn && saveBtn.click();
+    }
+  };
+  if (input) input.addEventListener('keydown', inputKeyHandler);
+
+  saveBtn.addEventListener('click', async () => {
+    const newName = input ? input.value.trim() : '';
+    if (!newName) return;
+    try {
+      await updatePlaceModel(placeId, { name: newName });
+      // Update displayed label in the tag
+      const nameEl = tagEl.querySelector('.place-tag-name');
+      if (nameEl) nameEl.textContent = newName;
+      cleanup();
+    } catch (err) {
+      console.error('Failed to update place', err);
+    }
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    cleanup();
+  });
+
+  // Close when clicking on backdrop (outside popup)
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) {
+      cleanup();
+    }
+  });
+
+  // Close on Escape key
+  const keydownHandler = (e) => {
+    if (e.key === 'Escape') {
+      cleanup();
+    }
+  };
+  document.addEventListener('keydown', keydownHandler);
 }
 
 /**
