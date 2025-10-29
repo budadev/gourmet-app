@@ -762,3 +762,22 @@
 
 /* make room for the clear button inside the input */
 .inline-place-map-search { padding-right: 44px; }
+
+/* Selected places (inline) - show tags in one row and wrap as needed */
+.selected-places .place-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center; /* keep tags vertically centered */
+}
+
+/* Ensure individual tags size to their content instead of stretching */
+.selected-places .place-tag {
+  display: inline-flex;
+  width: auto; /* override any stretching */
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
