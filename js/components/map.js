@@ -1,0 +1,181 @@
+// Lightweight reusable map component wrapper using Leaflet and MapTiler tiles
+// Exports createMap(containerElement, options) -> { map, setMarker, getMarkerCoords, remove, onClick }
+
+import { MAPTILER_API_KEY } from '../config.js';
+
+export async function createMap(container, opts = {}) {
+  if (!container) throw new Error('Map container required');
+
+  // Ensure Leaflet is available
+  if (typeof L === 'undefined') {
+    throw new Error('Leaflet (L) is not available');
+  }
+
+  const center = opts.center || [51.505, -0.09];
+  const zoom = typeof opts.zoom === 'number' ? opts.zoom : 12;
+  const apiKey = opts.apiKey || MAPTILER_API_KEY || '';
+  const useOsmFallback = !apiKey || apiKey.length <= 8;
+
+  // Clean up previous map instance attached to the element if any
+  if (container._leaflet_map_instance && container._leaflet_map_instance.remove) {
+    try { container._leaflet_map_instance.remove(); } catch (e) {}
+    container._leaflet_map_instance = null;
+  }
+
+  const map = L.map(container, { center, zoom, zoomControl: true });
+  container._leaflet_map_instance = map;
+
+  let tileUrl, attribution;
+  if (useOsmFallback) {
+    tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    attribution = '&copy; OpenStreetMap contributors';
+  } else {
+    tileUrl = `https://api.maptiler.com/maps/bright/{z}/{x}/{y}.png?key=${apiKey}`;
+    attribution = '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap contributors';
+  }
+
+  const errorTile = 'data:image/svg+xml;utf8,' + encodeURIComponent("<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' font-size='13' fill='%239ca3af' text-anchor='middle' dominant-baseline='central'>Tile unavailable</text></svg>");
+
+  const tileLayer = L.tileLayer(tileUrl, {
+    attribution,
+    maxZoom: 19,
+    tileSize: 256,
+    detectRetina: false,
+    errorTileUrl: errorTile,
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    reuseTiles: true,
+    keepBuffer: 1,
+    crossOrigin: true
+  });
+
+  // Prepare tilesLoaded promise & timeout BEFORE attaching handlers to avoid race conditions
+  let tilesLoadedResolve;
+  const tilesLoaded = new Promise((resolve) => { tilesLoadedResolve = resolve; });
+  const tilesLoadTimeout = setTimeout(() => {
+    if (console && console.debug) console.debug('[Map] tiles load timeout reached');
+    // If no tiles loaded yet, try switching to OSM as a fallback
+    try {
+      if (tileLoadCount === 0) {
+        if (console && console.debug) console.debug('[Map] No tiles loaded from MapTiler, switching to OSM fallback');
+        const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        try {
+          const osmLayer = L.tileLayer(osmUrl, { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' });
+          osmLayer.addTo(map);
+          try { map.invalidateSize(); } catch (e) {}
+        } catch (e) { if (console && console.warn) console.warn('[Map] Failed to add OSM fallback', e); }
+      }
+    } catch (e) {
+      if (console && console.warn) console.warn('[Map] tiles load timeout handler error', e);
+    }
+    try { tilesLoadedResolve(); } catch (e) {}
+  }, 6000);
+
+  // Tile events for diagnostics
+  let tileLoadCount = 0;
+  tileLayer.on('tileload', (e) => {
+    tileLoadCount += 1;
+    if (console && console.debug) console.debug('[Map] tileload', tileLoadCount, e.tile && e.tile.src);
+  });
+  tileLayer.on('tileerror', (err) => {
+    if (console && console.warn) console.warn('[Map] tileerror', err);
+  });
+  tileLayer.on('load', () => {
+    if (console && console.debug) console.debug('[Map] tilelayer load - tilesLoaded, total:', tileLoadCount);
+    try { map.invalidateSize(); } catch (e) {}
+    try { clearTimeout(tilesLoadTimeout); } catch (e) {}
+    try { tilesLoadedResolve(); } catch (e) { if (console && console.debug) console.debug('[Map] tilesLoadedResolve error', e); }
+  });
+
+  tileLayer.addTo(map);
+
+  // Wait for first tile load or timeout (so callers can hide loading UI once tiles are visible)
+  // If the 'load' event had already fired above, ensure we clear timeout (in case listeners order differs)
+  // (no-op if already cleared)
+  tileLayer.on('load', () => {
+    clearTimeout(tilesLoadTimeout);
+  });
+
+  // Provide an SVG icon similar to other maps
+  const svg = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+  <svg xmlns='http://www.w3.org/2000/svg' width='32' height='44' viewBox='0 0 32 44'>
+    <defs>
+      <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
+        <stop offset='0%' stop-color='#ff3b30'/>
+        <stop offset='100%' stop-color='#c80000'/>
+      </linearGradient>
+      <mask id='dotMask'>
+        <rect width='32' height='44' fill='white'/>
+        <circle cx='16' cy='14' r='6' fill='black'/>
+      </mask>
+    </defs>
+    <path d='M16 2C9 2 4 7 4 14c0 9 12 28 12 28s12-19 12-28c0-7-5-12-12-12z' fill='url(%23pinGradient)' stroke='#222' stroke-width='2' mask='url(%23dotMask)'/>
+    <circle cx='16' cy='14' r='6' fill='none' stroke='#222' stroke-width='2'/>
+  </svg>`;
+
+  const icon = L.icon({
+    iconUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+    iconSize: [32, 44],
+    iconAnchor: [16, 44]
+  });
+
+  let marker = null;
+
+  function setMarker(latlng, opts = {}) {
+    if (!latlng) return;
+    const lat = latlng.lat || (Array.isArray(latlng) ? latlng[0] : null);
+    const lng = latlng.lng || (Array.isArray(latlng) ? latlng[1] : null);
+    if (lat == null || lng == null) return;
+    if (!marker) {
+      marker = L.marker([lat, lng], { icon, draggable: opts.draggable || false }).addTo(map);
+    } else {
+      marker.setLatLng([lat, lng]);
+    }
+    return marker;
+  }
+
+  function getMarkerCoords() {
+    if (!marker) return null;
+    const pos = marker.getLatLng();
+    return { lat: pos.lat, lng: pos.lng };
+  }
+
+  function removeMarker() {
+    if (marker && marker.remove) {
+      marker.remove();
+      marker = null;
+    }
+  }
+
+  function onMapClick(handler) {
+    if (!map) return;
+    map.off('click.map_component');
+    if (typeof handler === 'function') {
+      map.on('click.map_component', (e) => {
+        const latlng = e.latlng;
+        // Drop or move marker
+        setMarker(latlng, { draggable: true });
+        handler(latlng);
+      });
+    }
+  }
+
+  function remove() {
+    try { removeMarker(); } catch (e) {}
+    try { map.remove(); } catch (e) {}
+    if (container && container._leaflet_map_instance) container._leaflet_map_instance = null;
+  }
+
+  // Return a small API
+  return {
+    map,
+    setMarker,
+    getMarkerCoords,
+    removeMarker,
+    onMapClick,
+    remove,
+    // tile loading helper
+    tilesLoaded,
+    onTilesLoaded: (cb) => { if (typeof cb === 'function') tilesLoaded.then(cb); }
+  };
+}

@@ -4,6 +4,7 @@
 
 import { escapeHtml, el } from '../utils.js';
 import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
+import { createMap } from './map.js';
 
 let placeSearchTimeout = null;
 
@@ -93,11 +94,17 @@ function openInlinePlaceEditor(tagEl, placeId) {
   const popup = document.createElement('div');
   popup.className = 'inline-place-editor';
   popup.setAttribute('data-place-id', placeId);
-  popup.innerHTML = '<input type="text" class="inline-place-input" />' +
-                    '<div class="inline-place-actions">' +
-                    '<button class="inline-place-save btn primary">Save</button>' +
-                    '<button class="inline-place-cancel btn">Cancel</button>' +
-                    '</div>';
+  popup.innerHTML =
+    '<input type="text" class="inline-place-input" />' +
+    '<div class="inline-place-map-wrapper" style="display:none;margin-top:10px">' +
+    '<div class="inline-place-map-loading" style="text-align:center;padding:12px">Loading map...</div>' +
+    '<div class="inline-place-map" style="width:100%;height:220px;display:none;border-radius:10px;overflow:hidden"></div>' +
+    '</div>' +
+    '<div class="inline-place-coords" style="font-size:12px;color:var(--text-secondary);min-height:18px;margin-top:4px"></div>' +
+    '<div class="inline-place-actions" style="display:flex;gap:8px;justify-content:flex-start">' +
+    '<button class="inline-place-save btn primary">Save</button>' +
+    '<button class="inline-place-cancel btn">Cancel</button>' +
+    '</div>';
 
   backdrop.appendChild(popup);
   document.body.appendChild(backdrop);
@@ -106,10 +113,138 @@ function openInlinePlaceEditor(tagEl, placeId) {
   popup.style.position = 'relative';
   popup.style.zIndex = 10002;
 
-  // Prefill input with current name
+  // Prefill input with current name and set up map
   const input = popup.querySelector('.inline-place-input');
+  const mapWrapper = popup.querySelector('.inline-place-map-wrapper');
+  const mapLoading = popup.querySelector('.inline-place-map-loading');
+  const mapEl = popup.querySelector('.inline-place-map');
+  const coordsEl = popup.querySelector('.inline-place-coords');
+  const actionsRow = popup.querySelector('.inline-place-actions');
+
+  let mapInstance = null;
+  let selectedCoords = null; // {lat,lng} if user picks
+
+  // Show map wrapper by default (but map not initialized until user interacts)
+  mapWrapper.style.display = 'block';
+  mapLoading.textContent = 'Click to load map';
+  mapLoading.style.display = 'block';
+  mapEl.style.display = 'none';
+
+  // Auto-init map shortly after opening (for parity with the old implementation)
+  setTimeout(() => {
+    if (!mapInstance) {
+      mapLoading.textContent = 'Loading map...';
+      try { initMapIfNeeded(null); } catch (err) { console.error('initMapIfNeeded error', err); }
+    }
+  }, 60);
+
+  // If user clicks the loading area, initialize map (lazy load)
+  mapLoading.addEventListener('click', () => {
+    if (!mapInstance) {
+      mapLoading.textContent = 'Loading map...';
+      initMapIfNeeded(null);
+    }
+  });
+
+  const initMapIfNeeded = async (existingCoords) => {
+    // show the map area
+    mapWrapper.style.display = 'block';
+    mapLoading.style.display = 'block';
+    // Make the map element visible before initializing Leaflet so tiles load correctly
+    mapEl.style.display = 'block';
+
+    try {
+      if (typeof L === 'undefined') {
+        mapLoading.textContent = 'Map library unavailable.';
+        return;
+      }
+
+      mapInstance = await createMap(mapEl, { center: existingCoords ? [existingCoords.lat, existingCoords.lng] : undefined, zoom: 12 });
+
+      // Wait for tiles to load (or fallback via timeout inside createMap)
+      try {
+        await Promise.race([
+          mapInstance.tilesLoaded,
+          new Promise(res => setTimeout(res, 8000))
+        ]);
+      } catch (e) {
+        // ignore
+      }
+
+      if (existingCoords && existingCoords.lat && existingCoords.lng) {
+        mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { draggable: true });
+        selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
+        // center map
+        try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
+      }
+
+      // allow clicking to set marker — explicitly set the marker here and update selectedCoords
+      mapInstance.onMapClick((latlng) => {
+        try {
+          console.debug('[PlaceSelector] map click (wrapper)', latlng);
+        } catch (e) {}
+        try {
+          const m = (mapInstance && typeof mapInstance.setMarker === 'function') ? mapInstance.setMarker(latlng, { draggable: true }) : null;
+          if (m && m.on) {
+            m.on('dragend', (ev) => {
+              try {
+                const p = ev.target.getLatLng();
+                selectedCoords = { lat: p.lat, lng: p.lng };
+                if (coordsEl) coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`;
+              } catch (err) {}
+            });
+          }
+        } catch (e) { console.warn('setMarker failed', e); }
+        selectedCoords = { lat: latlng.lat, lng: latlng.lng };
+        if (coordsEl) coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`;
+      });
+
+      // Also attach a direct Leaflet click listener on the raw map in case wrapper isn't wired
+      try {
+        mapInstance.map.on('click', (e) => {
+          const latlng = e && e.latlng;
+          if (!latlng) return;
+          try { console.debug('[PlaceSelector] map click (direct)', latlng); } catch (e) {}
+          try {
+            const m2 = (mapInstance && typeof mapInstance.setMarker === 'function') ? mapInstance.setMarker(latlng, { draggable: true }) : null;
+            if (m2 && m2.on) {
+              m2.on('dragend', (ev) => {
+                try {
+                  const p = ev.target.getLatLng(); selectedCoords = { lat: p.lat, lng: p.lng };
+                  if (coordsEl) coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`;
+                } catch (err) {}
+              });
+            }
+          } catch (err) { console.warn('setMarker direct failed', err); }
+          selectedCoords = { lat: latlng.lat, lng: latlng.lng };
+          if (coordsEl) coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`;
+        });
+      } catch (e) {
+        // ignore if map not available
+      }
+
+      mapLoading.style.display = 'none';
+      mapEl.style.display = 'block';
+      try { mapInstance.map.invalidateSize(); } catch (e) {}
+      // Some browsers need a delayed invalidateSize when inside hidden->visible containers
+      setTimeout(() => {
+        try { mapInstance.map.invalidateSize(); } catch (e) {}
+      }, 250);
+    } catch (err) {
+      console.error('Map init error', err);
+      mapLoading.textContent = 'Map failed to load.';
+      mapEl.style.display = 'none';
+    }
+  };
+
+  // Load place data
   getPlaceById(placeId).then(place => {
     if (place && input) input.value = place.name || '';
+    // If the place already has coordinates, show map and existing pin
+    if (place && place.coordinates && typeof place.coordinates.lat === 'number' && typeof place.coordinates.lng === 'number') {
+      // initialize map immediately if coords exist
+      initMapIfNeeded(place.coordinates);
+    }
     // Auto-focus the input (small timeout to ensure element is in DOM)
     setTimeout(() => {
       if (input) input.focus();
@@ -119,6 +254,17 @@ function openInlinePlaceEditor(tagEl, placeId) {
         input.setSelectionRange(len, len);
       }
     }, 10);
+  });
+
+  // Add a small toggle: clicking the tag's icon or name opens map area if user wants to configure location
+  // We'll show map area when user double-clicks the input or clicks a small keyboard shortcut (Alt+M)
+  input.addEventListener('dblclick', () => {
+    if (!mapInstance) initMapIfNeeded(null);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+      if (!mapInstance) initMapIfNeeded(null);
+    }
   });
 
   // Prevent background scroll while backdrop is open
@@ -131,6 +277,10 @@ function openInlinePlaceEditor(tagEl, placeId) {
 
   // Cleanup utility
   const cleanup = () => {
+    if (mapInstance && mapInstance.remove) {
+      try { mapInstance.remove(); } catch (e) {}
+      mapInstance = null;
+    }
     if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
     document.removeEventListener('keydown', keydownHandler);
     if (input) input.removeEventListener('keydown', inputKeyHandler);
@@ -151,7 +301,11 @@ function openInlinePlaceEditor(tagEl, placeId) {
     const newName = input ? input.value.trim() : '';
     if (!newName) return;
     try {
-      await updatePlaceModel(placeId, { name: newName });
+      const patch = { name: newName };
+      if (selectedCoords && typeof selectedCoords.lat === 'number' && typeof selectedCoords.lng === 'number') {
+        patch.coordinates = { lat: selectedCoords.lat, lng: selectedCoords.lng };
+      }
+      await updatePlaceModel(placeId, patch);
       // Update displayed label in the tag
       const nameEl = tagEl.querySelector('.place-tag-name');
       if (nameEl) nameEl.textContent = newName;
