@@ -817,25 +817,33 @@ async function setupMergePlaceMap() {
   // SVG marker for Leaflet (red pin)
   function getMarkerIcon(selected) {
     const color = selected ? '#2dd4bf' : '#ff3b30';
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-    <svg xmlns='http://www.w3.org/2000/svg' width='32' height='44' viewBox='0 0 32 44'>
-      <defs>
-        <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
-          <stop offset='0%' stop-color='${color}'/>
-          <stop offset='100%' stop-color='#c80000'/>
-        </linearGradient>
-        <mask id='dotMask'>
-          <rect width='32' height='44' fill='white'/>
-          <circle cx='16' cy='14' r='6' fill='black'/>
-        </mask>
-      </defs>
-      <path d='M16 2C9 2 4 7 4 14c0 9 12 28 12 28s12-19 12-28c0-7-5-12-12-12z' fill='url(%23pinGradient)' stroke='#222' stroke-width='2' mask='url(%23dotMask)'/>
-      <circle cx='16' cy='14' r='6' fill='none' stroke='#222' stroke-width='2'/>
-    </svg>`;
-    return L.icon({
-      iconUrl: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
-      iconSize: [32, 44],
-      iconAnchor: [16, 44]
+    // Use a DivIcon so we can control the hit area and classes more directly.
+    const html = `
+      <div class="merge-marker ${selected ? 'selected' : ''}" style="width:56px;height:56px;display:flex;align-items:flex-start;justify-content:center;">
+        <svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44' style='pointer-events:none;'>
+          <defs>
+            <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
+              <stop offset='0%' stop-color='${color}'/>
+              <stop offset='100%' stop-color='#c80000'/>
+            </linearGradient>
+            <mask id='dotMask'>
+              <rect width='44' height='44' fill='white'/>
+              <circle cx='22' cy='14' r='8' fill='black'/>
+            </mask>
+          </defs>
+          <!-- Slightly visible hit circle for easier taps (tiny opacity) -->
+          <circle cx='22' cy='14' r='14' fill='#000' fill-opacity='0.02' />
+          <g transform='translate(6,0) scale(1.375)'>
+            <path d='M16 2C9 2 4 7 4 14c0 9 12 28 12 28s12-19 12-28c0-7-5-12-12-12z' fill='url(%23pinGradient)' stroke='#222' stroke-width='2' mask='url(%23dotMask)'/>
+            <circle cx='16' cy='14' r='6' fill='none' stroke='#222' stroke-width='2'/>
+          </g>
+        </svg>
+      </div>`;
+    return L.divIcon({
+      html,
+      className: 'merge-place-div-icon',
+      iconSize: [56, 56],
+      iconAnchor: [28, 56]
     });
   }
 
@@ -865,19 +873,48 @@ async function setupMergePlaceMap() {
     placesWithCoords.forEach((place, idx) => {
       const marker = L.marker([place.coordinates.lat, place.coordinates.lng], {
         icon: getMarkerIcon(false),
-        title: place.name
+        title: place.name,
+        // ensure marker is interactive
+        interactive: true,
+        riseOnHover: true
       }).addTo(mergePlaceMapInstance);
-      marker.on('click', () => {
-        // Deselect all markers
-        mergePlaceMarkers.forEach(m => m.setIcon(getMarkerIcon(false)));
-        marker.setIcon(getMarkerIcon(true));
+
+      // Ensure pointer events and cursor are enabled on the underlying icon element
+      try {
+        const el = marker.getElement && marker.getElement();
+        if (el) {
+          el.style.cursor = 'pointer';
+          el.style.pointerEvents = 'auto';
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Helper to select this marker and visually update others
+      const selectMarker = () => {
+        // Reset others
+        mergePlaceMarkers.forEach(m => {
+          try { m.setIcon(getMarkerIcon(false)); m.setZIndexOffset(0); } catch (err) {}
+          // ensure pointer events exist on their element after icon swap
+          try { setTimeout(() => { const el2 = m.getElement && m.getElement(); if (el2) { el2.style.pointerEvents = 'auto'; el2.style.cursor = 'pointer'; } }, 0); } catch (err) {}
+        });
+
+        // Set selected icon and bring it to front
+        try { marker.setIcon(getMarkerIcon(true)); marker.setZIndexOffset(1000); } catch (err) {}
+        try { setTimeout(() => { const el3 = marker.getElement && marker.getElement(); if (el3) { el3.style.pointerEvents = 'auto'; el3.style.cursor = 'pointer'; el3.style.zIndex = '1000'; } }, 0); } catch (err) {}
+
         mergePlaceSelectedCoords = { lat: place.coordinates.lat, lng: place.coordinates.lng };
+      };
+
+      marker.on('click', () => {
+        selectMarker();
       });
+
       mergePlaceMarkers.push(marker);
+
       // Select the first marker by default
       if (idx === 0) {
-        marker.setIcon(getMarkerIcon(true));
-        mergePlaceSelectedCoords = { lat: place.coordinates.lat, lng: place.coordinates.lng };
+        selectMarker();
       }
     });
   }
