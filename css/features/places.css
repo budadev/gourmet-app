@@ -670,3 +670,62 @@
     font-size: 14px;
   }
 }
+
+/* Make popup field titles consistent with other form labels */
+.inline-place-field-label,
+.inline-place-map-title {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+/* Ensure the search wrapper is positioned so results can align below the input */
+.inline-place-map-search-wrapper {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+  position: relative; /* important for absolute-positioned results */
+}
+
+.inline-place-map-search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 14002;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.inline-place-map-search-results.hidden {
+  display: none;
+}
+
+/* Clear (X) button inside search input */
+.inline-place-map-search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: rgba(0,0,0,0.04);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+.inline-place-map-search-clear:hover { background: rgba(0,0,0,0.06); }
+
+/* make room for the clear button inside the input */
+.inline-place-map-search { padding-right: 44px; }
