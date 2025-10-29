@@ -236,16 +236,60 @@ function openInlinePlaceEditor(tagEl, placeId) {
           } catch (e) { /* ignore */ }
         }
 
-        const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=6${proximityParam}${bboxParam}&language=en`;
-        const res = await fetch(url); if (!res.ok) return [];
-        const data = await res.json(); if (!data || !data.features) return [];
-        return data.features.map(f => ({
+        // Helper to map MapTiler features to our lighter result objects
+        const mapFeatures = (features) => (features || []).map(f => ({
           id: f.properties && (f.properties.osm_id || f.id),
           title: f.properties && (f.properties.name || f.place_name || ''),
-          // prefer explicit english place name if available, then general place_name, then label
           subtitle: f.properties && (f.properties.place_name_en || f.properties.place_name || f.properties.label || ''),
           center: f.geometry && f.geometry.coordinates ? { lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] } : null
         }));
+
+        // First, try local (proximity + bbox) search if we have any of those params
+        let localResults = [];
+        if (proximityParam || bboxParam) {
+          const localUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=6${proximityParam}${bboxParam}&language=en`;
+          try {
+            const resLocal = await fetch(localUrl);
+            if (resLocal && resLocal.ok) {
+              const dataLocal = await resLocal.json();
+              if (dataLocal && Array.isArray(dataLocal.features) && dataLocal.features.length > 0) {
+                localResults = mapFeatures(dataLocal.features);
+              }
+            }
+          } catch (e) { /* ignore local fetch errors and fall back to global */ }
+        }
+
+        // Always fetch global results so we can append worldwide options after local ones.
+        const globalUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=8&language=en`;
+        let globalResults = [];
+        try {
+          const resGlobal = await fetch(globalUrl);
+          if (resGlobal && resGlobal.ok) {
+            const dataGlobal = await resGlobal.json();
+            if (dataGlobal && Array.isArray(dataGlobal.features) && dataGlobal.features.length > 0) {
+              globalResults = mapFeatures(dataGlobal.features);
+            }
+          }
+        } catch (e) { /* ignore global fetch errors */ }
+
+        // If no local results, return global only (may be empty)
+        if (!localResults || localResults.length === 0) return globalResults.slice(0, 6);
+
+        // Otherwise merge local + deduped global (local first), limit to 6 results
+        const merged = [];
+        const addToMerged = (item) => {
+          // simple dedupe by exact coords if available, otherwise by title+subtitle
+          const exists = merged.some(m => {
+            if (m.center && item.center && typeof m.center.lat === 'number' && typeof item.center.lat === 'number') {
+              return m.center.lat === item.center.lat && m.center.lng === item.center.lng;
+            }
+            return (m.title && item.title && m.title === item.title && m.subtitle === item.subtitle);
+          });
+          if (!exists) merged.push(item);
+        };
+        for (const r of localResults) { if (merged.length >= 6) break; addToMerged(r); }
+        for (const g of globalResults) { if (merged.length >= 6) break; addToMerged(g); }
+        return merged;
       } catch (e) { return []; }
     };
 
@@ -255,6 +299,18 @@ function openInlinePlaceEditor(tagEl, placeId) {
         selectedCoords = { lat: latlng.lat, lng: latlng.lng };
         if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
       });
+
+      // when marker is dragged, update selectedCoords
+      try { if (mapInstance && typeof mapInstance.onMarkerDrag === 'function') {
+        mapInstance.onMarkerDrag((latlng) => {
+          try {
+            if (!latlng) return;
+            selectedCoords = { lat: latlng.lat, lng: latlng.lng };
+            if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+            setLastLocation(selectedCoords.lat, selectedCoords.lng);
+          } catch (e) {}
+        });
+      } } catch (e) {}
     } catch (e) {}
 
     if (existingCoords && existingCoords.lat && existingCoords.lng) {
@@ -362,6 +418,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
   function cleanup() {
     try { if (mapInstance && mapInstance.remove) mapInstance.remove(); } catch (e) {}
     try { outsideListeners.forEach(fn => { try { fn(); } catch (e) {} }); } catch (e) {}
+    try { if (mapInstance && typeof mapInstance.onMarkerDrag === 'function') mapInstance.onMarkerDrag(null); } catch (e) {}
     try { if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); } catch (e) {}
     try { if (!previousBodyNoScroll) document.body.classList.remove('no-scroll'); } catch (e) {}
     try { document.removeEventListener('keydown', onKeydown); } catch (e) {}
@@ -438,10 +495,13 @@ export async function renderPlacesInDetails(placeIds) {
   html += '<div class="detail-value">';
   for (const placeId of placeIds) {
     const place = await getPlaceById(placeId);
-    if (place) html += `<span class="place-badge clickable" data-place-id="${placeId}">📍 ${escapeHtml(place.name)}</span>`;
+    if (!place) continue;
+    html += `<div class="place-tag" data-place-id="${placeId}">`;
+    html += `<span class="place-tag-icon" data-action="edit">📍</span>`;
+    html += `<span class="place-tag-name" data-action="edit">${escapeHtml(place.name)}</span>`;
+    html += `<button class="place-tag-remove" data-place-id="${placeId}" type="button">×</button>`;
+    html += `</div>`;
   }
   html += '</div></div>';
   return html;
 }
-
-// End of file

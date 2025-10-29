@@ -120,6 +120,20 @@ export async function createMap(container, opts = {}) {
   });
 
   let marker = null;
+  let markerDragHandler = null;
+
+  function attachMarkerDrag(markerInstance) {
+    try {
+      if (!markerInstance || !markerInstance.on) return;
+      markerInstance.off('dragend');
+      markerInstance.on('dragend', (ev) => {
+        try {
+          const latlng = ev.target.getLatLng();
+          if (typeof markerDragHandler === 'function') markerDragHandler(latlng);
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }
 
   function setMarker(latlng, opts = {}) {
     if (!latlng) return;
@@ -128,8 +142,14 @@ export async function createMap(container, opts = {}) {
     if (lat == null || lng == null) return;
     if (!marker) {
       marker = L.marker([lat, lng], { icon, draggable: opts.draggable || false }).addTo(map);
+      attachMarkerDrag(marker);
     } else {
       marker.setLatLng([lat, lng]);
+      // update draggable state if requested
+      try { if (typeof marker.dragging === 'object') {
+        if (opts.draggable) marker.dragging.enable(); else marker.dragging.disable();
+      } } catch (e) {}
+      attachMarkerDrag(marker);
     }
     return marker;
   }
@@ -147,11 +167,16 @@ export async function createMap(container, opts = {}) {
     }
   }
 
+  function onMarkerDrag(cb) {
+    markerDragHandler = typeof cb === 'function' ? cb : null;
+  }
+
   function onMapClick(handler) {
     if (!map) return;
-    map.off('click.map_component');
+    // remove any previous click handlers
+    map.off('click');
     if (typeof handler === 'function') {
-      map.on('click.map_component', (e) => {
+      map.on('click', (e) => {
         const latlng = e.latlng;
         // Drop or move marker
         setMarker(latlng, { draggable: true });
@@ -173,6 +198,7 @@ export async function createMap(container, opts = {}) {
     getMarkerCoords,
     removeMarker,
     onMapClick,
+    onMarkerDrag,
     remove,
     // tile loading helper
     tilesLoaded,
