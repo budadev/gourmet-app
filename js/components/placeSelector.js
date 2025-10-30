@@ -496,10 +496,10 @@ export async function renderPlacesInDetails(placeIds) {
   for (const placeId of placeIds) {
     const place = await getPlaceById(placeId);
     if (!place) continue;
-    html += `<div class="place-tag" data-place-id="${placeId}">`;
-    html += `<span class="place-tag-icon" data-action="edit">📍</span>`;
-    html += `<span class="place-tag-name" data-action="edit">${escapeHtml(place.name)}</span>`;
-    html += `<button class="place-tag-remove" data-place-id="${placeId}" type="button">×</button>`;
+    // Render as a simple clickable badge, no remove button or edit actions
+    html += `<div class="place-tag clickable" data-place-id="${placeId}">`;
+    html += `<span class="place-tag-icon">📍</span>`;
+    html += `<span class="place-tag-name">${escapeHtml(place.name)}</span>`;
     html += `</div>`;
   }
   html += '</div></div>';

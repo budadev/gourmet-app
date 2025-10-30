@@ -150,6 +150,24 @@ export async function showItemDetails(id, onEdit, onDelete) {
       // Apply the place filter (which clears other filters)
       const { applyPlaceFilter } = await import('./filters.js');
       await applyPlaceFilter(placeId);
+      // Close the item details modal after applying the filter
+      const { closeModal } = await import('../components/modal.js');
+      closeModal('item-details-modal');
+    };
+  });
+
+  // Bind place tags to filter by that place
+  detailsContent.querySelectorAll('.place-tag.clickable').forEach(placeTag => {
+    placeTag.onclick = async (event) => {
+      // Prevent filter if clicking remove button or edit actions
+      if (event.target.closest('.place-tag-remove') || event.target.getAttribute('data-action') === 'edit') {
+        return;
+      }
+      const placeId = Number(placeTag.getAttribute('data-place-id'));
+      const { applyPlaceFilter } = await import('./filters.js');
+      await applyPlaceFilter(placeId);
+      const { closeModal } = await import('../components/modal.js');
+      closeModal('detailsModal');
     };
   });
 
