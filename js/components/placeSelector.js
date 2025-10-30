@@ -11,6 +11,7 @@ import { escapeHtml, el } from '../utils.js';
 import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
 import { createMap } from './map.js';
 import { MAPTILER_API_KEY } from '../config.js';
+import { closeModal } from './modal.js';
 
 const LAST_LOCATION_KEY = 'gourmet_last_location_v1';
 function getLastLocation() {
@@ -442,7 +443,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
 export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
   if (!containerEl) return;
   containerEl.innerHTML = `
-    <div class="place-map-filter-modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:10000;"></div>
+    <div id="place-map-filter-modal" class="place-map-filter-modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:10000;"></div>
     <div class="place-map-filter-modal-content" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;box-shadow:0 4px 32px rgba(0,0,0,0.18);padding:24px 16px 16px 16px;z-index:10001;min-width:320px;max-width:95vw;max-height:90vh;overflow:auto;">
       <button class="place-map-filter-modal-close" style="position:absolute;top:8px;right:12px;font-size:22px;background:none;border:none;cursor:pointer;">×</button>
       <div class="place-map-filter-modal-title" style="font-size:1.2em;font-weight:600;margin-bottom:10px;">Select a Place on Map</div>
@@ -568,7 +569,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     if (onPlaceSelect) {
       // Optionally, reverse geocode here to get a place name
       onPlaceSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
-      closeModal();
+      closeModal('place-map-filter-modal');
     }
   });
 
@@ -601,8 +602,19 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     backdrop.onclick = (e) => {
       if (e.target === backdrop) {
         e.stopPropagation(); // Prevent bubbling to parent overlays
-        closeModal();
+        // Remove modal from DOM
+        containerEl.innerHTML = '';
+        document.body.classList.remove('no-scroll');
       }
+    };
+  }
+  // Add close button logic
+  const closeBtn = containerEl.querySelector('.place-map-filter-modal-close');
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.preventDefault();
+      containerEl.innerHTML = '';
+      document.body.classList.remove('no-scroll');
     };
   }
 }
