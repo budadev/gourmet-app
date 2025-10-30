@@ -61,3 +61,20 @@ main{
 .list{display:grid;gap:12px}
 
 .fab{bottom:calc(20px + env(safe-area-inset-bottom));}
+
+/* Filter side menu overlay (background dimmer) */
+.filter-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 32, 38, 0.32); /* slightly lighter than modal overlay */
+  z-index: 1000; /* below modal overlay (modal is 1200) */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.filter-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}

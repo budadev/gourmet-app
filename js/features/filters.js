@@ -284,7 +284,7 @@ async function renderPlaceSearch(container) {
   html += '<div class="filter-place-dropdown" id="filterPlaceDropdown"></div>';
   html += '</div>';
   html += '<div class="filter-selected-places" id="filterSelectedPlaces"></div>';
-  html += '<div class="filter-place-map-modal" id="filterPlaceMapModal" style="display:none;"></div>';
+  // Remove modal from here; it will be created dynamically
   html += '</div>';
 
   container.innerHTML = html;
@@ -292,22 +292,40 @@ async function renderPlaceSearch(container) {
   const input = el('filterPlaceInput');
   const dropdown = el('filterPlaceDropdown');
   const mapBtn = el('filterPlaceMapBtn');
-  const mapModal = el('filterPlaceMapModal');
 
   // Render selected places
   await renderSelectedPlaces();
 
   // Map button event handler
   mapBtn.onclick = () => {
-    mapModal.style.display = 'block';
+    // Create modal content element and append to body (no overlay)
+    let mapModalContent = document.createElement('div');
+    mapModalContent.className = 'filter-place-map-modal-content';
+    mapModalContent.setAttribute('role', 'dialog');
+    mapModalContent.setAttribute('aria-modal', 'true');
+    document.body.appendChild(mapModalContent);
+    // Helper to close and fully remove modal content
+    function closeMapModal() {
+      if (mapModalContent && mapModalContent.parentNode) {
+        mapModalContent.parentNode.removeChild(mapModalContent);
+        mapModalContent = null;
+      }
+    }
     import('../components/placeSelector.js').then(({ renderPlaceMapFilterModal }) => {
-      renderPlaceMapFilterModal(mapModal, async (placeId) => {
+      renderPlaceMapFilterModal(mapModalContent, async (placeId) => {
         // Apply the place filter and close the modal
         await applyPlaceFilter(placeId);
-        mapModal.style.display = 'none';
-        mapModal.innerHTML = '';
+        closeMapModal();
       });
     });
+    // Close modal on Escape key
+    function escListener(e) {
+      if (e.key === 'Escape') {
+        closeMapModal();
+        document.removeEventListener('keydown', escListener);
+      }
+    }
+    document.addEventListener('keydown', escListener);
   };
 
   // Search on input
@@ -574,4 +592,17 @@ function triggerFilterChange() {
   if (filterChangeCallback) {
     filterChangeCallback();
   }
+}
+
+// Helper to close all map modals and any inline backdrops (robust cleanup)
+function closeAllMapModals() {
+  document.querySelectorAll('.filter-place-map-modal, .inline-place-backdrop').forEach(modal => {
+    if (modal && modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+  });
+  document.body.classList.remove('modal-open');
+  document.documentElement.classList.remove('modal-open');
+  // Debug log
+  console.log('[Modal] All overlays cleaned up');
 }
