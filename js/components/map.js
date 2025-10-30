@@ -121,6 +121,8 @@ export async function createMap(container, opts = {}) {
 
   let marker = null;
   let markerDragHandler = null;
+  let circle = null;
+  let circleChangeHandler = null;
 
   function attachMarkerDrag(markerInstance) {
     try {
@@ -171,16 +173,67 @@ export async function createMap(container, opts = {}) {
     markerDragHandler = typeof cb === 'function' ? cb : null;
   }
 
-  function onMapClick(handler) {
+  function setCircle(center, radius = 1000, opts = {}) {
+    if (!center) return;
+    const lat = center.lat || (Array.isArray(center) ? center[0] : null);
+    const lng = center.lng || (Array.isArray(center) ? center[1] : null);
+    if (lat == null || lng == null) return;
+    if (!circle) {
+      circle = L.circle([lat, lng], {
+        radius,
+        color: opts.color || '#007aff',
+        fillColor: opts.fillColor || '#007aff',
+        fillOpacity: opts.fillOpacity || 0.15,
+        weight: opts.weight || 2,
+        interactive: !!opts.interactive
+      }).addTo(map);
+      if (opts.interactive) {
+        circle.on('mousedown', function (e) {
+          map.dragging.disable();
+          map.on('mousemove', resizeCircle);
+          map.once('mouseup', function () {
+            map.dragging.enable();
+            map.off('mousemove', resizeCircle);
+          });
+        });
+      }
+    } else {
+      circle.setLatLng([lat, lng]);
+      circle.setRadius(radius);
+    }
+    if (typeof circleChangeHandler === 'function') circleChangeHandler({ center: { lat, lng }, radius });
+    return circle;
+  }
+
+  function getCircle() {
+    if (!circle) return null;
+    const center = circle.getLatLng();
+    const radius = circle.getRadius();
+    return { center: { lat: center.lat, lng: center.lng }, radius };
+  }
+
+  function removeCircle() {
+    if (circle) { map.removeLayer(circle); circle = null; }
+  }
+
+  function onCircleChange(handler) {
+    circleChangeHandler = handler;
+  }
+
+  function resizeCircle(e) {
+    if (!circle) return;
+    const center = circle.getLatLng();
+    const dist = map.distance(center, e.latlng);
+    circle.setRadius(dist);
+    if (typeof circleChangeHandler === 'function') circleChangeHandler({ center, radius: dist });
+  }
+
+  function onClick(handler) {
     if (!map) return;
-    // remove any previous click handlers
     map.off('click');
     if (typeof handler === 'function') {
-      map.on('click', (e) => {
-        const latlng = e.latlng;
-        // Drop or move marker
-        setMarker(latlng, { draggable: true });
-        handler(latlng);
+      map.on('click', function (e) {
+        handler(e.latlng);
       });
     }
   }
@@ -189,6 +242,7 @@ export async function createMap(container, opts = {}) {
     try { removeMarker(); } catch (e) {}
     try { map.remove(); } catch (e) {}
     if (container && container._leaflet_map_instance) container._leaflet_map_instance = null;
+    removeCircle();
   }
 
   // Return a small API
@@ -196,12 +250,11 @@ export async function createMap(container, opts = {}) {
     map,
     setMarker,
     getMarkerCoords,
-    removeMarker,
-    onMapClick,
-    onMarkerDrag,
+    setCircle,
+    getCircle,
+    removeCircle,
+    onCircleChange,
     remove,
-    // tile loading helper
-    tilesLoaded,
-    onTilesLoaded: (cb) => { if (typeof cb === 'function') tilesLoaded.then(cb); }
+    onClick
   };
 }

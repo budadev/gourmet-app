@@ -312,9 +312,11 @@ async function renderPlaceSearch(container) {
       }
     }
     import('../components/placeSelector.js').then(({ renderPlaceMapFilterModal }) => {
-      renderPlaceMapFilterModal(mapModalContent, async (placeId) => {
-        // Apply the place filter and close the modal
-        await applyPlaceFilter(placeId);
+      renderPlaceMapFilterModal(mapModalContent, async (selection) => {
+        if (selection && selection.type === 'place' && selection.placeId) {
+          await applyPlaceFilter(selection.placeId);
+        }
+        // If area selection, do nothing for now (can be handled in the future)
         closeMapModal();
       });
     });

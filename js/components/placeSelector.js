@@ -457,6 +457,8 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>
+      <div id="placeMapFilterAreaInfo" style="font-size:13px;color:#555;text-align:center;margin-bottom:8px;min-height:18px;"></div>
+      <button id="placeMapFilterSelectAreaBtn" class="btn primary" style="width:100%;margin-top:8px;">Select Area</button>
     </div>
   `;
 
@@ -466,12 +468,15 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
 
   // Setup map
   const mapEl = containerEl.querySelector('#placeMapFilterMap');
+  const areaInfoEl = containerEl.querySelector('#placeMapFilterAreaInfo');
+  const selectAreaBtn = containerEl.querySelector('#placeMapFilterSelectAreaBtn');
   const { createMap } = await import('./map.js');
   let mapInstance = null;
   let userLocation = null;
-  let marker = null;
+  let areaCenter = null;
+  let areaRadius = 1000; // meters
+  let marker = null; // for search result selection, but not used for area
 
-  // Center to user location
   async function centerToUser() {
     if (navigator.geolocation) {
       try {
@@ -484,9 +489,33 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     }
   }
 
-  // Initialize map
   mapInstance = await createMap(mapEl, { zoom: 13 });
   await centerToUser();
+
+  // Area select: click to set center, draw circle
+  mapInstance.onClick((latlng) => {
+    areaCenter = { lat: latlng.lat, lng: latlng.lng };
+    mapInstance.setCircle(areaCenter, areaRadius, { color: '#007aff', fillColor: '#007aff', fillOpacity: 0.15, interactive: true });
+    updateAreaInfo();
+  });
+
+  // Allow resizing the circle by dragging its edge (optional, interactive: true)
+  mapInstance.onCircleChange(({ center, radius }) => {
+    areaCenter = { lat: center.lat, lng: center.lng };
+    areaRadius = radius;
+    updateAreaInfo();
+  });
+
+  function updateAreaInfo() {
+    if (!areaCenter) {
+      areaInfoEl.textContent = 'Click the map to select an area.';
+      selectAreaBtn.disabled = true;
+    } else {
+      areaInfoEl.textContent = `Center: ${areaCenter.lat.toFixed(5)}, ${areaCenter.lng.toFixed(5)} | Radius: ${(areaRadius/1000).toFixed(2)} km`;
+      selectAreaBtn.disabled = false;
+    }
+  }
+  updateAreaInfo();
 
   // Place search logic (MapTiler/Leaflet search, same as edit popup)
   const searchInput = containerEl.querySelector('#placeMapFilterSearchInput');
@@ -496,13 +525,10 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     if (!query) {
       searchResults.classList.add('hidden');
       searchResults.innerHTML = '';
-      // setZoomControlVisibility(true); // No longer needed
       return;
     }
-    // Use MapTiler API for geocoding
     const { MAPTILER_API_KEY } = await import('../config.js');
     let url = `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${MAPTILER_API_KEY}&limit=6&language=en`;
-    // Add proximity if userLocation is available
     if (userLocation && userLocation.lat && userLocation.lng) {
       url += `&proximity=${userLocation.lng},${userLocation.lat}`;
     }
@@ -519,7 +545,6 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     if (!results || results.length === 0) {
       searchResults.innerHTML = '<div class="place-search-empty">No results</div>';
       searchResults.classList.remove('hidden');
-      // setZoomControlVisibility(false); // No longer needed
       return;
     }
     let html = '';
@@ -534,17 +559,16 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     }
     searchResults.innerHTML = html;
     searchResults.classList.remove('hidden');
-    // setZoomControlVisibility(false); // No longer needed
     searchResults.querySelectorAll('.place-search-item').forEach(item => {
       item.onclick = async () => {
         const lat = parseFloat(item.getAttribute('data-lat'));
         const lng = parseFloat(item.getAttribute('data-lng'));
         if (!isNaN(lat) && !isNaN(lng)) {
           mapInstance.map.setView([lat, lng], 15);
-          if (marker) marker.remove();
-          marker = L.marker([lat, lng]).addTo(mapInstance.map);
+          areaCenter = { lat, lng };
+          mapInstance.setCircle(areaCenter, areaRadius, { color: '#007aff', fillColor: '#007aff', fillOpacity: 0.15, interactive: true });
+          updateAreaInfo();
         }
-        // Hide dropdown after selection
         searchResults.classList.add('hidden');
       };
     });
@@ -553,25 +577,21 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
   searchInput.oninput = (e) => { doMapSearch(e.target.value.trim()); };
   searchInput.onfocus = (e) => { if (e.target.value.trim()) doMapSearch(e.target.value.trim()); };
 
-  // Remove zoom control visibility logic
-  // searchInput.addEventListener('focus', () => setZoomControlVisibility(false));
-  // searchInput.addEventListener('blur', () => setTimeout(() => setZoomControlVisibility(true), 200));
-  // searchResults.addEventListener('mouseenter', () => setZoomControlVisibility(false));
-  // searchResults.addEventListener('mouseleave', () => setZoomControlVisibility(true));
-
   // Center button
   containerEl.querySelector('.place-map-filter-center-btn').onclick = async () => {
     await centerToUser();
   };
 
-  // Map click: select place (optional, could be extended)
-  mapInstance.map.on('click', function(e) {
-    if (onPlaceSelect) {
-      // Optionally, reverse geocode here to get a place name
-      onPlaceSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
-      closeModal('place-map-filter-modal');
+  // Select Area button logic
+  selectAreaBtn.onclick = () => {
+    if (areaCenter && typeof onPlaceSelect === 'function') {
+      onPlaceSelect({ type: 'area', center: areaCenter, radius: areaRadius });
+      // Close modal
+      const modal = containerEl.querySelector('#place-map-filter-modal');
+      if (modal && modal.parentNode) modal.parentNode.innerHTML = '';
+      document.body.classList.remove('no-scroll');
     }
-  });
+  };
 
   // --- Z-INDEX FIXES ---
   // Ensure dropdown overlays zoom controls
