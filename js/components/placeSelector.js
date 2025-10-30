@@ -457,6 +457,10 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>
+      <div id="placeMapFilterRadiusSliderWrapper" style="margin-bottom:8px;text-align:center;">
+        <label for="placeMapFilterRadiusSlider" style="font-size:13px;color:#555;display:block;margin-bottom:2px;">Radius: <span id="placeMapFilterRadiusValue">1.00</span> km</label>
+        <input type="range" id="placeMapFilterRadiusSlider" min="100" max="10000" step="50" value="1000" style="width:90%;max-width:340px;">
+      </div>
       <div id="placeMapFilterAreaInfo" style="font-size:13px;color:#555;text-align:center;margin-bottom:8px;min-height:18px;"></div>
       <button id="placeMapFilterSelectAreaBtn" class="btn primary" style="width:100%;margin-top:8px;">Select Area</button>
     </div>
@@ -470,6 +474,8 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
   const mapEl = containerEl.querySelector('#placeMapFilterMap');
   const areaInfoEl = containerEl.querySelector('#placeMapFilterAreaInfo');
   const selectAreaBtn = containerEl.querySelector('#placeMapFilterSelectAreaBtn');
+  const radiusSlider = containerEl.querySelector('#placeMapFilterRadiusSlider');
+  const radiusValueEl = containerEl.querySelector('#placeMapFilterRadiusValue');
   const { createMap } = await import('./map.js');
   let mapInstance = null;
   let userLocation = null;
@@ -506,6 +512,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     updateAreaInfo();
   });
 
+  // Update area info and slider value
   function updateAreaInfo() {
     if (!areaCenter) {
       areaInfoEl.textContent = 'Click the map to select an area.';
@@ -514,8 +521,19 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
       areaInfoEl.textContent = `Center: ${areaCenter.lat.toFixed(5)}, ${areaCenter.lng.toFixed(5)} | Radius: ${(areaRadius/1000).toFixed(2)} km`;
       selectAreaBtn.disabled = false;
     }
+    if (radiusValueEl) radiusValueEl.textContent = (areaRadius/1000).toFixed(2);
+    if (radiusSlider && Number(radiusSlider.value) !== areaRadius) radiusSlider.value = areaRadius;
   }
   updateAreaInfo();
+
+  // Slider event: update radius in real time
+  if (radiusSlider) {
+    radiusSlider.addEventListener('input', (e) => {
+      areaRadius = Number(e.target.value);
+      if (areaCenter) mapInstance.setCircle(areaCenter, areaRadius, { color: '#007aff', fillColor: '#007aff', fillOpacity: 0.15, interactive: true });
+      updateAreaInfo();
+    });
+  }
 
   // Place search logic (MapTiler/Leaflet search, same as edit popup)
   const searchInput = containerEl.querySelector('#placeMapFilterSearchInput');
