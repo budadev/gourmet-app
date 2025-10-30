@@ -442,6 +442,8 @@ async function openInlinePlaceEditor(tagEl, placeId) {
 
 export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
   if (!containerEl) return;
+  // Define non-linear radius steps (in meters)
+  const radiusSteps = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 40000, 50000, 75000, 100000];
   containerEl.innerHTML = `
     <div id="place-map-filter-modal" class="place-map-filter-modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:10000;"></div>
     <div class="place-map-filter-modal-content" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;box-shadow:0 4px 32px rgba(0,0,0,0.18);padding:24px 16px 16px 16px;z-index:10001;min-width:320px;max-width:95vw;max-height:90vh;overflow:auto;">
@@ -457,22 +459,24 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>
-      <div id="placeMapFilterRadiusSliderWrapper" style="margin-bottom:8px;text-align:center;">
+      <div id="placeMapFilterRadiusSliderWrapper" style="margin-bottom:16px;text-align:center;">
         <label for="placeMapFilterRadiusSlider" style="font-size:13px;color:#555;display:block;margin-bottom:2px;">Radius: <span id="placeMapFilterRadiusValue">1.00</span> km</label>
-        <input type="range" id="placeMapFilterRadiusSlider" min="100" max="10000" step="50" value="1000" style="width:90%;max-width:340px;">
+        <div style="position:relative;width:90%;max-width:340px;margin:0 auto;">
+          <input type="range" id="placeMapFilterRadiusSlider" min="0" max="${radiusSteps.length-1}" step="1" value="6" style="width:100%;accent-color:#3b82f6;margin-left:-12px;margin-right:-12px;">
+          <div id="radius-slider-labels" style="display:flex;justify-content:space-between;width:100%;font-size:12px;color:#888;margin-top:2px;pointer-events:none;">
+            <span style="text-align:left;">0.1</span>
+            <span>1</span>
+            <span>10</span>
+            <span style="text-align:right;">100 km</span>
+          </div>
+        </div>
       </div>
-      <div id="placeMapFilterAreaInfo" style="font-size:13px;color:#555;text-align:center;margin-bottom:8px;min-height:18px;"></div>
       <button id="placeMapFilterSelectAreaBtn" class="btn primary" style="width:100%;margin-top:8px;">Select Area</button>
     </div>
   `;
 
-  // --- Z-INDEX FIXES ---
-  // Remove previous style injection, as inline styles now handle stacking
-
-
   // Setup map
   const mapEl = containerEl.querySelector('#placeMapFilterMap');
-  const areaInfoEl = containerEl.querySelector('#placeMapFilterAreaInfo');
   const selectAreaBtn = containerEl.querySelector('#placeMapFilterSelectAreaBtn');
   const radiusSlider = containerEl.querySelector('#placeMapFilterRadiusSlider');
   const radiusValueEl = containerEl.querySelector('#placeMapFilterRadiusValue');
@@ -480,8 +484,8 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
   let mapInstance = null;
   let userLocation = null;
   let areaCenter = null;
-  let areaRadius = 1000; // meters
-  let marker = null; // for search result selection, but not used for area
+  let areaRadius = radiusSteps[6]; // default 1000m
+  let marker = null;
 
   async function centerToUser() {
     if (navigator.geolocation) {
@@ -512,24 +516,26 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     updateAreaInfo();
   });
 
-  // Update area info and slider value
+  // Update slider and value
   function updateAreaInfo() {
-    if (!areaCenter) {
-      areaInfoEl.textContent = 'Click the map to select an area.';
-      selectAreaBtn.disabled = true;
-    } else {
-      areaInfoEl.textContent = `Center: ${areaCenter.lat.toFixed(5)}, ${areaCenter.lng.toFixed(5)} | Radius: ${(areaRadius/1000).toFixed(2)} km`;
-      selectAreaBtn.disabled = false;
-    }
+    // No coordinates/radius text shown anymore
     if (radiusValueEl) radiusValueEl.textContent = (areaRadius/1000).toFixed(2);
-    if (radiusSlider && Number(radiusSlider.value) !== areaRadius) radiusSlider.value = areaRadius;
+    if (radiusSlider) {
+      // Find the closest index for the current areaRadius
+      let idx = radiusSteps.findIndex(r => r >= areaRadius);
+      if (idx === -1) idx = radiusSteps.length-1;
+      if (Number(radiusSlider.value) !== idx) radiusSlider.value = idx;
+    }
+    // Enable/disable select button
+    selectAreaBtn.disabled = !areaCenter;
   }
   updateAreaInfo();
 
   // Slider event: update radius in real time
   if (radiusSlider) {
     radiusSlider.addEventListener('input', (e) => {
-      areaRadius = Number(e.target.value);
+      const idx = Number(e.target.value);
+      areaRadius = radiusSteps[idx];
       if (areaCenter) mapInstance.setCircle(areaCenter, areaRadius, { color: '#007aff', fillColor: '#007aff', fillOpacity: 0.15, interactive: true });
       updateAreaInfo();
     });
@@ -654,6 +660,21 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
       containerEl.innerHTML = '';
       document.body.classList.remove('no-scroll');
     };
+  }
+
+  // After setting innerHTML, adjust the slider labels for perfect alignment
+  const sliderLabels = containerEl.querySelector('#radius-slider-labels');
+  if (sliderLabels) {
+    // Set flex-basis for each label to align with the slider's steps
+    const labels = sliderLabels.querySelectorAll('span');
+    if (labels.length === 4) {
+      labels[0].style.flexBasis = '0%'; // min
+      labels[1].style.flexBasis = '33%';
+      labels[2].style.flexBasis = '33%';
+      labels[3].style.flexBasis = '0%'; // max
+      labels[0].style.textAlign = 'left';
+      labels[3].style.textAlign = 'right';
+    }
   }
 }
 
