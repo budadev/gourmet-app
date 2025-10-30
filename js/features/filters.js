@@ -275,20 +275,40 @@ async function renderPlaceSearch(container) {
   if (!container) return;
 
   let html = '<div class="filter-place-search">';
-  html += '<div class="filter-place-search-wrapper">';
-  html += '<input type="text" class="filter-place-input" id="filterPlaceInput" placeholder="Search places..." autocomplete="off">';
+  html += '<div class="filter-place-search-wrapper" style="position:relative;">';
+  html += '<input type="text" class="filter-place-input" id="filterPlaceInput" placeholder="Search places..." autocomplete="off" style="padding-right:38px;">';
+  // Modern SVG map icon button, right-aligned inside input
+  html += '<button class="filter-place-map-btn" id="filterPlaceMapBtn" title="Show map filter" type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;">'
+    + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><circle cx="12" cy="13" r="3.2"/></svg>'
+    + '</button>';
   html += '<div class="filter-place-dropdown" id="filterPlaceDropdown"></div>';
   html += '</div>';
   html += '<div class="filter-selected-places" id="filterSelectedPlaces"></div>';
+  html += '<div class="filter-place-map-modal" id="filterPlaceMapModal" style="display:none;"></div>';
   html += '</div>';
 
   container.innerHTML = html;
 
   const input = el('filterPlaceInput');
   const dropdown = el('filterPlaceDropdown');
+  const mapBtn = el('filterPlaceMapBtn');
+  const mapModal = el('filterPlaceMapModal');
 
   // Render selected places
   await renderSelectedPlaces();
+
+  // Map button event handler
+  mapBtn.onclick = () => {
+    mapModal.style.display = 'block';
+    import('../components/placeSelector.js').then(({ renderPlaceMapFilterModal }) => {
+      renderPlaceMapFilterModal(mapModal, async (placeId) => {
+        // Apply the place filter and close the modal
+        await applyPlaceFilter(placeId);
+        mapModal.style.display = 'none';
+        mapModal.innerHTML = '';
+      });
+    });
+  };
 
   // Search on input
   let searchTimeout;

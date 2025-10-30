@@ -83,12 +83,28 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   });
 }
 
-function openInlinePlaceEditor(tagEl, placeId) {
+async function openInlinePlaceEditor(tagEl, placeId) {
   // ensure only one editor at a time
   const existing = document.querySelector('.inline-place-backdrop'); if (existing) existing.remove();
 
   const backdrop = document.createElement('div'); backdrop.className = 'inline-place-backdrop';
   const popup = document.createElement('div'); popup.className = 'inline-place-editor'; popup.setAttribute('data-place-id', placeId);
+
+  // Declare missing variables
+  let mapInstance = null;
+  let selectedCoords = null;
+  let existingCoords = null;
+  let mapWrapper = null;
+  let mapLoading = null;
+  let mapEl = null;
+  let centerBtn = null;
+  let coordsEl = null;
+  let mapSearchInput = null;
+  let mapSearchClear = null;
+  let mapSearchResults = null;
+  let outsideListeners = [];
+  let nameInput = null;
+  let saveBtn = null;
 
   popup.innerHTML = `
     <label class="inline-place-field-label">Place name</label>
@@ -109,301 +125,281 @@ function openInlinePlaceEditor(tagEl, placeId) {
     </div>
   `;
 
-  backdrop.appendChild(popup);
-  document.body.appendChild(backdrop);
-  popup.style.position = 'relative'; popup.style.zIndex = 10002;
+  // Assign DOM elements after setting innerHTML
+  mapWrapper = popup.querySelector('.inline-place-map-wrapper');
+  mapLoading = popup.querySelector('.inline-place-map-loading');
+  mapEl = popup.querySelector('.inline-place-map');
+  centerBtn = popup.querySelector('.inline-place-map-center-btn');
+  coordsEl = popup.querySelector('.inline-place-coords');
+  mapSearchInput = popup.querySelector('.inline-place-map-search');
+  mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
+  mapSearchResults = popup.querySelector('.inline-place-map-search-results');
+  nameInput = popup.querySelector('.inline-place-input');
+  saveBtn = popup.querySelector('.inline-place-save');
 
-  const nameInput = popup.querySelector('.inline-place-input');
-  const mapWrapper = popup.querySelector('.inline-place-map-wrapper');
-  const mapLoading = popup.querySelector('.inline-place-map-loading');
-  const mapEl = popup.querySelector('.inline-place-map');
-  const mapSearchInput = popup.querySelector('.inline-place-map-search');
-  const mapSearchResults = popup.querySelector('.inline-place-map-search-results');
-  const mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
-  const coordsEl = popup.querySelector('.inline-place-coords');
-  const saveBtn = popup.querySelector('.inline-place-save');
-
-  let mapInstance = null;
-  let selectedCoords = null;
-  const outsideListeners = [];
-
-  const hideMapSearchResults = () => { if (mapSearchResults) mapSearchResults.classList.add('hidden'); };
-  const showMapSearchResults = () => { if (mapSearchResults) mapSearchResults.classList.remove('hidden'); };
-
+  // JS code must be outside the template string
   if (mapWrapper) mapWrapper.style.display = 'block';
-  if (mapLoading) { mapLoading.textContent = 'Click to load map'; mapLoading.style.display = 'block'; }
-  if (mapEl) mapEl.style.display = 'none';
+  if (mapLoading) mapLoading.style.display = 'block';
+  if (mapEl) mapEl.style.display = 'block';
 
-  const centerBtn = document.createElement('button');
-  centerBtn.type = 'button'; centerBtn.className = 'inline-place-center-btn disabled';
-  centerBtn.title = 'Center to your location';
-  centerBtn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="var(--primary)" stroke-width="1.6" fill="none"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  try { if (mapWrapper) mapWrapper.appendChild(centerBtn); else popup.appendChild(centerBtn); } catch (e) {}
+  if (typeof L === 'undefined') {
+    if (mapLoading) mapLoading.textContent = 'Map library unavailable.';
+    return;
+  }
 
-  const initMapIfNeeded = async (existingCoords) => {
-    if (mapWrapper) mapWrapper.style.display = 'block';
-    if (mapLoading) mapLoading.style.display = 'block';
-    if (mapEl) mapEl.style.display = 'block';
+  const lastLoc = !existingCoords ? getLastLocation() : null;
+  const initialCenter = existingCoords ? [existingCoords.lat, existingCoords.lng] : (lastLoc ? [lastLoc.lat, lastLoc.lng] : undefined);
 
-    if (typeof L === 'undefined') {
-      if (mapLoading) mapLoading.textContent = 'Map library unavailable.';
-      return;
-    }
+  mapInstance = await createMap(mapEl, { center: initialCenter, zoom: 12 });
 
-    const lastLoc = !existingCoords ? getLastLocation() : null;
-    const initialCenter = existingCoords ? [existingCoords.lat, existingCoords.lng] : (lastLoc ? [lastLoc.lat, lastLoc.lng] : undefined);
+  const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
+  if (geoAvailable) centerBtn.classList.remove('disabled'); else centerBtn.classList.add('disabled');
 
-    mapInstance = await createMap(mapEl, { center: initialCenter, zoom: 12 });
+  // Try geolocation once for better search proximity if we don't already have a last location
+  let geoRequested = false;
 
-    const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
-    if (geoAvailable) centerBtn.classList.remove('disabled'); else centerBtn.classList.add('disabled');
+  const centerToUser = () => {
+    if (!geoAvailable) return Promise.reject(new Error('Geolocation unavailable'));
+    return new Promise((resolve, reject) => {
+      let handled = false;
+      const success = pos => { handled = true; resolve(pos); };
+      const failure = err => { handled = true; reject(err); };
+      try { navigator.geolocation.getCurrentPosition(success, failure, { enableHighAccuracy: true, timeout: 10000 }); } catch (e) { reject(e); }
+      setTimeout(() => { if (!handled) reject(new Error('Geolocation timeout')); }, 11000);
+    }).then(position => { const lat = position.coords.latitude; const lng = position.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); return { lat, lng }; });
+  };
 
-    // Try geolocation once for better search proximity if we don't already have a last location
-    let geoRequested = false;
+  centerBtn.onclick = () => {
+    if (centerBtn.classList.contains('disabled') || centerBtn.classList.contains('loading')) return;
+    centerBtn.classList.add('loading');
+    centerToUser().then(() => {}).catch(() => { centerBtn.classList.add('disabled'); }).finally(() => { centerBtn.classList.remove('loading'); });
+  };
 
-    const centerToUser = () => {
-      if (!geoAvailable) return Promise.reject(new Error('Geolocation unavailable'));
-      return new Promise((resolve, reject) => {
-        let handled = false;
-        const success = pos => { handled = true; resolve(pos); };
-        const failure = err => { handled = true; reject(err); };
-        try { navigator.geolocation.getCurrentPosition(success, failure, { enableHighAccuracy: true, timeout: 10000 }); } catch (e) { reject(e); }
-        setTimeout(() => { if (!handled) reject(new Error('Geolocation timeout')); }, 11000);
-      }).then(position => { const lat = position.coords.latitude; const lng = position.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); return { lat, lng }; });
-    };
-
-    centerBtn.onclick = () => {
-      if (centerBtn.classList.contains('disabled') || centerBtn.classList.contains('loading')) return;
-      centerBtn.classList.add('loading');
-      centerToUser().then(() => {}).catch(() => { centerBtn.classList.add('disabled'); }).finally(() => { centerBtn.classList.remove('loading'); });
-    };
-
-    const doMapSearch = async (q) => {
-      if (!q || !MAPTILER_API_KEY) return [];
+  const doMapSearch = async (q) => {
+    if (!q || !MAPTILER_API_KEY) return [];
+    try {
+      // Try to provide a proximity parameter to MapTiler so results are biased toward
+      // the user's or map's current location. MapTiler expects proximity as lon,lat.
+      let proximityParam = '';
+      let bboxParam = '';
       try {
-        // Try to provide a proximity parameter to MapTiler so results are biased toward
-        // the user's or map's current location. MapTiler expects proximity as lon,lat.
-        let proximityParam = '';
-        let bboxParam = '';
-        try {
-          const lastLoc = getLastLocation();
-          if (lastLoc && typeof lastLoc.lat === 'number' && typeof lastLoc.lng === 'number') {
-            proximityParam = `&proximity=${encodeURIComponent(lastLoc.lng)},${encodeURIComponent(lastLoc.lat)}`;
-            // create a small bbox (~±0.15 degrees ~ ~15km) around last location to prioritize truly nearby results
-            const delta = 0.15;
-            const minLon = lastLoc.lng - delta;
-            const minLat = lastLoc.lat - delta;
-            const maxLon = lastLoc.lng + delta;
-            const maxLat = lastLoc.lat + delta;
-            bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
-          } else if (mapInstance && mapInstance.map && typeof mapInstance.map.getCenter === 'function') {
-            try {
-              const c = mapInstance.map.getCenter();
-              if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
-                proximityParam = `&proximity=${encodeURIComponent(c.lng)},${encodeURIComponent(c.lat)}`;
-                const delta = 0.15;
-                const minLon = c.lng - delta;
-                const minLat = c.lat - delta;
-                const maxLon = c.lng + delta;
-                const maxLat = c.lat + delta;
-                bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
-              }
-            } catch (e) { /* ignore */ }
-          }
-        } catch (e) { /* ignore */ }
-
-        // If still no proximity, attempt to request geolocation once (this may prompt the user).
-        if (!proximityParam && !geoRequested && navigator && navigator.geolocation) {
-          geoRequested = true;
+        const lastLoc = getLastLocation();
+        if (lastLoc && typeof lastLoc.lat === 'number' && typeof lastLoc.lng === 'number') {
+          proximityParam = `&proximity=${encodeURIComponent(lastLoc.lng)},${encodeURIComponent(lastLoc.lat)}`;
+          // create a small bbox (~±0.15 degrees ~ ~15km) around last location to prioritize truly nearby results
+          const delta = 0.15;
+          const minLon = lastLoc.lng - delta;
+          const minLat = lastLoc.lat - delta;
+          const maxLon = lastLoc.lng + delta;
+          const maxLat = lastLoc.lat + delta;
+          bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
+        } else if (mapInstance && mapInstance.map && typeof mapInstance.map.getCenter === 'function') {
           try {
-            const pos = await new Promise((resolve) => {
-              let handled = false;
-              try {
-                navigator.geolocation.getCurrentPosition((p) => { if (!handled) { handled = true; resolve(p); } }, () => { if (!handled) { handled = true; resolve(null); } }, { enableHighAccuracy: true, timeout: 5000 });
-              } catch (e) { if (!handled) { handled = true; resolve(null); } }
-              // fallback timeout to avoid waiting too long
-              setTimeout(() => { if (!handled) { handled = true; resolve(null); } }, 5200);
-            });
-            if (pos && pos.coords) {
-              const lat = pos.coords.latitude; const lng = pos.coords.longitude;
-              setLastLocation(lat, lng);
-              proximityParam = `&proximity=${encodeURIComponent(lng)},${encodeURIComponent(lat)}`;
-              // also set bbox for stronger bias
+            const c = mapInstance.map.getCenter();
+            if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+              proximityParam = `&proximity=${encodeURIComponent(c.lng)},${encodeURIComponent(c.lat)}`;
               const delta = 0.15;
-              const minLon = lng - delta; const minLat = lat - delta; const maxLon = lng + delta; const maxLat = lat + delta;
+              const minLon = c.lng - delta;
+              const minLat = c.lat - delta;
+              const maxLon = c.lng + delta;
+              const maxLat = c.lat + delta;
               bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
             }
           } catch (e) { /* ignore */ }
         }
+      } catch (e) { /* ignore */ }
 
-        // Helper to map MapTiler features to our lighter result objects
-        const mapFeatures = (features) => (features || []).map(f => ({
-          id: f.properties && (f.properties.osm_id || f.id),
-          title: f.properties && (f.properties.name || f.place_name || ''),
-          subtitle: f.properties && (f.properties.place_name_en || f.properties.place_name || f.properties.label || ''),
-          center: f.geometry && f.geometry.coordinates ? { lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] } : null
-        }));
-
-        // First, try local (proximity + bbox) search if we have any of those params
-        let localResults = [];
-        if (proximityParam || bboxParam) {
-          const localUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=6${proximityParam}${bboxParam}&language=en`;
-          try {
-            const resLocal = await fetch(localUrl);
-            if (resLocal && resLocal.ok) {
-              const dataLocal = await resLocal.json();
-              if (dataLocal && Array.isArray(dataLocal.features) && dataLocal.features.length > 0) {
-                localResults = mapFeatures(dataLocal.features);
-              }
-            }
-          } catch (e) { /* ignore local fetch errors and fall back to global */ }
-        }
-
-        // Always fetch global results so we can append worldwide options after local ones.
-        const globalUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=8&language=en`;
-        let globalResults = [];
+      // If still no proximity, attempt to request geolocation once (this may prompt the user).
+      if (!proximityParam && !geoRequested && navigator && navigator.geolocation) {
+        geoRequested = true;
         try {
-          const resGlobal = await fetch(globalUrl);
-          if (resGlobal && resGlobal.ok) {
-            const dataGlobal = await resGlobal.json();
-            if (dataGlobal && Array.isArray(dataGlobal.features) && dataGlobal.features.length > 0) {
-              globalResults = mapFeatures(dataGlobal.features);
+          const pos = await new Promise((resolve) => {
+            let handled = false;
+            try {
+              navigator.geolocation.getCurrentPosition((p) => { if (!handled) { handled = true; resolve(p); } }, () => { if (!handled) { handled = true; resolve(null); } }, { enableHighAccuracy: true, timeout: 5000 });
+            } catch (e) { if (!handled) { handled = true; resolve(null); } }
+            // fallback timeout to avoid waiting too long
+            setTimeout(() => { if (!handled) { handled = true; resolve(null); } }, 5200);
+          });
+          if (pos && pos.coords) {
+            const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+            setLastLocation(lat, lng);
+            proximityParam = `&proximity=${encodeURIComponent(lng)},${encodeURIComponent(lat)}`;
+            // also set bbox for stronger bias
+            const delta = 0.15;
+            const minLon = lng - delta; const minLat = lat - delta; const maxLon = lng + delta; const maxLat = lat + delta;
+            bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      // Helper to map MapTiler features to our lighter result objects
+      const mapFeatures = (features) => (features || []).map(f => ({
+        id: f.properties && (f.properties.osm_id || f.id),
+        title: f.properties && (f.properties.name || f.place_name || ''),
+        subtitle: f.properties && (f.properties.place_name_en || f.properties.place_name || f.properties.label || ''),
+        center: f.geometry && f.geometry.coordinates ? { lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] } : null
+      }));
+
+      // First, try local (proximity + bbox) search if we have any of those params
+      let localResults = [];
+      if (proximityParam || bboxParam) {
+        const localUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=6${proximityParam}${bboxParam}&language=en`;
+        try {
+          const resLocal = await fetch(localUrl);
+          if (resLocal && resLocal.ok) {
+            const dataLocal = await resLocal.json();
+            if (dataLocal && Array.isArray(dataLocal.features) && dataLocal.features.length > 0) {
+              localResults = mapFeatures(dataLocal.features);
             }
           }
-        } catch (e) { /* ignore global fetch errors */ }
-
-        // If no local results, return global only (may be empty)
-        if (!localResults || localResults.length === 0) return globalResults.slice(0, 6);
-
-        // Otherwise merge local + deduped global (local first), limit to 6 results
-        const merged = [];
-        const addToMerged = (item) => {
-          // simple dedupe by exact coords if available, otherwise by title+subtitle
-          const exists = merged.some(m => {
-            if (m.center && item.center && typeof m.center.lat === 'number' && typeof item.center.lat === 'number') {
-              return m.center.lat === item.center.lat && m.center.lng === item.center.lng;
-            }
-            return (m.title && item.title && m.title === item.title && m.subtitle === item.subtitle);
-          });
-          if (!exists) merged.push(item);
-        };
-        for (const r of localResults) { if (merged.length >= 6) break; addToMerged(r); }
-        for (const g of globalResults) { if (merged.length >= 6) break; addToMerged(g); }
-        return merged;
-      } catch (e) { return []; }
-    };
-
-    try {
-      mapInstance.onMapClick((latlng) => {
-        try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { draggable: true }); } catch (e) {}
-        selectedCoords = { lat: latlng.lat, lng: latlng.lng };
-        if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
-      });
-
-      // when marker is dragged, update selectedCoords
-      try { if (mapInstance && typeof mapInstance.onMarkerDrag === 'function') {
-        mapInstance.onMarkerDrag((latlng) => {
-          try {
-            if (!latlng) return;
-            selectedCoords = { lat: latlng.lat, lng: latlng.lng };
-            if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
-            setLastLocation(selectedCoords.lat, selectedCoords.lng);
-          } catch (e) {}
-        });
-      } } catch (e) {}
-    } catch (e) {}
-
-    if (existingCoords && existingCoords.lat && existingCoords.lng) {
-      try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { draggable: true }); } catch (e) {}
-      selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
-      try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
-      if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
-    } else {
-      const last = getLastLocation();
-      if (last) { try { mapInstance.map.setView([last.lat, last.lng], 12); } catch (e) {} }
-      if (navigator && navigator.geolocation) {
-        try {
-          centerBtn.classList.add('loading');
-          navigator.geolocation.getCurrentPosition((pos) => {
-            try { centerBtn.classList.remove('loading'); const lat = pos.coords.latitude; const lng = pos.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); } catch (e) {}
-          }, (err) => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
-        } catch (e) { try { centerBtn.classList.remove('loading'); } catch (e) {} }
-      }
-    }
-
-    if (mapLoading) mapLoading.style.display = 'none'; if (mapEl) mapEl.style.display = 'block'; try { mapInstance.map.invalidateSize(); } catch (e) {};
-    setTimeout(() => { try { mapInstance.map.invalidateSize(); } catch (e) {} }, 250);
-
-    // map search wiring
-    if (mapSearchInput) {
-      let searchTimer = null;
-      mapSearchInput.addEventListener('input', (ev) => {
-        const q = (ev.target.value || '').trim();
-        if (searchTimer) clearTimeout(searchTimer);
-        if (!q) { hideMapSearchResults(); if (mapSearchResults) mapSearchResults.innerHTML = ''; return; }
-        searchTimer = setTimeout(async () => {
-          if (!mapSearchResults) return;
-          mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">Searching...</div></div>';
-          showMapSearchResults();
-          const results = await doMapSearch(q);
-          if (!results || results.length === 0) { mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">No results</div></div>'; return; }
-          mapSearchResults.innerHTML = results.map(r => `
-            <div class="result-item" data-lat="${r.center ? r.center.lat : ''}" data-lng="${r.center ? r.center.lng : ''}">
-              <div class="ri-main">
-                <span class="ri-title">${escapeHtml(r.title || '')}</span>
-                ${r.subtitle ? `<span class="ri-sub">${escapeHtml(r.subtitle)}</span>` : ''}
-              </div>
-            </div>
-          `).join('');
-          mapSearchResults.querySelectorAll('.result-item').forEach(item => {
-            item.onclick = () => {
-              const titleEl = item.querySelector('.ri-title');
-              const title = titleEl ? (titleEl.textContent || '').trim() : '';
-               try { mapSearchInput.value = title; } catch (e) {}
-               const lat = parseFloat(item.getAttribute('data-lat'));
-               const lng = parseFloat(item.getAttribute('data-lng'));
-               if (!isNaN(lat) && !isNaN(lng)) {
-                 try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
-                 try { mapInstance.setMarker([lat, lng], { draggable: true }); } catch (e) {}
-                 selectedCoords = { lat, lng };
-                 if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
-                 setLastLocation(lat, lng);
-               }
-               hideMapSearchResults();
-             };
-           });
-        }, 350);
-      });
-
-      // focus-copy behavior: only copy when user focused directly
-      let programmaticFocus = false;
-      mapSearchInput.addEventListener('focus', () => {
-        if (programmaticFocus) { programmaticFocus = false; return; }
-        try { if (!mapSearchInput.value && nameInput && nameInput.value) { mapSearchInput.value = nameInput.value; mapSearchInput.dispatchEvent(new Event('input', { bubbles: true })); } } catch (e) {}
-      });
-
-      if (mapSearchClear) {
-        mapSearchClear.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          try { mapSearchInput.value = ''; } catch (e) {}
-          try { if (mapSearchResults) mapSearchResults.innerHTML = ''; } catch (e) {}
-          hideMapSearchResults();
-          programmaticFocus = true;
-        });
+        } catch (e) { /* ignore local fetch errors and fall back to global */ }
       }
 
-      const outsideHandler = (ev) => {
-        try {
-          const t = ev.target;
-          if (mapSearchInput && mapSearchInput.contains(t)) return;
-          if (mapSearchResults && mapSearchResults.contains(t)) return;
-          hideMapSearchResults();
-        } catch (e) {}
+      // Always fetch global results so we can append worldwide options after local ones.
+      const globalUrl = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=8&language=en`;
+      let globalResults = [];
+      try {
+        const resGlobal = await fetch(globalUrl);
+        if (resGlobal && resGlobal.ok) {
+          const dataGlobal = await resGlobal.json();
+          if (dataGlobal && Array.isArray(dataGlobal.features) && dataGlobal.features.length > 0) {
+            globalResults = mapFeatures(dataGlobal.features);
+          }
+        }
+      } catch (e) { /* ignore global fetch errors */ }
+
+      // If no local results, return global only (may be empty)
+      if (!localResults || localResults.length === 0) return globalResults.slice(0, 6);
+
+      // Otherwise merge local + deduped global (local first), limit to 6 results
+      const merged = [];
+      const addToMerged = (item) => {
+        // simple dedupe by exact coords if available, otherwise by title+subtitle
+        const exists = merged.some(m => {
+          if (m.center && item.center && typeof m.center.lat === 'number' && typeof item.center.lat === 'number') {
+            return m.center.lat === item.center.lat && m.center.lng === item.center.lng;
+          }
+          return (m.title && item.title && m.title === item.title && m.subtitle === item.subtitle);
+        });
+        if (!exists) merged.push(item);
       };
-      document.addEventListener('click', outsideHandler);
-      outsideListeners.push(() => document.removeEventListener('click', outsideHandler));
-    }
+      for (const r of localResults) { if (merged.length >= 6) break; addToMerged(r); }
+      for (const g of globalResults) { if (merged.length >= 6) break; addToMerged(g); }
+      return merged;
+    } catch (e) { return []; }
   };
+
+  try {
+    mapInstance.onMapClick((latlng) => {
+      try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { draggable: true }); } catch (e) {}
+      selectedCoords = { lat: latlng.lat, lng: latlng.lng };
+      if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+    });
+
+    // when marker is dragged, update selectedCoords
+    try { if (mapInstance && typeof mapInstance.onMarkerDrag === 'function') {
+      mapInstance.onMarkerDrag((latlng) => {
+        try {
+          if (!latlng) return;
+          selectedCoords = { lat: latlng.lat, lng: latlng.lng };
+          if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+          setLastLocation(selectedCoords.lat, selectedCoords.lng);
+        } catch (e) {}
+      });
+    } } catch (e) {}
+  } catch (e) {}
+
+  if (existingCoords && existingCoords.lat && existingCoords.lng) {
+    try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { draggable: true }); } catch (e) {}
+    selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
+    try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
+    if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+  } else {
+    const last = getLastLocation();
+    if (last) { try { mapInstance.map.setView([last.lat, last.lng], 12); } catch (e) {} }
+    if (navigator && navigator.geolocation) {
+      try {
+        centerBtn.classList.add('loading');
+        navigator.geolocation.getCurrentPosition((pos) => {
+          try { centerBtn.classList.remove('loading'); const lat = pos.coords.latitude; const lng = pos.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); } catch (e) {}
+        }, (err) => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
+      } catch (e) { try { centerBtn.classList.remove('loading'); } catch (e) {} }
+    }
+  }
+
+  if (mapLoading) mapLoading.style.display = 'none'; if (mapEl) mapEl.style.display = 'block'; try { mapInstance.map.invalidateSize(); } catch (e) {};
+  setTimeout(() => { try { mapInstance.map.invalidateSize(); } catch (e) {} }, 250);
+
+  // map search wiring
+  if (mapSearchInput) {
+    let searchTimer = null;
+    mapSearchInput.addEventListener('input', (ev) => {
+      const q = (ev.target.value || '').trim();
+      if (searchTimer) clearTimeout(searchTimer);
+      if (!q) { hideMapSearchResults(); if (mapSearchResults) mapSearchResults.innerHTML = ''; return; }
+      searchTimer = setTimeout(async () => {
+        if (!mapSearchResults) return;
+        mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">Searching...</div></div>';
+        showMapSearchResults();
+        const results = await doMapSearch(q);
+        if (!results || results.length === 0) { mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">No results</div></div>'; return; }
+        mapSearchResults.innerHTML = results.map(r => `
+          <div class="result-item" data-lat="${r.center ? r.center.lat : ''}" data-lng="${r.center ? r.center.lng : ''}">
+            <div class="ri-main">
+              <span class="ri-title">${escapeHtml(r.title || '')}</span>
+              ${r.subtitle ? `<span class="ri-sub">${escapeHtml(r.subtitle)}</span>` : ''}
+            </div>
+          </div>
+        `).join('');
+        mapSearchResults.querySelectorAll('.result-item').forEach(item => {
+          item.onclick = () => {
+            const titleEl = item.querySelector('.ri-title');
+            const title = titleEl ? (titleEl.textContent || '').trim() : '';
+             try { mapSearchInput.value = title; } catch (e) {}
+             const lat = parseFloat(item.getAttribute('data-lat'));
+             const lng = parseFloat(item.getAttribute('data-lng'));
+             if (!isNaN(lat) && !isNaN(lng)) {
+               try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
+               try { mapInstance.setMarker([lat, lng], { draggable: true }); } catch (e) {}
+               selectedCoords = { lat, lng };
+               if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+               setLastLocation(lat, lng);
+             }
+             hideMapSearchResults();
+           };
+         });
+      }, 350);
+    });
+
+    // focus-copy behavior: only copy when user focused directly
+    let programmaticFocus = false;
+    mapSearchInput.addEventListener('focus', () => {
+      if (programmaticFocus) { programmaticFocus = false; return; }
+      try { if (!mapSearchInput.value && nameInput && nameInput.value) { mapSearchInput.value = nameInput.value; mapSearchInput.dispatchEvent(new Event('input', { bubbles: true })); } } catch (e) {}
+    });
+
+    if (mapSearchClear) {
+      mapSearchClear.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        try { mapSearchInput.value = ''; } catch (e) {}
+        try { if (mapSearchResults) mapSearchResults.innerHTML = ''; } catch (e) {}
+        hideMapSearchResults();
+        programmaticFocus = true;
+      });
+    }
+
+    const outsideHandler = (ev) => {
+      try {
+        const t = ev.target;
+        if (mapSearchInput && mapSearchInput.contains(t)) return;
+        if (mapSearchResults && mapSearchResults.contains(t)) return;
+        hideMapSearchResults();
+      } catch (e) {}
+    };
+    document.addEventListener('click', outsideHandler);
+    outsideListeners.push(() => document.removeEventListener('click', outsideHandler));
+  }
 
   // load place and init map
   getPlaceById(placeId).then(place => {
@@ -441,6 +437,174 @@ function openInlinePlaceEditor(tagEl, placeId) {
 
   if (saveBtn) saveBtn.addEventListener('click', onSave);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(); });
+}
+
+export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
+  if (!containerEl) return;
+  containerEl.innerHTML = `
+    <div class="place-map-filter-modal-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:10000;"></div>
+    <div class="place-map-filter-modal-content" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;box-shadow:0 4px 32px rgba(0,0,0,0.18);padding:24px 16px 16px 16px;z-index:10001;min-width:320px;max-width:95vw;max-height:90vh;overflow:auto;">
+      <button class="place-map-filter-modal-close" style="position:absolute;top:8px;right:12px;font-size:22px;background:none;border:none;cursor:pointer;">×</button>
+      <div class="place-map-filter-modal-title" style="font-size:1.2em;font-weight:600;margin-bottom:10px;">Select a Place on Map</div>
+      <div class="place-search-wrapper" style="position:relative;">
+        <input type="text" id="placeMapFilterSearchInput" class="place-search-input" placeholder="Search map (city, place, address)..." autocomplete="off" style="width:100%;margin-bottom:8px;" />
+        <div class="place-search-results hidden" id="placeMapFilterSearchResults" style="position:absolute;left:0;right:0;top:40px;z-index:10010;background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.10);max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <div style="position:relative;width:100%;height:260px;margin-bottom:8px;">
+        <div id="placeMapFilterMap" style="width:100%;height:260px;border-radius:10px;overflow:hidden;position:relative;z-index:1;"></div>
+        <button class="place-map-filter-center-btn" title="Center to my location" style="position:absolute;bottom:12px;right:12px;background:#fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.12);border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:10;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+
+  // --- Z-INDEX FIXES ---
+  // Remove previous style injection, as inline styles now handle stacking
+
+
+  // Setup map
+  const mapEl = containerEl.querySelector('#placeMapFilterMap');
+  const { createMap } = await import('./map.js');
+  let mapInstance = null;
+  let userLocation = null;
+  let marker = null;
+
+  // Center to user location
+  async function centerToUser() {
+    if (navigator.geolocation) {
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+        });
+        userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (mapInstance) mapInstance.map.setView([userLocation.lat, userLocation.lng], 13);
+      } catch (e) {}
+    }
+  }
+
+  // Initialize map
+  mapInstance = await createMap(mapEl, { zoom: 13 });
+  await centerToUser();
+
+  // Place search logic (MapTiler/Leaflet search, same as edit popup)
+  const searchInput = containerEl.querySelector('#placeMapFilterSearchInput');
+  const searchResults = containerEl.querySelector('#placeMapFilterSearchResults');
+
+  async function doMapSearch(query) {
+    if (!query) {
+      searchResults.classList.add('hidden');
+      searchResults.innerHTML = '';
+      // setZoomControlVisibility(true); // No longer needed
+      return;
+    }
+    // Use MapTiler API for geocoding
+    const { MAPTILER_API_KEY } = await import('../config.js');
+    let url = `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${MAPTILER_API_KEY}&limit=6&language=en`;
+    // Add proximity if userLocation is available
+    if (userLocation && userLocation.lat && userLocation.lng) {
+      url += `&proximity=${userLocation.lng},${userLocation.lat}`;
+    }
+    let results = [];
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.features)) {
+          results = data.features;
+        }
+      }
+    } catch (e) {}
+    if (!results || results.length === 0) {
+      searchResults.innerHTML = '<div class="place-search-empty">No results</div>';
+      searchResults.classList.remove('hidden');
+      // setZoomControlVisibility(false); // No longer needed
+      return;
+    }
+    let html = '';
+    for (const feature of results) {
+      const name = feature.properties && (feature.properties.name || feature.properties.label || feature.place_name || '');
+      const subtitle = feature.properties && (feature.properties.place_name_en || feature.properties.place_name || '');
+      html += `<div class="place-search-item" data-lat="${feature.geometry.coordinates[1]}" data-lng="${feature.geometry.coordinates[0]}">`;
+      html += `<span class="place-search-item-icon">📍</span>`;
+      html += `<span class="place-search-item-name">${name}</span>`;
+      if (subtitle && subtitle !== name) html += `<span class="place-search-item-sub">${subtitle}</span>`;
+      html += `</div>`;
+    }
+    searchResults.innerHTML = html;
+    searchResults.classList.remove('hidden');
+    // setZoomControlVisibility(false); // No longer needed
+    searchResults.querySelectorAll('.place-search-item').forEach(item => {
+      item.onclick = async () => {
+        const lat = parseFloat(item.getAttribute('data-lat'));
+        const lng = parseFloat(item.getAttribute('data-lng'));
+        if (!isNaN(lat) && !isNaN(lng)) {
+          mapInstance.map.setView([lat, lng], 15);
+          if (marker) marker.remove();
+          marker = L.marker([lat, lng]).addTo(mapInstance.map);
+        }
+        // Hide dropdown after selection
+        searchResults.classList.add('hidden');
+      };
+    });
+  }
+
+  searchInput.oninput = (e) => { doMapSearch(e.target.value.trim()); };
+  searchInput.onfocus = (e) => { if (e.target.value.trim()) doMapSearch(e.target.value.trim()); };
+
+  // Remove zoom control visibility logic
+  // searchInput.addEventListener('focus', () => setZoomControlVisibility(false));
+  // searchInput.addEventListener('blur', () => setTimeout(() => setZoomControlVisibility(true), 200));
+  // searchResults.addEventListener('mouseenter', () => setZoomControlVisibility(false));
+  // searchResults.addEventListener('mouseleave', () => setZoomControlVisibility(true));
+
+  // Center button
+  containerEl.querySelector('.place-map-filter-center-btn').onclick = async () => {
+    await centerToUser();
+  };
+
+  // Map click: select place (optional, could be extended)
+  mapInstance.map.on('click', function(e) {
+    if (onPlaceSelect) {
+      // Optionally, reverse geocode here to get a place name
+      onPlaceSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
+      closeModal();
+    }
+  });
+
+  // --- Z-INDEX FIXES ---
+  // Ensure dropdown overlays zoom controls
+  const style = document.createElement('style');
+  style.innerHTML = `
+    #placeMapFilterMap .leaflet-control-zoom {
+      z-index: 1 !important;
+    }
+    #placeMapFilterSearchResults {
+      z-index: 10 !important;
+      position: absolute !important;
+      left: 0; right: 0;
+      top: 40px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .place-search-wrapper { position: relative !important; }
+  `;
+  containerEl.appendChild(style);
+
+  // --- MODAL BACKDROP LOGIC ---
+  // Prevent backdrop click from closing parent overlays
+  const backdrop = containerEl.querySelector('.place-map-filter-modal-backdrop');
+  if (backdrop) {
+    backdrop.onclick = (e) => {
+      if (e.target === backdrop) {
+        e.stopPropagation(); // Prevent bubbling to parent overlays
+        closeModal();
+      }
+    };
+  }
 }
 
 function setupPlaceSearchListeners() {
