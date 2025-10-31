@@ -89,17 +89,57 @@ export function initSideMenu() {
   const placesNoCoordsBtn = el('placesNoCoordsBtn');
   const placesContent = el('placesContent');
 
+  // Shared function to render search and list of places
+  function renderPlacesList(places, container) {
+    container.innerHTML = '';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search places...';
+    searchInput.style = 'width:100%;padding:8px 12px;margin-bottom:12px;font-size:16px;box-sizing:border-box;border-radius:6px;border:1px solid #ccc;';
+    container.appendChild(searchInput);
+
+    const list = document.createElement('div');
+    container.appendChild(list);
+
+    function renderList(filtered) {
+      list.innerHTML = '';
+      if (!filtered.length) {
+        list.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">No places found.</div>';
+        return;
+      }
+      filtered.forEach(place => {
+        const item = document.createElement('div');
+        item.textContent = place.name || '(Unnamed)';
+        item.style = 'padding:10px 0;border-bottom:1px solid #eee;font-size:17px;';
+        list.appendChild(item);
+      });
+    }
+
+    renderList(places);
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      renderList(
+        !q ? places : places.filter(p => (p.name || '').toLowerCase().includes(q))
+      );
+    });
+  }
+
   if (allPlacesBtn) allPlacesBtn.addEventListener('click', async () => {
-    // Placeholder: show all places list
     if (placesContent) {
-      placesContent.innerHTML = '<div style="padding:24px;text-align:center;">All places list goes here.</div>';
+      placesContent.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">Loading...</div>';
+      const { getAllPlaces } = await import('../models/places.js');
+      const places = await getAllPlaces();
+      renderPlacesList(places, placesContent);
     }
   });
 
   if (placesNoCoordsBtn) placesNoCoordsBtn.addEventListener('click', async () => {
-    // Placeholder: show places without coordinates list
     if (placesContent) {
-      placesContent.innerHTML = '<div style="padding:24px;text-align:center;">Places without coordinates list goes here.</div>';
+      placesContent.innerHTML = '<div style="padding:24px;text-align:center;color:#888;">Loading...</div>';
+      const { getAllPlaces } = await import('../models/places.js');
+      const places = await getAllPlaces();
+      const noCoord = places.filter(p => !p.coordinates || typeof p.coordinates.lat !== 'number' || typeof p.coordinates.lng !== 'number');
+      renderPlacesList(noCoord, placesContent);
     }
   });
 }
