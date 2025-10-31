@@ -142,8 +142,9 @@ export async function createMap(container, opts = {}) {
     const lat = latlng.lat || (Array.isArray(latlng) ? latlng[0] : null);
     const lng = latlng.lng || (Array.isArray(latlng) ? latlng[1] : null);
     if (lat == null || lng == null) return;
+    const markerIcon = opts.icon || icon; // use custom icon if provided, else default
     if (!marker) {
-      marker = L.marker([lat, lng], { icon, draggable: opts.draggable || false }).addTo(map);
+      marker = L.marker([lat, lng], { icon: markerIcon, draggable: opts.draggable || false }).addTo(map);
       attachMarkerDrag(marker);
     } else {
       marker.setLatLng([lat, lng]);

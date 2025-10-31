@@ -31,6 +31,13 @@ function setLastLocation(lat, lng) {
 
 let placeSearchTimeout = null;
 
+// Add this utility for the custom SVG pin icon
+const customPinIcon = L.icon({
+  iconUrl: '/icons/map-pin.svg',
+  iconSize: [40, 40],
+  iconAnchor: [16, 32],
+});
+
 export async function renderPlaceSelector(containerEl, currentPlaceIds = []) {
     if (!containerEl) return;
     const html = `
@@ -141,7 +148,12 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     mapWrapper = popup.querySelector('.inline-place-map-wrapper');
     mapLoading = popup.querySelector('.inline-place-map-loading');
     mapEl = popup.querySelector('.inline-place-map');
-    centerBtn = popup.querySelector('.inline-place-map-center-btn');
+    centerBtn = document.createElement('button');
+    centerBtn.type = 'button';
+    centerBtn.className = 'inline-place-center-btn disabled';
+    centerBtn.title = 'Center to your location';
+    centerBtn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+    mapEl.parentNode.appendChild(centerBtn);
     coordsEl = popup.querySelector('.inline-place-coords');
     mapSearchInput = popup.querySelector('.inline-place-map-search');
     mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
@@ -304,7 +316,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
 
     try {
         mapInstance.onMapClick((latlng) => {
-            try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { draggable: true }); } catch (e) {}
+            try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { icon: customPinIcon, draggable: true }); } catch (e) {}
             selectedCoords = { lat: latlng.lat, lng: latlng.lng };
             if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
         });
@@ -323,7 +335,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     } catch (e) {}
 
     if (existingCoords && existingCoords.lat && existingCoords.lng) {
-        try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { draggable: true }); } catch (e) {}
+        try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { icon: customPinIcon, draggable: true }); } catch (e) {}
         selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
         try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
         if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
@@ -373,7 +385,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                         const lng = parseFloat(item.getAttribute('data-lng'));
                         if (!isNaN(lat) && !isNaN(lng)) {
                             try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
-                            try { mapInstance.setMarker([lat, lng], { draggable: true }); } catch (e) {}
+                            try { mapInstance.setMarker([lat, lng], { icon: customPinIcon, draggable: true }); } catch (e) {}
                             selectedCoords = { lat, lng };
                             if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
                             setLastLocation(lat, lng);
@@ -468,7 +480,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
       </div>
       <div style="position:relative;width:100%;height:260px;margin-bottom:8px;">
         <div id="placeMapFilterMap" style="width:100%;height:260px;border-radius:10px;overflow:hidden;position:relative;z-index:1;"></div>
-        <button class="place-map-filter-center-btn" title="Center to my location" style="position:absolute;bottom:12px;right:12px;background:#fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.12);border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:10;">
+        <button class="place-map-filter-center-btn" title="Center to my location" style="position:absolute;bottom:12px;left:12px;background:#fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.12);border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:10;">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>

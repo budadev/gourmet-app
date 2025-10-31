@@ -28,6 +28,13 @@ function setLastLocation(lat, lng) {
 
 let placeSearchTimeout = null;
 
+// Add this utility for the custom SVG pin icon
+const customPinIcon = L.icon({
+  iconUrl: '/icons/map-pin.svg',
+  iconSize: [40, 40],
+  iconAnchor: [16, 32],
+});
+
 export async function renderPlaceSelector(containerEl, currentPlaceIds = []) {
   if (!containerEl) return;
   const html = `
@@ -137,7 +144,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
   const centerBtn = document.createElement('button');
   centerBtn.type = 'button'; centerBtn.className = 'inline-place-center-btn disabled';
   centerBtn.title = 'Center to your location';
-  centerBtn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="var(--primary)" stroke-width="1.6" fill="none"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  centerBtn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
   try { if (mapWrapper) mapWrapper.appendChild(centerBtn); else popup.appendChild(centerBtn); } catch (e) {}
 
   const initMapIfNeeded = async (existingCoords) => {
@@ -295,7 +302,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
 
     try {
       mapInstance.onClick((latlng) => {
-        try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { draggable: true }); } catch (e) {}
+        try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { icon: customPinIcon, draggable: true }); } catch (e) {}
         selectedCoords = { lat: latlng.lat, lng: latlng.lng };
         if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
       });
@@ -314,7 +321,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
     } catch (e) {}
 
     if (existingCoords && existingCoords.lat && existingCoords.lng) {
-      try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { draggable: true }); } catch (e) {}
+      try { mapInstance.setMarker([existingCoords.lat, existingCoords.lng], { icon: customPinIcon, draggable: true }); } catch (e) {}
       selectedCoords = { lat: existingCoords.lat, lng: existingCoords.lng };
       try { mapInstance.map.setView([existingCoords.lat, existingCoords.lng], 13); } catch (e) {}
       if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
@@ -364,7 +371,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
               const lng = parseFloat(item.getAttribute('data-lng'));
               if (!isNaN(lat) && !isNaN(lng)) {
                 try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
-                try { mapInstance.setMarker([lat, lng], { draggable: true }); } catch (e) {}
+                try { mapInstance.setMarker([lat, lng], { icon: customPinIcon, draggable: true }); } catch (e) {}
                 selectedCoords = { lat, lng };
                 if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
                 setLastLocation(lat, lng);
