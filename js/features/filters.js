@@ -311,7 +311,7 @@ async function renderPlaceSearch(container) {
         mapModalContent = null;
       }
     }
-    import('../components/placeSelector.js').then(({ renderPlaceMapFilterModal }) => {
+    import('../components/placeMapFilter.js').then(({ renderPlaceMapFilterModal }) => {
       renderPlaceMapFilterModal(mapModalContent, async (selection) => {
         if (selection && selection.type === 'place' && selection.placeId) {
           await applyPlaceFilter(selection.placeId);

@@ -11,7 +11,7 @@ import { getConfig, getTypeInfo } from '../config.js';
 import { addPairing, removePairing } from '../models/pairings.js';
 import { openPairingSelector, setCurrentPairings, getCurrentPairings } from './pairingSelector.js';
 import { startScanForInput } from './scanner.js';
-import { renderPlaceSelector } from '../components/placeSelector.js';
+import { renderPlaceSelector } from '../components/placeEditor.js';
 import { setCurrentPlaces, getCurrentPlaces, invalidatePlaceUsageCache } from '../models/places.js';
 
 let currentEditingId = null;

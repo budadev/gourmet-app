@@ -9,7 +9,7 @@ import { openModal, closeModal } from '../components/modal.js';
 import { showPhotoModal, blobToDataURL } from '../components/photos.js';
 import { getTypeInfo } from '../config.js';
 import { cleanupPairingsOnDelete } from '../models/pairings.js';
-import { renderPlacesInDetails } from '../components/placeSelector.js';
+import { renderPlacesInDetails } from '../components/placeEditor.js';
 import { invalidatePlaceUsageCache } from '../models/places.js';
 
 export async function showItemDetails(id, onEdit, onDelete) {
