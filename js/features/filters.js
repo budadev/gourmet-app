@@ -316,7 +316,48 @@ async function renderPlaceSearch(container) {
         if (selection && selection.type === 'place' && selection.placeId) {
           await applyPlaceFilter(selection.placeId);
         }
-        // If area selection, do nothing for now (can be handled in the future)
+        // Handle area selection: add all places with coordinates in the area
+        if (selection && selection.type === 'area' && selection.center && selection.radius) {
+          const { getAllPlaces } = await import('../models/places.js');
+          const allPlaces = await getAllPlaces();
+          const center = selection.center;
+          const radius = selection.radius; // in meters
+          // Haversine formula for distance between two lat/lng points
+          function getDistanceMeters(lat1, lng1, lat2, lng2) {
+            const R = 6371000; // Earth radius in meters
+            const toRad = x => x * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+          }
+          // Collect all matching place IDs, log all checked places
+          const matchingPlaces = [];
+          allPlaces.forEach(place => {
+            const coords = place.coordinates;
+            if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number') {
+              const dist = getDistanceMeters(center.lat, center.lng, coords.lat, coords.lng);
+              if (dist <= radius) {
+                matchingPlaces.push(place);
+              } else {
+              }
+            } else {
+            }
+          });
+          const matchingPlaceIds = matchingPlaces.map(place => place.id);
+          if (matchingPlaces.length > 0) {
+            matchingPlaces.forEach(place => {
+              const coords = place.coordinates;
+            });
+          }
+          // Set as current filters
+          currentFilters.places = matchingPlaceIds;
+          await renderSelectedPlaces();
+          triggerFilterChange();
+        }
         closeMapModal();
       });
     });
