@@ -542,7 +542,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
                     lng = place.coordinates.lng;
                 }
                 if (lat !== null && lng !== null) {
-                    L.marker([lat, lng]).addTo(mapInstance.map);
+                    L.marker([lat, lng], { icon: customPinIcon }).addTo(mapInstance.map);
                 }
             });
         }
