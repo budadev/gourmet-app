@@ -188,6 +188,26 @@ async function initApp() {
     }
   };
 
+  // Places modal navigation logic
+  el('allPlacesBtn')?.addEventListener('click', () => {
+    el('placesModal').classList.remove('active');
+    el('allPlacesModal').classList.add('active');
+    renderAllPlacesList();
+  });
+  el('placesNoCoordsBtn')?.addEventListener('click', () => {
+    el('placesModal').classList.remove('active');
+    el('placesNoCoordsModal').classList.add('active');
+    renderPlacesNoCoordsList();
+  });
+  el('backAllPlacesBtn')?.addEventListener('click', () => {
+    el('allPlacesModal').classList.remove('active');
+    el('placesModal').classList.add('active');
+  });
+  el('backPlacesNoCoordsBtn')?.addEventListener('click', () => {
+    el('placesNoCoordsModal').classList.remove('active');
+    el('placesModal').classList.add('active');
+  });
+
   // Initialize photo modal with iOS-style controls and gestures
   initPhotoModal();
 
@@ -237,6 +257,16 @@ function hideLoader() {
       loader.remove();
     }, 400);
   }
+}
+
+// Outside initApp(), add placeholder renderers:
+function renderAllPlacesList() {
+  const container = document.getElementById('allPlacesContent');
+  container.innerHTML = '<div class="muted">All places list goes here.</div>';
+}
+function renderPlacesNoCoordsList() {
+  const container = document.getElementById('placesNoCoordsContent');
+  container.innerHTML = '<div class="muted">Places without coordinates list goes here.</div>';
 }
 
 // Initialize the app
