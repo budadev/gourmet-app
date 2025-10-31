@@ -77,6 +77,16 @@ export function generatePhotoId() {
   return `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Convert File to data URL
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // Capture photo using camera
 export async function capturePhoto() {
   return new Promise((resolve, reject) => {
