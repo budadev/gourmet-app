@@ -8,7 +8,7 @@
 */
 
 import { escapeHtml, el } from '../utils.js';
-import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
+import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel, listAllPlaces } from '../models/places.js';
 import { createMap } from './map.js';
 import { MAPTILER_API_KEY } from '../config.js';
 import { closeModal } from './modal.js';
@@ -514,6 +514,29 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
 
     mapInstance = await createMap(mapEl, { zoom: 13 });
     await centerToUser();
+
+    // Add pins for all saved locations
+    try {
+        const allPlaces = await listAllPlaces();
+        console.log('[MapFilter] Places fetched for pins:', allPlaces);
+        if (Array.isArray(allPlaces)) {
+            allPlaces.forEach(place => {
+                let lat = null, lng = null;
+                if (place && typeof place.lat === 'number' && typeof place.lng === 'number') {
+                    lat = place.lat;
+                    lng = place.lng;
+                } else if (place && place.coordinates && typeof place.coordinates.lat === 'number' && typeof place.coordinates.lng === 'number') {
+                    lat = place.coordinates.lat;
+                    lng = place.coordinates.lng;
+                }
+                if (lat !== null && lng !== null) {
+                    L.marker([lat, lng]).addTo(mapInstance.map);
+                }
+            });
+        }
+    } catch (e) {
+        console.error('[MapFilter] Error adding place pins:', e);
+    }
 
     // Area select: click to set center, draw circle
     mapInstance.onClick((latlng) => {

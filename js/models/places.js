@@ -2,7 +2,7 @@
    Places Management
    ============================= */
 
-import { addPlace, getPlace, searchPlacesByText, listAllPlaces, listAll, updatePlace as dbUpdatePlace } from '../db.js';
+import { addPlace, getPlace, searchPlacesByText, listAllPlaces as dbListAllPlaces, listAll, updatePlace as dbUpdatePlace } from '../db.js';
 
 let currentPlaces = []; // Current places selected for an item
 
@@ -111,7 +111,7 @@ export async function searchPlaces(query) {
  * Get all places (sorted by usage desc, then name)
  */
 export async function getAllPlaces() {
-  const places = await listAllPlaces();
+  const places = await dbListAllPlaces();
   const usageCounts = await getPlaceUsageCounts();
   return sortPlacesByUsage(places, usageCounts);
 }
@@ -134,3 +134,5 @@ export async function updatePlace(id, patch) {
 export async function getPlacesUsageMap() {
   return await getPlaceUsageCounts();
 }
+
+export { dbListAllPlaces as listAllPlaces };
