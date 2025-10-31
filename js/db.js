@@ -332,3 +332,45 @@ export async function deletePhotosByItemId(itemId) {
   const promises = photos.map(photo => deletePhoto(photo.id));
   await Promise.all(promises);
 }
+
+// Utility: Get all object store names
+export async function getAllStoreNames() {
+  const db = await initDb();
+  return Array.from(db.objectStoreNames);
+}
+
+// Utility: Get all data from a given store
+export async function getAllFromStore(storeName) {
+  const db = await initDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// Utility: Add multiple records to a store
+export async function bulkAddToStore(storeName, records) {
+  if (!Array.isArray(records)) return;
+  const db = await initDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    let count = 0;
+    for (const rec of records) {
+      // Remove id if autoIncrement is true (for items/places)
+      const { id, ...recNoId } = rec;
+      try {
+        store.add(recNoId);
+        count++;
+      } catch (e) {
+        // fallback: try with id
+        try { store.add(rec); count++; } catch (e2) { /* skip */ }
+      }
+    }
+    tx.oncomplete = () => resolve(count);
+    tx.onerror = () => reject(tx.error);
+  });
+}
