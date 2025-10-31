@@ -19,6 +19,8 @@ function getLastLocation() {
         const raw = localStorage.getItem(LAST_LOCATION_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
+        // Re-enable swipe gestures when popup closes
+        if (window.enableSwipeGestures) window.enableSwipeGestures();
         if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') return { lat: parsed.lat, lng: parsed.lng };
     } catch (e) {}
     return null;
@@ -88,8 +90,17 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     // ensure only one editor at a time
     const existing = document.querySelector('.inline-place-backdrop'); if (existing) existing.remove();
 
+    // Disable swipe gestures while popup is open
+    if (window.disableSwipeGestures) window.disableSwipeGestures();
+
     const backdrop = document.createElement('div'); backdrop.className = 'inline-place-backdrop';
     const popup = document.createElement('div'); popup.className = 'inline-place-editor'; popup.setAttribute('data-place-id', placeId);
+
+    // Prevent swipe/touch gestures from propagating to the document
+    ['touchstart', 'touchmove', 'touchend'].forEach(evt => {
+        backdrop.addEventListener(evt, function(e) { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+        popup.addEventListener(evt, function(e) { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+    });
 
     // Declare missing variables
     let mapInstance = null;
@@ -442,6 +453,8 @@ async function openInlinePlaceEditor(tagEl, placeId) {
 
 export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     if (!containerEl) return;
+    // Disable swipe gestures while modal is open
+    if (window.disableSwipeGestures) window.disableSwipeGestures();
     // Define non-linear radius steps (in meters)
     const radiusSteps = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 40000, 50000, 75000, 100000];
     containerEl.innerHTML = `
@@ -649,6 +662,8 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
                 // Remove modal from DOM
                 containerEl.innerHTML = '';
                 document.body.classList.remove('no-scroll');
+                // Re-enable swipe gestures
+                if (window.enableSwipeGestures) window.enableSwipeGestures();
             }
         };
     }
@@ -659,8 +674,17 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
             e.preventDefault();
             containerEl.innerHTML = '';
             document.body.classList.remove('no-scroll');
+            // Re-enable swipe gestures
+            if (window.enableSwipeGestures) window.enableSwipeGestures();
         };
     }
+
+    // Also re-enable swipe gestures if modal is closed programmatically (e.g., after area select)
+    const originalInnerHTML = containerEl.innerHTML;
+    const observer = new MutationObserver(() => {
+        if (containerEl.innerHTML === '' && window.enableSwipeGestures) window.enableSwipeGestures();
+    });
+    observer.observe(containerEl, { childList: true });
 
     // After setting innerHTML, adjust the slider labels for perfect alignment
     const sliderLabels = containerEl.querySelector('#radius-slider-labels');

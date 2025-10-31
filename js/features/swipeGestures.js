@@ -5,6 +5,9 @@
 /**
  * Swipe gesture handler for opening/closing side menu and filter panel
  */
+let swipeGesturesEnabled = false;
+let touchStartHandler, touchMoveHandler, touchEndHandler;
+
 export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPanelFn, closeFilterPanelFn) {
   let touchStartX = 0;
   let touchStartY = 0;
@@ -21,6 +24,13 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
     return !!document.querySelector('.modal.active');
   }
 
+  // Helper: check if event target is inside map popup or backdrop
+  function isEventFromMapPopup(e) {
+    const popup = document.querySelector('.inline-place-editor');
+    const backdrop = document.querySelector('.inline-place-backdrop');
+    return (popup && popup.contains(e.target)) || (backdrop && backdrop.contains(e.target));
+  }
+
   function resetTracking() {
     touchStartX = 0;
     touchStartY = 0;
@@ -30,7 +40,7 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   }
 
   function handleTouchStart(e) {
-    if (gesturesDisabled()) return; // Ignore while modal open
+    if (gesturesDisabled() || isEventFromMapPopup(e)) return; // Ignore while modal or popup open
     // Only capture single touch
     if (e.touches.length !== 1) return;
 
@@ -40,7 +50,7 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   }
 
   function handleTouchMove(e) {
-    if (gesturesDisabled()) { resetTracking(); return; }
+    if (gesturesDisabled() || isEventFromMapPopup(e)) { resetTracking(); return; }
     if (!touchStartX) return;
 
     touchEndX = e.touches[0].clientX;
@@ -56,7 +66,7 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   }
 
   function handleTouchEnd(e) {
-    if (gesturesDisabled()) { resetTracking(); return; }
+    if (gesturesDisabled() || isEventFromMapPopup(e)) { resetTracking(); return; }
     if (!isSwiping) { resetTracking(); return; }
 
     const deltaX = touchEndX - touchStartX;
@@ -103,8 +113,29 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
     }
   }
 
-  // Add event listeners to document body
-  document.body.addEventListener('touchstart', handleTouchStart, { passive: true });
-  document.body.addEventListener('touchmove', handleTouchMove, { passive: true });
-  document.body.addEventListener('touchend', handleTouchEnd, { passive: true });
+  touchStartHandler = handleTouchStart;
+  touchMoveHandler = handleTouchMove;
+  touchEndHandler = handleTouchEnd;
+
+  enableSwipeGestures();
+
+  // Expose enable/disable globally for popup logic
+  window.enableSwipeGestures = enableSwipeGestures;
+  window.disableSwipeGestures = disableSwipeGestures;
+
+  function enableSwipeGestures() {
+    if (swipeGesturesEnabled) return;
+    document.body.addEventListener('touchstart', touchStartHandler, { passive: true });
+    document.body.addEventListener('touchmove', touchMoveHandler, { passive: true });
+    document.body.addEventListener('touchend', touchEndHandler, { passive: true });
+    swipeGesturesEnabled = true;
+  }
+
+  function disableSwipeGestures() {
+    if (!swipeGesturesEnabled) return;
+    document.body.removeEventListener('touchstart', touchStartHandler, { passive: true });
+    document.body.removeEventListener('touchmove', touchMoveHandler, { passive: true });
+    document.body.removeEventListener('touchend', touchEndHandler, { passive: true });
+    swipeGesturesEnabled = false;
+  }
 }
