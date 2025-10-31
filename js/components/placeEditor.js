@@ -294,7 +294,7 @@ function openInlinePlaceEditor(tagEl, placeId) {
     };
 
     try {
-      mapInstance.onMapClick((latlng) => {
+      mapInstance.onClick((latlng) => {
         try { if (mapInstance && typeof mapInstance.setMarker === 'function') mapInstance.setMarker(latlng, { draggable: true }); } catch (e) {}
         selectedCoords = { lat: latlng.lat, lng: latlng.lng };
         if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
