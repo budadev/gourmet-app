@@ -139,13 +139,12 @@ async function handleImportFile(event) {
   event.target.value = '';
 
   try {
-    const text = await file.text();
-    await importData(text);
-    showNotification('\u2713 Import complete! All tables imported.', 'success');
+    await importData(file); // Pass File directly for ZIP/JSON support
+    showNotification('\u2713 Import complete! All tables and photos imported (ZIP/JSON).', 'success');
     window.dispatchEvent(new CustomEvent('data-imported'));
   } catch (error) {
     console.error('Import error:', error);
-    showNotification('\u2717 Failed to import data. Please check the file format.', 'error');
+    showNotification('\u2717 Failed to import data. Please check the ZIP or JSON file format.', 'error');
   }
 }
 

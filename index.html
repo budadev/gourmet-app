@@ -173,7 +173,7 @@ How to use:
 </nav>
 
 <!-- File input for import -->
-<input type="file" id="importFileInput" class="hidden-file-input" accept=".json" />
+<input type="file" id="importFileInput" class="hidden-file-input" accept=".zip,application/zip,application/json,.json" />
 
 <!-- About Dialog -->
 <div class="about-dialog" id="aboutDialog">
@@ -475,6 +475,8 @@ How to use:
 <!-- Quagga2 Barcode Scanner Library -->
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 
+<!-- JSZip for ZIP export/import -->
+<script src="js/external/JSZip.min.js"></script>
 <!-- Main Application JavaScript Module -->
 <script type="module" src="js/app.js"></script>
 </body>

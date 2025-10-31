@@ -2,18 +2,20 @@
    Data Import/Export Manager
    ============================= */
 
+const JSZip = window.JSZip;
+
 import { listAll, addItem, savePhoto, getPhoto, getAllStoreNames, getAllFromStore, bulkAddToStore } from './db.js';
 import { dataURLToBlob, createThumbnail, generatePhotoId, blobToDataURL } from './components/photos.js';
 
 /**
- * Export all data from IndexedDB to a JSON file (dynamic, all tables)
+ * Export all data from IndexedDB to a ZIP file (JSON + photos)
  */
 export async function exportAllData() {
   try {
     // Get all store names
     const storeNames = await getAllStoreNames();
     const exportData = {
-      version: '3.0', // New dynamic export version
+      version: '3.1', // New export version with ZIP/photos
       exportDate: new Date().toISOString(),
       stores: {}
     };
@@ -21,23 +23,39 @@ export async function exportAllData() {
     for (const storeName of storeNames) {
       exportData.stores[storeName] = await getAllFromStore(storeName);
     }
-    // Convert to JSON
+    // Prepare ZIP
+    const zip = new JSZip();
+    // Add JSON data
     const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    // Create download link
-    const url = URL.createObjectURL(blob);
+    zip.file('data.json', jsonString);
+    // Add photos (if any)
+    if (exportData.stores.photos && Array.isArray(exportData.stores.photos)) {
+      for (const photo of exportData.stores.photos) {
+        if (photo && photo.id) {
+          try {
+            const blob = await getPhoto(photo.id);
+            if (blob) {
+              zip.file(`photos/${photo.id}`, blob);
+            }
+          } catch (err) {
+            console.warn('Could not export photo', photo.id, err);
+          }
+        }
+      }
+    }
+    // Generate ZIP and trigger download
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `gourmetapp-export-${timestamp}.json`;
-    // Trigger download
+    const filename = `gourmetapp-export-${timestamp}.zip`;
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // Clean up
     setTimeout(() => URL.revokeObjectURL(url), 100);
-    console.log(`Exported all tables to ${filename}`);
+    console.log(`Exported all tables and photos to ${filename}`);
     return true;
   } catch (err) {
     console.error('Export failed:', err);
@@ -46,9 +64,8 @@ export async function exportAllData() {
 }
 
 /**
- * Import data from a JSON file into IndexedDB (dynamic, all tables)
- * Accepts file content (string) or a File object. If not provided, opens file dialog (for backward compatibility).
- * Merges with existing data (doesn't overwrite)
+ * Import data from a ZIP file (JSON + photos) into IndexedDB
+ * Accepts File/Blob (ZIP) or string (legacy JSON)
  */
 export async function importData(fileOrContent) {
   // If no argument, open file dialog (legacy usage)
@@ -56,7 +73,7 @@ export async function importData(fileOrContent) {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'application/json,.json';
+      input.accept = '.zip,application/zip,application/json,.json';
       input.onchange = async (e) => {
         try {
           const file = e.target.files[0];
@@ -64,8 +81,7 @@ export async function importData(fileOrContent) {
             resolve(null);
             return;
           }
-          const text = await file.text();
-          await importData(text);
+          await importData(file);
           resolve({ imported: true });
         } catch (err) {
           reject(err);
@@ -76,19 +92,61 @@ export async function importData(fileOrContent) {
       document.body.removeChild(input);
     });
   }
-  // If argument is a File, read as text
-  if (fileOrContent instanceof File) {
-    const text = await fileOrContent.text();
-    return importData(text);
+  // If argument is a File or Blob, check if ZIP or JSON
+  if (fileOrContent instanceof File || fileOrContent instanceof Blob) {
+    const isZip = fileOrContent.type === 'application/zip' || fileOrContent.name?.endsWith('.zip');
+    if (isZip) {
+      // ZIP import
+      const zip = await JSZip.loadAsync(fileOrContent);
+      // Find data.json
+      const jsonFile = zip.file('data.json');
+      if (!jsonFile) throw new Error('ZIP missing data.json');
+      const jsonString = await jsonFile.async('string');
+      const importDataObj = JSON.parse(jsonString);
+      // Import JSON data
+      let totalImported = 0;
+      for (const [storeName, records] of Object.entries(importDataObj.stores)) {
+        if (storeName === 'photos') continue; // Handle photos separately
+        if (Array.isArray(records) && records.length > 0) {
+          try {
+            const count = await bulkAddToStore(storeName, records);
+            totalImported += count || 0;
+          } catch (err) {
+            console.warn(`Could not import to store ${storeName}:`, err);
+          }
+        }
+      }
+      // Import photos
+      if (importDataObj.stores.photos && Array.isArray(importDataObj.stores.photos)) {
+        for (const photo of importDataObj.stores.photos) {
+          if (photo && photo.id) {
+            const photoFile = zip.file(`photos/${photo.id}`);
+            if (photoFile) {
+              const blob = await photoFile.async('blob');
+              try {
+                await savePhoto(photo.id, blob);
+              } catch (err) {
+                console.warn('Could not import photo', photo.id, err);
+              }
+            }
+          }
+        }
+      }
+      console.log(`Imported data and photos from ZIP. Total records imported: ${totalImported}`);
+      return { imported: totalImported };
+    } else {
+      // JSON import (legacy)
+      const text = await fileOrContent.text();
+      return importData(text);
+    }
   }
-  // Otherwise, treat as string content
+  // Otherwise, treat as string content (legacy JSON)
   try {
     const importDataObj = JSON.parse(fileOrContent);
     if (!importDataObj.stores || typeof importDataObj.stores !== 'object') {
       throw new Error('Invalid import file format');
     }
     let totalImported = 0;
-    // For each store in the import, bulk add records
     for (const [storeName, records] of Object.entries(importDataObj.stores)) {
       if (Array.isArray(records) && records.length > 0) {
         try {
