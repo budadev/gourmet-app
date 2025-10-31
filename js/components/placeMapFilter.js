@@ -113,7 +113,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     let mapInstance = null;
     let selectedCoords = null;
     let existingCoords = null;
-    let mapWrapper = null;
     let mapLoading = null;
     let mapEl = null;
     let centerBtn = null;
@@ -150,16 +149,34 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     mapEl = popup.querySelector('.inline-place-map');
     centerBtn = document.createElement('button');
     centerBtn.type = 'button';
-    centerBtn.className = 'inline-place-center-btn disabled';
+    centerBtn.className = 'inline-place-center-btn';
     centerBtn.title = 'Center to your location';
+    // Use SVG without inline stroke, let CSS handle color
     centerBtn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
-    mapEl.parentNode.appendChild(centerBtn);
-    coordsEl = popup.querySelector('.inline-place-coords');
-    mapSearchInput = popup.querySelector('.inline-place-map-search');
-    mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
-    mapSearchResults = popup.querySelector('.inline-place-map-search-results');
-    nameInput = popup.querySelector('.inline-place-input');
-    saveBtn = popup.querySelector('.inline-place-save');
+    // Ensure the map wrapper is relatively positioned
+    const mapWrapper = mapEl.parentNode;
+    if (mapWrapper && getComputedStyle(mapWrapper).position === 'static') {
+        mapWrapper.style.position = 'relative';
+    }
+    mapWrapper.appendChild(centerBtn);
+    // Update icon color if geolocation changes (optional, for dynamic UX)
+    if (navigator && navigator.permissions && navigator.permissions.query) {
+        try {
+            navigator.permissions.query({ name: 'geolocation' }).then(function (result) {
+                function updateIcon() {
+                    const available = result.state === 'granted' || result.state === 'prompt';
+                    const color = available ? '#007aff' : '#222';
+                    centerBtn.innerHTML = `<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"${color}\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"6\"/><line x1=\"12\" y1=\"18\" x2=\"12\" y2=\"22\"/><line x1=\"2\" y1=\"12\" x2=\"6\" y2=\"12\"/><line x1=\"18\" y1=\"12\" x2=\"22\" y2=\"12\"/></svg>`;
+                }
+                updateIcon();
+                result.onchange = updateIcon;
+            });
+        } catch (e) {}
+    }
+    // Attach click handler
+    centerBtn.onclick = async () => {
+        await centerToUser();
+    };
 
     // JS code must be outside the template string
     if (mapWrapper) mapWrapper.style.display = 'block';
@@ -176,8 +193,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
 
     mapInstance = await createMap(mapEl, { center: initialCenter, zoom: 12 });
 
-    const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
-    if (geoAvailable) centerBtn.classList.remove('disabled'); else centerBtn.classList.add('disabled');
 
     // Try geolocation once for better search proximity if we don't already have a last location
     let geoRequested = false;
@@ -480,8 +495,8 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
       </div>
       <div style="position:relative;width:100%;height:260px;margin-bottom:8px;">
         <div id="placeMapFilterMap" style="width:100%;height:260px;border-radius:10px;overflow:hidden;position:relative;z-index:1;"></div>
-        <button class="place-map-filter-center-btn" title="Center to my location" style="position:absolute;bottom:12px;left:12px;background:#fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.12);border:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:10;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        <button id="placeMapFilterCenterBtn" class="inline-place-center-btn" type="button" title="Center to your location" style="position:absolute;bottom:12px;left:12px;z-index:14001;display:flex;align-items:center;justify-content:center;padding:4px 4px;border-radius:8px;background:#fff;border:1px solid #e0e0e0;box-shadow:0 2px 8px rgba(0,0,0,0.10);">
+          <svg id="placeMapFilterCenterIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>
       <div id="placeMapFilterRadiusSliderWrapper" style="margin-bottom:16px;text-align:center;">
@@ -530,7 +545,6 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     // Add pins for all saved locations
     try {
         const allPlaces = await listAllPlaces();
-        console.log('[MapFilter] Places fetched for pins:', allPlaces);
         if (Array.isArray(allPlaces)) {
             allPlaces.forEach(place => {
                 let lat = null, lng = null;
@@ -649,10 +663,6 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     searchInput.oninput = (e) => { doMapSearch(e.target.value.trim()); };
     searchInput.onfocus = (e) => { if (e.target.value.trim()) doMapSearch(e.target.value.trim()); };
 
-    // Center button
-    containerEl.querySelector('.place-map-filter-center-btn').onclick = async () => {
-        await centerToUser();
-    };
 
     // Select Area button logic
     selectAreaBtn.onclick = () => {
@@ -735,6 +745,28 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
             labels[3].style.textAlign = 'right';
         }
     }
+
+    // Update center button icon color based on geolocation
+    const centerBtn = containerEl.querySelector('#placeMapFilterCenterBtn');
+    const centerIcon = containerEl.querySelector('#placeMapFilterCenterIcon');
+    function updateCenterIconColor() {
+      const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
+      if (centerIcon) centerIcon.setAttribute('stroke', geoAvailable ? '#007aff' : '#222');
+    }
+    updateCenterIconColor();
+    if (navigator && navigator.permissions && navigator.permissions.query) {
+      try {
+        navigator.permissions.query({ name: 'geolocation' }).then(function (result) {
+          function updateIcon() {
+            const available = result.state === 'granted' || result.state === 'prompt';
+            if (centerIcon) centerIcon.setAttribute('stroke', available ? '#007aff' : '#222');
+          }
+          updateIcon();
+          result.onchange = updateIcon;
+        });
+      } catch (e) {}
+    }
+    if (centerBtn) centerBtn.onclick = async () => { await centerToUser(); };
 }
 
 function setupPlaceSearchListeners() {
