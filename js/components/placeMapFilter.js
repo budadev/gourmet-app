@@ -8,7 +8,7 @@
 */
 
 import { escapeHtml, el } from '../utils.js';
-import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel, listAllPlaces } from '../models/places.js';
+import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace, listAllPlaces } from '../models/places.js';
 import { createMap } from './map.js';
 import { MAPTILER_API_KEY } from '../config.js';
 import { closeModal } from './modal.js';
@@ -66,10 +66,21 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
     for (const id of placeIds) {
         const place = await getPlaceById(id);
         if (!place) continue;
-        html += `<div class="place-tag" data-place-id="${id}">`;
+
+        // Check if this place is currently loading location
+        const isLoading = place._loadingLocation === true;
+
+        html += `<div class="place-tag ${isLoading ? 'loading-location' : ''}" data-place-id="${id}">`;
         html += `<span class="place-tag-icon" data-action="edit">📍</span>`;
         html += `<span class="place-tag-name" data-action="edit">${escapeHtml(place.name)}</span>`;
-        html += `<button class="place-tag-remove" data-place-id="${id}" type="button">×</button>`;
+
+        if (isLoading) {
+            // Show spinner instead of remove button while loading
+            html += `<span class="place-tag-spinner"></span>`;
+        } else {
+            html += `<button class="place-tag-remove" data-place-id="${id}" type="button">×</button>`;
+        }
+
         html += `</div>`;
     }
     html += '</div>';
@@ -468,7 +479,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
         try {
             const patch = { name: newName };
             if (selectedCoords && typeof selectedCoords.lat === 'number' && typeof selectedCoords.lng === 'number') patch.coordinates = { lat: selectedCoords.lat, lng: selectedCoords.lng };
-            await updatePlaceModel(placeId, patch);
+            await updatePlace(placeId, patch);
             const nameEl = tagEl.querySelector('.place-tag-name'); if (nameEl) nameEl.textContent = newName;
             cleanup();
         } catch (e) { console.error('Failed to update place', e); }
@@ -784,7 +795,47 @@ function setupPlaceSearchListeners() {
     const outsideHandler = (e) => { if (!e.target.closest('.place-search-wrapper') && !e.target.closest('.place-search-results')) resultsContainer.classList.add('hidden'); };
     document.addEventListener('click', outsideHandler);
 
-    addBtn.addEventListener('click', async () => { const placeName = searchInput.value.trim(); if (!placeName) return; const placeId = await getOrCreatePlace(placeName); if (placeId) { addCurrentPlace(placeId); await renderSelectedPlaces(); searchInput.value = ''; addBtn.classList.add('hidden'); resultsContainer.classList.add('hidden'); } });
+    addBtn.addEventListener('click', async () => {
+        const placeName = searchInput.value.trim();
+        if (!placeName) return;
+
+        const result = await getOrCreatePlace(placeName);
+        if (result) {
+            const placeId = result.placeId || result; // Handle both old format (just ID) and new format ({placeId, loadingLocation})
+            const loadingLocation = result.loadingLocation || false;
+
+            addCurrentPlace(placeId);
+
+            // Mark place as loading if location is being fetched
+            if (loadingLocation) {
+                const place = await getPlaceById(placeId);
+                if (place) {
+                    place._loadingLocation = true;
+                    await updatePlace(placeId, place); // Store the loading state
+                }
+            }
+
+            await renderSelectedPlaces();
+            searchInput.value = '';
+            addBtn.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+        }
+    });
+
+    // Listen for location update events to refresh the UI
+    const locationUpdateHandler = async (event) => {
+        if (event.detail && event.detail.placeId) {
+            const place = await getPlaceById(event.detail.placeId);
+            if (place) {
+                place._loadingLocation = false;
+                await updatePlace(event.detail.placeId, place);
+                await renderSelectedPlaces();
+            }
+        }
+    };
+
+    window.addEventListener('place-location-updated', locationUpdateHandler);
+    window.addEventListener('place-location-failed', locationUpdateHandler);
 }
 
 async function renderSearchResults(results, query) {

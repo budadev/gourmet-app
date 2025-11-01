@@ -24,6 +24,7 @@ export function removeCurrentPlace(placeId) {
   currentPlaces = currentPlaces.filter(id => id !== placeId);
 }
 
+
 /**
  * Internal: cache for place usage counts to avoid recomputing too often.
  */
@@ -73,9 +74,71 @@ export function invalidatePlaceUsageCache() {
 }
 
 /**
+ * Get user's current location
+ * Returns { lat, lng } or null if unavailable
+ */
+async function getCurrentLocation() {
+  if (!navigator || !navigator.geolocation) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    let handled = false;
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!handled) {
+            handled = true;
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          }
+        },
+        (error) => {
+          if (!handled) {
+            handled = true;
+            resolve(null);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } catch (e) {
+      if (!handled) {
+        handled = true;
+        resolve(null);
+      }
+    }
+
+    // Fallback timeout
+    setTimeout(() => {
+      if (!handled) {
+        handled = true;
+        resolve(null);
+      }
+    }, 5200);
+  });
+}
+
+/**
+ * Check if auto-add location setting is enabled
+ */
+function shouldAutoAddLocation() {
+  try {
+    const value = localStorage.getItem('placesDefaultLocation');
+    const enabled = value === 'true';
+    return enabled;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Get or create a place by name
  * If the place exists, return its ID
  * If not, create it and return the new ID
+ * If auto-add location is enabled, add current location to new places (async)
+ * Returns { placeId, loadingLocation: boolean }
  */
 export async function getOrCreatePlace(placeName) {
   if (!placeName || !placeName.trim()) return null;
@@ -89,13 +152,46 @@ export async function getOrCreatePlace(placeName) {
   );
 
   if (exactMatch) {
-    return exactMatch.id;
+    return { placeId: exactMatch.id, loadingLocation: false };
   }
 
   // Create new place
-  const newPlaceId = await addPlace({ name: trimmedName });
+  const placeData = { name: trimmedName };
+
+  // Check if we should auto-add current location
+  const autoAddEnabled = shouldAutoAddLocation();
+
+  const newPlaceId = await addPlace(placeData);
   invalidatePlaceUsageCache();
-  return newPlaceId;
+
+  // If auto-add is enabled, fetch location asynchronously and update the place
+  if (autoAddEnabled) {
+
+    // Fetch location in the background and update the place
+    getCurrentLocation().then(async (location) => {
+      if (location) {
+        await updatePlace(newPlaceId, { coordinates: location });
+
+        // Dispatch event so UI can update
+        window.dispatchEvent(new CustomEvent('place-location-updated', {
+          detail: { placeId: newPlaceId, coordinates: location }
+        }));
+      } else {
+        // Dispatch event so UI can remove loading state
+        window.dispatchEvent(new CustomEvent('place-location-failed', {
+          detail: { placeId: newPlaceId }
+        }));
+      }
+    }).catch(error => {
+      window.dispatchEvent(new CustomEvent('place-location-failed', {
+        detail: { placeId: newPlaceId }
+      }));
+    });
+
+    return { placeId: newPlaceId, loadingLocation: true };
+  }
+
+  return { placeId: newPlaceId, loadingLocation: false };
 }
 
 /**

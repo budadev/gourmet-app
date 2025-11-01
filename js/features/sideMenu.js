@@ -6,7 +6,7 @@ import { el, escapeHtml } from '../utils.js';
 import { checkUpdateStatus, showUpdateBannerManually } from '../updateManager.js';
 import { getAllPlaces, getPlacesUsageMap } from '../models/places.js';
 import { exportAllData, importData } from '../dataManager.js';
-import { openInlinePlaceEditor } from '../components/placeEditor.js';
+import { openInlinePlaceEditor, openCreatePlaceEditor } from '../components/placeEditor.js';
 
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
@@ -100,10 +100,16 @@ export function initSideMenu() {
 
   const allPlacesBtn = el('allPlacesBtn');
   const placesNoCoordsBtn = el('placesNoCoordsBtn');
+  const createPlaceBtn = el('createPlaceBtn');
   const allPlacesContent = el('allPlacesContent');
   const placesNoCoordsContent = el('placesNoCoordsContent');
   const backAllPlacesBtn = el('backAllPlacesBtn');
   const backPlacesNoCoordsBtn = el('backPlacesNoCoordsBtn');
+
+  // Create Place button handler
+  if (createPlaceBtn) createPlaceBtn.addEventListener('click', () => {
+    openCreatePlaceEditor();
+  });
 
   // Functions to refresh the lists
   async function refreshAllPlacesList() {
@@ -131,6 +137,12 @@ export function initSideMenu() {
 
   // Listen for place updates and refresh the appropriate list
   window.addEventListener('place-updated', async () => {
+    await refreshAllPlacesList();
+    await refreshPlacesNoCoordssList();
+  });
+
+  // Listen for place created and refresh lists
+  window.addEventListener('place-created', async () => {
     await refreshAllPlacesList();
     await refreshPlacesNoCoordssList();
   });

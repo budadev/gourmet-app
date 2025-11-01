@@ -8,7 +8,7 @@
 */
 
 import { escapeHtml, el } from '../utils.js';
-import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace as updatePlaceModel } from '../models/places.js';
+import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace } from '../models/places.js';
 import { createMap } from './map.js';
 import { MAPTILER_API_KEY } from '../config.js';
 
@@ -63,10 +63,21 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   for (const id of placeIds) {
     const place = await getPlaceById(id);
     if (!place) continue;
-    html += `<div class="place-tag" data-place-id="${id}">`;
+
+    // Check if this place is currently loading location
+    const isLoading = place._loadingLocation === true;
+
+    html += `<div class="place-tag ${isLoading ? 'loading-location' : ''}" data-place-id="${id}">`;
     html += `<span class="place-tag-icon" data-action="edit">📍</span>`;
     html += `<span class="place-tag-name" data-action="edit">${escapeHtml(place.name)}</span>`;
-    html += `<button class="place-tag-remove" data-place-id="${id}" type="button">×</button>`;
+
+    if (isLoading) {
+      // Show spinner instead of remove button while loading
+      html += `<span class="place-tag-spinner"></span>`;
+    } else {
+      html += `<button class="place-tag-remove" data-place-id="${id}" type="button">×</button>`;
+    }
+
     html += `</div>`;
   }
   html += '</div>';
@@ -441,12 +452,362 @@ export function openInlinePlaceEditor(tagEl, placeId) {
     try {
       const patch = { name: newName };
       if (selectedCoords && typeof selectedCoords.lat === 'number' && typeof selectedCoords.lng === 'number') patch.coordinates = { lat: selectedCoords.lat, lng: selectedCoords.lng };
-      await updatePlaceModel(placeId, patch);
+      await updatePlace(placeId, patch);
       const nameEl = tagEl.querySelector('.place-tag-name'); if (nameEl) nameEl.textContent = newName;
       // Dispatch event so other components can refresh
       window.dispatchEvent(new CustomEvent('place-updated', { detail: { placeId, patch } }));
       cleanup();
     } catch (e) { console.error('Failed to update place', e); }
+  };
+
+  if (saveBtn) saveBtn.addEventListener('click', onSave);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(); });
+}
+
+export function openCreatePlaceEditor() {
+  // ensure only one editor at a time
+  const existing = document.querySelector('.inline-place-backdrop'); if (existing) existing.remove();
+
+  const backdrop = document.createElement('div'); backdrop.className = 'inline-place-backdrop';
+  const popup = document.createElement('div'); popup.className = 'inline-place-editor';
+
+  popup.innerHTML = `
+    <label class="inline-place-field-label">Place name</label>
+    <input type="text" class="inline-place-input" />
+    <label class="inline-place-map-title">Location</label>
+    <div class="inline-place-map-search-wrapper">
+      <input type="text" class="inline-place-map-search" placeholder="Search map (city, place, address)..." />
+      <button type="button" class="inline-place-map-search-clear" aria-label="Clear">×</button>
+      <div class="inline-place-map-search-results hidden"></div>
+    </div>
+    <div class="inline-place-map-wrapper" style="display:none;margin-top:0">
+      <div class="inline-place-map-loading" style="text-align:center;padding:12px">Loading map...</div>
+      <div class="inline-place-map" style="width:100%;height:220px;display:none;border-radius:10px;overflow:hidden"></div>
+    </div>
+    <div class="inline-place-coords" style="font-size:12px;color:var(--text-secondary);min-height:18px;margin-top:4px;display:none"></div>
+    <div class="inline-place-actions" style="display:block;margin-top:8px">
+      <button class="inline-place-save btn primary">Create</button>
+    </div>
+  `;
+
+  // Declare missing variables
+  let mapInstance = null;
+  let selectedCoords = null;
+  let mapLoading = null;
+  let mapEl = null;
+  let coordsEl = null;
+  let mapSearchInput = null;
+  let mapSearchClear = null;
+  let mapSearchResults = null;
+  let outsideListeners = [];
+  let nameInput = null;
+  let saveBtn = null;
+  let mapWrapper = null;
+
+  // Assign DOM elements after setting innerHTML
+  mapWrapper = popup.querySelector('.inline-place-map-wrapper');
+  mapLoading = popup.querySelector('.inline-place-map-loading');
+  mapEl = popup.querySelector('.inline-place-map');
+  coordsEl = popup.querySelector('.inline-place-coords');
+  mapSearchInput = popup.querySelector('.inline-place-map-search');
+  mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
+  mapSearchResults = popup.querySelector('.inline-place-map-search-results');
+  nameInput = popup.querySelector('.inline-place-input');
+  saveBtn = popup.querySelector('.inline-place-save');
+
+  backdrop.appendChild(popup);
+  document.body.appendChild(backdrop);
+
+  let geoRequested = false; // Track if we've requested geolocation to avoid multiple prompts
+
+  const doMapSearch = async (q) => {
+    if (!q || !MAPTILER_API_KEY) return [];
+    try {
+      let proximityParam = '';
+      let bboxParam = '';
+      try {
+        const lastLoc = getLastLocation();
+        if (lastLoc && typeof lastLoc.lat === 'number' && typeof lastLoc.lng === 'number') {
+          proximityParam = `&proximity=${encodeURIComponent(lastLoc.lng)},${encodeURIComponent(lastLoc.lat)}`;
+          const delta = 0.15;
+          const minLon = lastLoc.lng - delta;
+          const minLat = lastLoc.lat - delta;
+          const maxLon = lastLoc.lng + delta;
+          const maxLat = lastLoc.lat + delta;
+          bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
+        } else if (mapInstance && mapInstance.map && typeof mapInstance.map.getCenter === 'function') {
+          try {
+            const c = mapInstance.map.getCenter();
+            if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+              proximityParam = `&proximity=${encodeURIComponent(c.lng)},${encodeURIComponent(c.lat)}`;
+              const delta = 0.15;
+              const minLon = c.lng - delta;
+              const minLat = c.lat - delta;
+              const maxLon = c.lng + delta;
+              const maxLat = c.lat + delta;
+              bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
+            }
+          } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
+
+      if (!proximityParam && !geoRequested && navigator && navigator.geolocation) {
+        geoRequested = true;
+        try {
+          const pos = await new Promise((resolve) => {
+            let handled = false;
+            try {
+              navigator.geolocation.getCurrentPosition((p) => { if (!handled) { handled = true; resolve(p); } }, () => { if (!handled) { handled = true; resolve(null); } }, { enableHighAccuracy: true, timeout: 5000 });
+            } catch (e) { if (!handled) { handled = true; resolve(null); } }
+            setTimeout(() => { if (!handled) { handled = true; resolve(null); } }, 5200);
+          });
+          if (pos && pos.coords) {
+            const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+            setLastLocation(lat, lng);
+            proximityParam = `&proximity=${encodeURIComponent(lng)},${encodeURIComponent(lat)}`;
+            const delta = 0.15;
+            const minLon = lng - delta; const minLat = lat - delta; const maxLon = lng + delta; const maxLat = lat + delta;
+            bboxParam = `&bbox=${encodeURIComponent(minLon)},${encodeURIComponent(minLat)},${encodeURIComponent(maxLon)},${encodeURIComponent(maxLat)}`;
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      const mapFeatures = (features) => (features || []).map(f => ({
+        id: f.properties && (f.properties.osm_id || f.id),
+        title: f.properties && (f.properties.name || f.place_name || ''),
+        subtitle: f.properties && (f.properties.place_name_en || f.properties.place_name || f.properties.label || ''),
+        center: f.center && f.center.length === 2 ? { lng: f.center[0], lat: f.center[1] } : null
+      }));
+
+      const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_API_KEY}&limit=5${proximityParam}${bboxParam}`;
+      const resp = await fetch(url);
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      return mapFeatures(data.features || []);
+    } catch (err) {
+      console.error('Map search error:', err);
+      return [];
+    }
+  };
+
+  const initMapIfNeeded = async (initialCoords) => {
+    if (mapInstance) {
+      return;
+    }
+
+    if (!mapEl || !mapWrapper) {
+      return;
+    }
+
+    mapWrapper.style.display = 'block';
+    if (mapLoading) mapLoading.style.display = 'block';
+    if (mapEl) mapEl.style.display = 'none';
+
+    // For create place, center on last location or default, but DON'T set selectedCoords initially
+    const coords = getLastLocation() || { lat: 51.505, lng: -0.09 };
+    selectedCoords = null; // No coordinates selected initially
+
+    try {
+      // Use correct createMap signature: createMap(container, opts)
+      mapInstance = await createMap(mapEl, {
+        center: [coords.lat, coords.lng],
+        zoom: 13,
+        apiKey: MAPTILER_API_KEY
+      });
+
+      if (mapLoading) mapLoading.style.display = 'none';
+      if (mapEl) mapEl.style.display = 'block';
+
+      // DON'T set marker initially - show instruction instead
+      if (coordsEl) { coordsEl.textContent = 'Click map or search to set location'; coordsEl.style.display = ''; }
+
+      // Create and add center button
+      const centerBtn = document.createElement('button');
+      centerBtn.type = 'button';
+      centerBtn.className = 'inline-place-center-btn';
+      centerBtn.title = 'Center to your location';
+      centerBtn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+
+      // Check if geolocation is available
+      const geoAvailable = !!(navigator && navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === 'function');
+      if (!geoAvailable) centerBtn.classList.add('disabled');
+
+      try { if (mapWrapper) mapWrapper.appendChild(centerBtn); else popup.appendChild(centerBtn); } catch (e) {}
+
+      // Center button click handler
+      centerBtn.onclick = () => {
+        if (!geoAvailable || centerBtn.classList.contains('disabled') || centerBtn.classList.contains('loading')) return;
+        centerBtn.classList.add('loading');
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            try {
+              mapInstance.map.setView([lat, lng], 13);
+              setLastLocation(lat, lng);
+            } catch (e) {}
+            centerBtn.classList.remove('loading');
+          },
+          (error) => {
+            console.warn('Geolocation error:', error.message);
+            centerBtn.classList.add('disabled');
+            centerBtn.classList.remove('loading');
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      };
+
+      // Set up click handler to add/move marker
+      mapInstance.onClick((latlng) => {
+        selectedCoords = latlng;
+        mapInstance.setMarker([latlng.lat, latlng.lng], { icon: customPinIcon, draggable: true });
+        if (coordsEl) { coordsEl.textContent = `Selected: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+        setLastLocation(latlng.lat, latlng.lng);
+      });
+
+      // Set up drag handler for when marker is moved
+      mapInstance.onMarkerDrag((latlng) => {
+        selectedCoords = latlng;
+        if (coordsEl) coordsEl.textContent = `Selected: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+        setLastLocation(latlng.lat, latlng.lng);
+      });
+
+      // Try to get current location and recenter map automatically
+      if (geoAvailable) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            try {
+              mapInstance.map.setView([lat, lng], 13);
+              setLastLocation(lat, lng);
+            } catch (e) {}
+          },
+          (error) => {
+            console.log('Initial geolocation failed:', error.message);
+            // Not a critical error, just continue with last known location
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      }
+
+    } catch (err) {
+      if (mapLoading) { mapLoading.textContent = 'Map failed to load.'; mapLoading.style.display = 'block'; }
+      if (mapEl) mapEl.style.display = 'none';
+    }
+
+    // Map search handlers (same as edit version)
+    if (mapSearchInput && mapSearchResults && mapSearchClear) {
+      let searchTimer = null;
+      const hideMapSearchResults = () => { try { if (mapSearchResults) mapSearchResults.classList.add('hidden'); } catch (e) {} };
+      const showMapSearchResults = () => { try { if (mapSearchResults) mapSearchResults.classList.remove('hidden'); } catch (e) {} };
+
+      mapSearchInput.addEventListener('input', () => {
+        const q = (mapSearchInput.value || '').trim();
+        if (searchTimer) clearTimeout(searchTimer);
+        if (!q) { hideMapSearchResults(); if (mapSearchResults) mapSearchResults.innerHTML = ''; return; }
+        searchTimer = setTimeout(async () => {
+          if (!mapSearchResults) return;
+          mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">Searching...</div></div>';
+          showMapSearchResults();
+          const results = await doMapSearch(q);
+          if (!results || results.length === 0) { mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">No results</div></div>'; return; }
+          mapSearchResults.innerHTML = results.map(r => `
+            <div class="result-item" data-lat="${r.center ? r.center.lat : ''}" data-lng="${r.center ? r.center.lng : ''}">
+              <div class="ri-main">
+                <span class="ri-title">${escapeHtml(r.title || '')}</span>
+                ${r.subtitle ? `<span class="ri-sub">${escapeHtml(r.subtitle)}</span>` : ''}
+              </div>
+            </div>
+          `).join('');
+          mapSearchResults.querySelectorAll('.result-item').forEach(item => {
+            item.onclick = () => {
+              const titleEl = item.querySelector('.ri-title');
+              const title = titleEl ? (titleEl.textContent || '').trim() : '';
+              try { mapSearchInput.value = title; } catch (e) {}
+              const lat = parseFloat(item.getAttribute('data-lat'));
+              const lng = parseFloat(item.getAttribute('data-lng'));
+              if (!isNaN(lat) && !isNaN(lng)) {
+                try { mapInstance.map.setView([lat, lng], 13); } catch (e) {}
+                try { mapInstance.setMarker([lat, lng], { icon: customPinIcon, draggable: true }); } catch (e) {}
+                selectedCoords = { lat, lng };
+                if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
+                setLastLocation(lat, lng);
+              }
+              hideMapSearchResults();
+            };
+          });
+        }, 350);
+      });
+
+      let programmaticFocus = false;
+      mapSearchInput.addEventListener('focus', () => {
+        if (programmaticFocus) { programmaticFocus = false; return; }
+        try { if (!mapSearchInput.value && nameInput && nameInput.value) { mapSearchInput.value = nameInput.value; mapSearchInput.dispatchEvent(new Event('input', { bubbles: true })); } } catch (e) {}
+      });
+
+      if (mapSearchClear) {
+        mapSearchClear.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          try { mapSearchInput.value = ''; } catch (e) {}
+          try { if (mapSearchResults) mapSearchResults.innerHTML = ''; } catch (e) {}
+          hideMapSearchResults();
+          programmaticFocus = true;
+        });
+      }
+
+      const outsideHandler = (ev) => {
+        try {
+          const t = ev.target;
+          if (mapSearchInput && mapSearchInput.contains(t)) return;
+          if (mapSearchResults && mapSearchResults.contains(t)) return;
+          hideMapSearchResults();
+        } catch (e) {}
+      };
+      document.addEventListener('click', outsideHandler);
+      outsideListeners.push(() => document.removeEventListener('click', outsideHandler));
+    }
+  };
+
+  // Initialize map after DOM is ready
+  setTimeout(() => {
+    initMapIfNeeded(null);
+    try { if (nameInput) { nameInput.focus(); } } catch (e) {}
+  }, 10);
+
+  const previousBodyNoScroll = document.body.classList.contains('no-scroll'); document.body.classList.add('no-scroll');
+
+  function cleanup() {
+    try { if (mapInstance && mapInstance.remove) mapInstance.remove(); } catch (e) {}
+    try { outsideListeners.forEach(fn => { try { fn(); } catch (e) {} }); } catch (e) {}
+    try { if (mapInstance && typeof mapInstance.onMarkerDrag === 'function') mapInstance.onMarkerDrag(null); } catch (e) {}
+    try { if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); } catch (e) {}
+    try { if (!previousBodyNoScroll) document.body.classList.remove('no-scroll'); } catch (e) {}
+    try { document.removeEventListener('keydown', onKeydown); } catch (e) {}
+  }
+
+  const onKeydown = (ev) => { if (ev.key === 'Escape') cleanup(); };
+  document.addEventListener('keydown', onKeydown);
+
+  const onSave = async () => {
+    const newName = nameInput ? nameInput.value.trim() : '';
+    if (!newName) return;
+    try {
+      const placeData = { name: newName };
+      if (selectedCoords && typeof selectedCoords.lat === 'number' && typeof selectedCoords.lng === 'number') {
+        placeData.coordinates = { lat: selectedCoords.lat, lng: selectedCoords.lng };
+      }
+
+      // Create new place using addPlace from db
+      const { addPlace } = await import('../db.js');
+      const newPlaceId = await addPlace(placeData);
+
+      // Dispatch event so other components can refresh
+      window.dispatchEvent(new CustomEvent('place-created', { detail: { placeId: newPlaceId, place: placeData } }));
+
+      cleanup();
+    } catch (e) { console.error('Failed to create place', e); }
   };
 
   if (saveBtn) saveBtn.addEventListener('click', onSave);
@@ -468,7 +829,47 @@ function setupPlaceSearchListeners() {
   const outsideHandler = (e) => { if (!e.target.closest('.place-search-wrapper') && !e.target.closest('.place-search-results')) resultsContainer.classList.add('hidden'); };
   document.addEventListener('click', outsideHandler);
 
-  addBtn.addEventListener('click', async () => { const placeName = searchInput.value.trim(); if (!placeName) return; const placeId = await getOrCreatePlace(placeName); if (placeId) { addCurrentPlace(placeId); await renderSelectedPlaces(); searchInput.value = ''; addBtn.classList.add('hidden'); resultsContainer.classList.add('hidden'); } });
+  addBtn.addEventListener('click', async () => {
+    const placeName = searchInput.value.trim();
+    if (!placeName) return;
+
+    const result = await getOrCreatePlace(placeName);
+    if (result) {
+      const placeId = result.placeId || result; // Handle both old format (just ID) and new format ({placeId, loadingLocation})
+      const loadingLocation = result.loadingLocation || false;
+
+      addCurrentPlace(placeId);
+
+      // Mark place as loading if location is being fetched
+      if (loadingLocation) {
+        const place = await getPlaceById(placeId);
+        if (place) {
+          place._loadingLocation = true;
+          await updatePlace(placeId, place); // Store the loading state
+        }
+      }
+
+      await renderSelectedPlaces();
+      searchInput.value = '';
+      addBtn.classList.add('hidden');
+      resultsContainer.classList.add('hidden');
+    }
+  });
+
+  // Listen for location update events to refresh the UI
+  const locationUpdateHandler = async (event) => {
+    if (event.detail && event.detail.placeId) {
+      const place = await getPlaceById(event.detail.placeId);
+      if (place) {
+        place._loadingLocation = false;
+        await updatePlace(event.detail.placeId, place);
+        await renderSelectedPlaces();
+      }
+    }
+  };
+
+  window.addEventListener('place-location-updated', locationUpdateHandler);
+  window.addEventListener('place-location-failed', locationUpdateHandler);
 }
 
 async function renderSearchResults(results, query) {

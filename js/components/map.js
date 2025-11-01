@@ -251,6 +251,8 @@ export async function createMap(container, opts = {}) {
     map,
     setMarker,
     getMarkerCoords,
+    removeMarker,
+    onMarkerDrag,
     setCircle,
     getCircle,
     removeCircle,
