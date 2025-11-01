@@ -90,7 +90,7 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   });
 }
 
-function openInlinePlaceEditor(tagEl, placeId) {
+export function openInlinePlaceEditor(tagEl, placeId) {
   // ensure only one editor at a time
   const existing = document.querySelector('.inline-place-backdrop'); if (existing) existing.remove();
 
@@ -443,6 +443,8 @@ function openInlinePlaceEditor(tagEl, placeId) {
       if (selectedCoords && typeof selectedCoords.lat === 'number' && typeof selectedCoords.lng === 'number') patch.coordinates = { lat: selectedCoords.lat, lng: selectedCoords.lng };
       await updatePlaceModel(placeId, patch);
       const nameEl = tagEl.querySelector('.place-tag-name'); if (nameEl) nameEl.textContent = newName;
+      // Dispatch event so other components can refresh
+      window.dispatchEvent(new CustomEvent('place-updated', { detail: { placeId, patch } }));
       cleanup();
     } catch (e) { console.error('Failed to update place', e); }
   };
