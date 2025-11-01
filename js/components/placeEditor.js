@@ -9,6 +9,7 @@
 
 import { escapeHtml, el } from '../utils.js';
 import { searchPlaces, getOrCreatePlace, addCurrentPlace, removeCurrentPlace, getCurrentPlaces, getPlaceById, updatePlace } from '../models/places.js';
+import { deletePlace, listAll, updateItem } from '../db.js';
 import { createMap } from './map.js';
 import { MAPTILER_API_KEY } from '../config.js';
 
@@ -101,7 +102,7 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
   });
 }
 
-export function openInlinePlaceEditor(tagEl, placeId) {
+export function openInlinePlaceEditor(tagEl, placeId, options = {}) {
   // ensure only one editor at a time
   const existing = document.querySelector('.inline-place-backdrop'); if (existing) existing.remove();
 
@@ -122,8 +123,9 @@ export function openInlinePlaceEditor(tagEl, placeId) {
       <div class="inline-place-map" style="width:100%;height:220px;display:none;border-radius:10px;overflow:hidden"></div>
     </div>
     <div class="inline-place-coords" style="font-size:12px;color:var(--text-secondary);min-height:18px;margin-top:4px;display:none"></div>
-    <div class="inline-place-actions" style="display:block;margin-top:8px">
+    <div class="inline-place-actions ${options.showDelete ? 'has-multiple' : ''}" style="margin-top:8px">
       <button class="inline-place-save btn primary">Save</button>
+      ${options.showDelete ? '<button class="inline-place-delete btn">Delete</button>' : ''}
     </div>
   `;
 
@@ -140,6 +142,7 @@ export function openInlinePlaceEditor(tagEl, placeId) {
   const mapSearchClear = popup.querySelector('.inline-place-map-search-clear');
   const coordsEl = popup.querySelector('.inline-place-coords');
   const saveBtn = popup.querySelector('.inline-place-save');
+  const deleteBtn = popup.querySelector('.inline-place-delete');
 
   let mapInstance = null;
   let selectedCoords = null;
@@ -460,7 +463,34 @@ export function openInlinePlaceEditor(tagEl, placeId) {
     } catch (e) { console.error('Failed to update place', e); }
   };
 
+  const onDelete = async () => {
+    if (!confirm('Are you sure you want to delete this place? This will also remove it from all items.')) return;
+
+    try {
+      // First, remove this place from all items that reference it
+      const allItems = await listAll();
+      const itemsToUpdate = allItems.filter(item => item.places && Array.isArray(item.places) && item.places.includes(placeId));
+
+      // Update each item to remove this place
+      for (const item of itemsToUpdate) {
+        const updatedPlaces = item.places.filter(pid => pid !== placeId);
+        await updateItem(item.id, { places: updatedPlaces });
+      }
+
+      // Now delete the place itself
+      await deletePlace(placeId);
+
+      // Dispatch event so other components can refresh
+      window.dispatchEvent(new CustomEvent('place-deleted', { detail: { placeId } }));
+      cleanup();
+    } catch (e) {
+      console.error('Failed to delete place', e);
+      alert('Failed to delete place. Please try again.');
+    }
+  };
+
   if (saveBtn) saveBtn.addEventListener('click', onSave);
+  if (deleteBtn) deleteBtn.addEventListener('click', onDelete);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(); });
 }
 

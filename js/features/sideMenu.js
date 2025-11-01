@@ -147,6 +147,12 @@ export function initSideMenu() {
     await refreshPlacesNoCoordssList();
   });
 
+  // Listen for place deleted and refresh lists
+  window.addEventListener('place-deleted', async () => {
+    await refreshAllPlacesList();
+    await refreshPlacesNoCoordssList();
+  });
+
   // Shared function to render search and list of places
   function renderPlacesList(places, container) {
     container.innerHTML = '';
@@ -190,7 +196,7 @@ export function initSideMenu() {
 
         // Add click handler to open the place editor
         item.addEventListener('click', () => {
-          openInlinePlaceEditor(item, place.id);
+          openInlinePlaceEditor(item, place.id, { showDelete: true });
         });
 
         list.appendChild(item);

@@ -545,6 +545,11 @@
   display: block; /* actions are stacked */
 }
 
+.inline-place-actions.has-multiple {
+  display: flex;
+  gap: 8px;
+}
+
 .inline-place-actions .inline-place-save.btn.primary {
   width: 100%;
   display: block;
@@ -553,6 +558,23 @@
   text-align: center;
   box-sizing: border-box;
   border-radius: 12px;
+}
+
+.inline-place-actions.has-multiple .inline-place-save.btn.primary {
+  width: auto;
+  flex: 1;
+}
+
+.inline-place-actions .inline-place-delete.btn {
+  padding: 12px 18px;
+  font-size: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  cursor: pointer;
 }
 
 .inline-place-cancel.btn {
