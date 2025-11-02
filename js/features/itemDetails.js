@@ -79,11 +79,26 @@ export async function showItemDetails(id, onEdit, onDelete) {
     // Load thumbnails from photos table (only when viewing this item's details)
     const photoData = await getPhotoThumbnails(item.photos);
 
+    // Convert any thumbnail Blobs to dataURLs so <img src=> works
+    const preparedThumbs = await Promise.all(photoData.map(async (p) => {
+      if (!p) return null;
+      let thumb = p.thumbnail;
+      if (thumb && typeof thumb !== 'string') {
+        try {
+          thumb = await blobToDataURL(thumb);
+        } catch (err) {
+          console.error('Error converting thumbnail blob to dataURL', err);
+          thumb = '';
+        }
+      }
+      return { id: p.id, thumbnail: thumb };
+    }));
+
     photosHTML = `
       <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border-light)">
         <label>Photos</label>
         <div class="photo-gallery">
-          ${photoData.map((photo, index) => `
+          ${preparedThumbs.filter(p => p !== null).map((photo, index) => `
             <img src="${photo.thumbnail}" alt="Photo ${index + 1}" data-photo-id="${photo.id}" class="photo-thumbnail" />
           `).join('')}
         </div>

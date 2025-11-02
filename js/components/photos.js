@@ -72,6 +72,41 @@ export async function createThumbnail(dataURL, maxWidth = 150, maxHeight = 150) 
   });
 }
 
+async function createThumbnailBlob(dataURL, maxW=150, maxH=150) {
+  // Create an Image from the dataURL
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataURL;
+  });
+
+  // Calculate target size keeping aspect ratio
+  let width = img.width;
+  let height = img.height;
+  if (width > height) {
+    if (width > maxW) {
+      height = Math.round((height * maxW) / width);
+      width = maxW;
+    }
+  } else {
+    if (height > maxH) {
+      width = Math.round((width * maxH) / height);
+      height = maxH;
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  // Convert to Blob (JPEG, quality 0.7)
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.7));
+  return blob;
+}
+
 // Generate unique photo ID
 export function generatePhotoId() {
   return `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -148,7 +183,24 @@ export async function renderPhotoPreview() {
   // Load thumbnails from photos table (on-demand)
   const photoData = await getPhotoThumbnails(currentPhotos);
 
-  container.innerHTML = photoData.map((photo, index) => `
+  // photoData.thumbnail may be a Blob (new) or a string (legacy); convert Blobs to dataURLs for rendering
+  const prepared = await Promise.all(photoData.map(async (photo) => {
+    if (!photo) return null;
+    let thumbnail = photo.thumbnail;
+    if (thumbnail && typeof thumbnail !== 'string') {
+      try {
+        thumbnail = await blobToDataURL(thumbnail);
+      } catch (err) {
+        console.error('Error converting thumbnail blob to dataURL', err);
+        thumbnail = '';
+      }
+    }
+    return { id: photo.id, thumbnail };
+  }));
+
+  const items = prepared.filter(p => p !== null);
+
+  container.innerHTML = items.map((photo, index) => `
     <div class="photo-preview-item">
       <img src="${photo.thumbnail}" alt="Photo ${index + 1}" />
       <button class="remove-photo" data-photo-id="${photo.id}" type="button">×</button>
@@ -405,11 +457,12 @@ export function clearPhotos() {
  */
 export async function processPhotoForEditing(dataURL, itemId = null) {
   const id = generatePhotoId();
-  const thumbnail = await createThumbnail(dataURL);
+  // Create thumbnail as Blob now
+  const thumbnailBlob = await createThumbnailBlob(dataURL);
   const blob = dataURLToBlob(dataURL);
 
   // Save to photos table immediately (itemId will be updated on item save)
-  await savePhoto(id, blob, thumbnail, itemId);
+  await savePhoto(id, blob, thumbnailBlob, itemId);
 
   return id; // Just return the ID
 }
