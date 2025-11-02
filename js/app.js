@@ -13,7 +13,6 @@ import { openEditor, closeEditor, saveItem, renderPairingsInEditor } from './fea
 import { startScan, stopScan } from './features/scanner.js';
 import { initPhotoModal } from './components/photos.js';
 import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';
-import { lookupByBarcode } from './external/openFoodFacts.js';
 import { initUpdateManager } from './updateManager.js';
 import { initSideMenu, openSideMenu, closeSideMenu } from './features/sideMenu.js';
 import { initFilters, applyFilters, setFilterChangeCallback, openFilterPanel, closeFilterPanel } from './features/filters.js';
@@ -94,17 +93,11 @@ async function initApp() {
               }, refreshList);
             });
           } else {
-            // Not found in internal DB - Step 2: Search external API
-            updateBarcodeLookupStep('🌐 Searching public database...');
-            const fetched = await lookupByBarcode(code);
+            // Not found in internal DB
             hideBarcodeLookupLoading();
 
-            if (fetched && confirm(`Barcode not found. Found "${fetched.name}" in Open Food Facts. Add it?`)) {
-              openEditor({ ...fetched, barcode: code }, refreshList);
-            } else if (!fetched) {
-              if (confirm('Barcode not found. Add new item?')) {
-                openEditor({ barcode: code }, refreshList);
-              }
+            if (confirm('Barcode not found. Add new item?')) {
+              openEditor({ barcode: code }, refreshList);
             }
             await refreshList();
           }
