@@ -1,5 +1,6 @@
 {
   "wine": {
+    "rank": 1,
     "label": "Wine",
     "icon": "🍷",
     "fields": [
@@ -11,6 +12,7 @@
   },
 
   "beer": {
+    "rank": 2,
     "label": "Beer",
     "icon": "🍺",
     "fields": [
@@ -24,6 +26,7 @@
   },
 
   "cheese": {
+    "rank": 3,
     "label": "Cheese",
     "icon": "🧀",
     "fields": [
@@ -35,6 +38,7 @@
   },
 
   "olives": {
+    "rank": 4,
     "label": "Olives",
     "icon": "🫒",
     "fields": [
@@ -48,6 +52,7 @@
   },
 
   "ham": {
+    "rank": 5,
     "label": "Ham",
     "icon": "🍖",
     "fields": [

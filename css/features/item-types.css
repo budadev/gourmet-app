@@ -1,0 +1,150 @@
+/* =============================
+   Item Type Editor Styles
+   ============================= */
+
+/* Eliminate all top gaps in item type editor modal */
+#itemTypesEditorModal .modal-header {
+  padding-bottom: 8px !important;
+  margin-bottom: 0 !important;
+}
+
+#itemTypesEditorModal .modal-body {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+.item-type-editor-content {
+  padding: 0 !important;
+  margin-top: 0 !important;
+}
+
+.item-type-editor-content .field-group:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.item-type-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.field-row-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-row-header .field-label-input {
+  flex: 1;
+}
+
+.field-label-input,
+.field-type-select,
+.field-options-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.field-options-container {
+  margin-top: 0;
+}
+
+.field-delete-btn {
+  padding: 6px 10px;
+  font-size: 18px;
+  line-height: 1;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.field-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.btn.danger {
+  background: var(--danger-bg, #fee);
+  border-color: var(--danger, #dc2626);
+  color: var(--danger, #dc2626);
+}
+
+.btn.danger:hover {
+  background: var(--danger, #dc2626);
+  color: #fff;
+}
+
+.btn.secondary {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn.secondary:hover {
+  background: var(--card-hover);
+}
+
+.list-item-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Drag and drop styles */
+.draggable-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle svg {
+  display: block;
+}
+
+.list-item-clickable {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.draggable-item.dragging {
+  opacity: 0.4;
+  background: var(--bg-secondary);
+}
+

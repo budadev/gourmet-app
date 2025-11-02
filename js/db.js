@@ -8,6 +8,7 @@ const DB_NAME = 'gourmetapp-db';
 const STORE = 'items';
 const PLACES_STORE = 'places';
 const PHOTOS_STORE = 'photos';
+const ITEM_TYPES_STORE = 'itemTypes';
 
 let dbp = null;
 let dbInitialized = false;
@@ -16,7 +17,7 @@ function initDb() {
   if (dbp) return dbp;
 
   dbp = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 4);
+    const req = indexedDB.open(DB_NAME, 5);
     req.onupgradeneeded = (event) => {
       const db = req.result;
       const oldVersion = event.oldVersion;
@@ -45,6 +46,15 @@ function initDb() {
 
       // Version 4: Add thumbnail field to photos (structure change, no schema migration needed)
       // Photos now store: { id, blob, thumbnail, itemId, createdAt }
+
+      // Version 5: Add item types store
+      if (oldVersion < 5) {
+        const itemTypesStore = db.createObjectStore(ITEM_TYPES_STORE, { keyPath: 'key' });
+        itemTypesStore.createIndex('by_label', 'label', { unique: false });
+
+        // Seed with default item types from config
+        // This will be populated on first app initialization
+      }
     };
     req.onsuccess = () => {
       dbInitialized = true;
@@ -409,3 +419,67 @@ export async function bulkAddToStore(storeName, records) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+/* =============================
+   Item Types Store Functions
+   ============================= */
+
+export async function addItemType(itemType) {
+  const store = await tx('readwrite', ITEM_TYPES_STORE);
+  return new Promise((res, rej) => {
+    // If no rank provided, set to max + 1
+    const r = store.add({ ...itemType, createdAt: Date.now() });
+    r.onsuccess = () => res(itemType.key);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+export async function getItemType(key) {
+  const store = await tx('readonly', ITEM_TYPES_STORE);
+  return new Promise((res, rej) => {
+    const r = store.get(key);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+export async function listAllItemTypes() {
+  const store = await tx('readonly', ITEM_TYPES_STORE);
+  return new Promise((res) => {
+    const out = [];
+    const c = store.openCursor();
+    c.onsuccess = () => {
+      const cur = c.result;
+      if (cur) {
+        out.push(cur.value);
+        cur.continue();
+      } else res(out);
+    };
+  });
+}
+
+export async function updateItemType(key, patch) {
+  const store = await tx('readwrite', ITEM_TYPES_STORE);
+  const get = store.get(key);
+  return new Promise((res, rej) => {
+    get.onsuccess = () => {
+      const cur = get.result;
+      if (!cur) return rej(new Error('Not found'));
+      const updatedItemType = { ...cur, ...patch, updatedAt: Date.now() };
+      const put = store.put(updatedItemType);
+      put.onsuccess = () => res(put.result);
+      put.onerror = () => rej(put.error);
+    };
+    get.onerror = () => rej(get.error);
+  });
+}
+
+export async function deleteItemType(key) {
+  const store = await tx('readwrite', ITEM_TYPES_STORE);
+  return new Promise((res, rej) => {
+    const r = store.delete(key);
+    r.onsuccess = () => res();
+    r.onerror = () => rej(r.error);
+  });
+}
+

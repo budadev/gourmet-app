@@ -89,7 +89,7 @@
 
 .modal-body{
     padding:20px 28px 28px 28px; /* slightly reduced top padding since header already expanded */
-    padding-top:12px; /* normal spacing only */
+    padding-top:4px; /* minimal spacing only */
     /* Remove extra space for fixed footer */
     padding-bottom:32px; /* keep footer breathing space */
     overflow-y:auto;

@@ -2,6 +2,8 @@
    Configuration Loader
    ============================= */
 
+import { getAllItemTypes } from './models/itemTypes.js';
+
 let ITEM_TYPES_CONFIG = {};
 
 // MapTiler / OpenMapTiles API key for Bright style
@@ -11,9 +13,9 @@ export const MAPTILER_API_KEY = 'wV8Y5oQjlhRfFIG6of6y';
 
 export async function loadConfig() {
   try {
-    const response = await fetch('./item-types-config.json');
-    ITEM_TYPES_CONFIG = await response.json();
-    console.log('Loaded item types:', Object.keys(ITEM_TYPES_CONFIG));
+    // Load item types from database
+    ITEM_TYPES_CONFIG = await getAllItemTypes();
+    console.log('Loaded item types from DB:', Object.keys(ITEM_TYPES_CONFIG));
     return ITEM_TYPES_CONFIG;
   } catch (e) {
     console.error('Could not load item types config:', e.message);
@@ -36,3 +38,8 @@ export function getConfig() {
 export function getTypeInfo(typeKey) {
   return ITEM_TYPES_CONFIG[typeKey] || { label: typeKey, icon: '📦', fields: [] };
 }
+
+export function reloadConfig() {
+  return loadConfig();
+}
+

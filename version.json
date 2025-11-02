@@ -1,10 +1,11 @@
 {
-  "version": "0.1.60",
+  "version": "0.1.61",
   "releaseDate": "2025-11-02",
   "changes": [
-    "Major barcode scanning accuracy improvements - now requires 3 consistent reads with quality validation",
-    "Added checksum validation for EAN/UPC barcodes to prevent false positives",
-    "Optimized scanner settings for accuracy over speed (full resolution, larger patch size)",
-    "Scanner now shows real-time quality feedback during scanning"
+    "Added configurable item types - users can now create, edit, and delete item types",
+    "Item types support custom fields with text, number, and dropdown types",
+    "Drag-and-drop reordering of item types with touch support for mobile",
+    "Auto-generated keys from display names for easier configuration",
+    "Item types stored in database with rank-based sorting"
   ]
 }

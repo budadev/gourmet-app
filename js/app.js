@@ -17,6 +17,8 @@ import { initUpdateManager } from './updateManager.js';
 import { initSideMenu, openSideMenu, closeSideMenu } from './features/sideMenu.js';
 import { initFilters, applyFilters, setFilterChangeCallback, openFilterPanel, closeFilterPanel } from './features/filters.js';
 import { initSwipeGestures } from './features/swipeGestures.js';
+import { seedItemTypesFromConfig } from './models/itemTypes.js';
+import { initItemTypeEditor } from './components/itemTypeEditor.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -42,6 +44,9 @@ async function refreshList() {
 async function initApp() {
   // Ensure database is ready before any operations
   await ensureDbReady();
+
+  // Seed item types from config on first run
+  await seedItemTypesFromConfig();
 
   // Build the search index from all items in the database
   await buildSearchIndex();
@@ -231,6 +236,9 @@ async function initApp() {
 
   // Initialize side menu
   initSideMenu();
+
+  // Initialize item type editor
+  initItemTypeEditor();
 
   // Initialize swipe gestures for side menu and filter panel
   initSwipeGestures(openSideMenu, closeSideMenu, openFilterPanel, closeFilterPanel);
