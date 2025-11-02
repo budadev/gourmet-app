@@ -3,7 +3,7 @@
    ============================= */
 
 import { escapeHtml, el, formatDate } from '../utils.js';
-import { getItem, deleteItem, listAll, getPhoto, deletePhotosByItemId } from '../db.js';
+import { getItem, deleteItem, listAll, getPhoto, deletePhotosByItemId, getPhotoThumbnails } from '../db.js';
 import { renderStars } from '../components/rating.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { showPhotoModal, blobToDataURL } from '../components/photos.js';
@@ -76,11 +76,14 @@ export async function showItemDetails(id, onEdit, onDelete) {
   // Add photos if available
   let photosHTML = '';
   if (item.photos && Array.isArray(item.photos) && item.photos.length > 0) {
+    // Load thumbnails from photos table (only when viewing this item's details)
+    const photoData = await getPhotoThumbnails(item.photos);
+
     photosHTML = `
       <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border-light)">
         <label>Photos</label>
         <div class="photo-gallery">
-          ${item.photos.map((photo, index) => `
+          ${photoData.map((photo, index) => `
             <img src="${photo.thumbnail}" alt="Photo ${index + 1}" data-photo-id="${photo.id}" class="photo-thumbnail" />
           `).join('')}
         </div>
@@ -115,15 +118,17 @@ export async function showItemDetails(id, onEdit, onDelete) {
         if (photoBlob) {
           const photoDataURL = await blobToDataURL(photoBlob);
 
-          // Load all full photos for navigation
+          // Load all full photos for navigation (item.photos is now array of IDs)
           const allPhotoDataURLs = await Promise.all(
-            item.photos.map(async (photo) => {
-              const blob = await getPhoto(photo.id);
-              return blob ? await blobToDataURL(blob) : photo.thumbnail;
+            item.photos.map(async (photoId) => {
+              const blob = await getPhoto(photoId);
+              return blob ? await blobToDataURL(blob) : null;
             })
           );
 
-          showPhotoModal(photoDataURL, allPhotoDataURLs);
+          // Filter out any failed loads
+          const validPhotoURLs = allPhotoDataURLs.filter(url => url !== null);
+          showPhotoModal(photoDataURL, validPhotoURLs);
         }
       } catch (err) {
         console.error('Error loading photo:', err);

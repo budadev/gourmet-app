@@ -3,9 +3,9 @@
    ============================= */
 
 import { el } from '../utils.js';
-import { savePhoto, getPhoto, deletePhoto } from '../db.js';
+import { savePhoto, getPhoto, deletePhoto, getPhotoThumbnails } from '../db.js';
 
-let currentPhotos = [];
+let currentPhotos = []; // Array of photo IDs (strings), not objects
 let currentPhotoIndex = 0;
 let allPhotosInViewer = [];
 let controlsVisible = true;
@@ -136,7 +136,7 @@ export async function selectPhoto() {
 }
 
 // Render photo preview grid in editor
-export function renderPhotoPreview() {
+export async function renderPhotoPreview() {
   const container = document.getElementById('photoPreviewContainer');
   if (!container) return;
 
@@ -145,19 +145,26 @@ export function renderPhotoPreview() {
     return;
   }
 
-  container.innerHTML = currentPhotos.map((photo, index) => `
+  // Load thumbnails from photos table (on-demand)
+  const photoData = await getPhotoThumbnails(currentPhotos);
+
+  container.innerHTML = photoData.map((photo, index) => `
     <div class="photo-preview-item">
       <img src="${photo.thumbnail}" alt="Photo ${index + 1}" />
-      <button class="remove-photo" data-index="${index}" type="button">×</button>
+      <button class="remove-photo" data-photo-id="${photo.id}" type="button">×</button>
     </div>
   `).join('');
 
   // Bind remove buttons
   container.querySelectorAll('.remove-photo').forEach(btn => {
-    btn.onclick = () => {
-      const index = parseInt(btn.getAttribute('data-index'));
-      currentPhotos.splice(index, 1);
-      renderPhotoPreview();
+    btn.onclick = async () => {
+      const photoId = btn.getAttribute('data-photo-id');
+      const index = currentPhotos.indexOf(photoId);
+      if (index > -1) {
+        currentPhotos.splice(index, 1);
+        await deletePhoto(photoId); // Delete from DB immediately
+        renderPhotoPreview();
+      }
     };
   });
 }
@@ -372,17 +379,17 @@ export function initPhotoModal() {
 }
 
 // Photo state management
-// currentPhotos now stores objects like { id: 'photo_123', thumbnail: 'data:image/jpeg...' }
+// currentPhotos now stores photo IDs (strings), not objects
 export function getPhotos() {
-  return currentPhotos;
+  return [...currentPhotos];
 }
 
-export function setPhotos(photos) {
-  currentPhotos = Array.isArray(photos) ? [...photos] : [];
+export function setPhotos(photoIds) {
+  currentPhotos = Array.isArray(photoIds) ? [...photoIds] : [];
 }
 
-export function addPhoto(photoObj) {
-  currentPhotos.push(photoObj);
+export function addPhoto(photoId) {
+  currentPhotos.push(photoId);
 }
 
 export function clearPhotos() {
@@ -390,15 +397,19 @@ export function clearPhotos() {
 }
 
 /**
- * Process a photo data URL and return a photo object with ID and thumbnail
- * Does NOT save to IndexedDB (that happens on item save)
+ * Process a photo data URL and save to photos table immediately
+ * Returns photo ID for referencing
+ * @param {string} dataURL - Photo data URL
+ * @param {number|null} itemId - Item ID (can be null for new items)
+ * @returns {Promise<string>} Photo ID
  */
-export async function processPhotoForEditing(dataURL) {
+export async function processPhotoForEditing(dataURL, itemId = null) {
   const id = generatePhotoId();
   const thumbnail = await createThumbnail(dataURL);
-  return {
-    id,
-    thumbnail,
-    fullDataURL: dataURL // Keep full version temporarily for editing session
-  };
+  const blob = dataURLToBlob(dataURL);
+
+  // Save to photos table immediately (itemId will be updated on item save)
+  await savePhoto(id, blob, thumbnail, itemId);
+
+  return id; // Just return the ID
 }

@@ -16,7 +16,7 @@ function initDb() {
   if (dbp) return dbp;
 
   dbp = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 3);
+    const req = indexedDB.open(DB_NAME, 4);
     req.onupgradeneeded = (event) => {
       const db = req.result;
       const oldVersion = event.oldVersion;
@@ -40,6 +40,9 @@ function initDb() {
         const photosStore = db.createObjectStore(PHOTOS_STORE, { keyPath: 'id' });
         photosStore.createIndex('by_itemId', 'itemId', { unique: false });
       }
+
+      // Version 4: Add thumbnail field to photos (structure change, no schema migration needed)
+      // Photos now store: { id, blob, thumbnail, itemId, createdAt }
     };
     req.onsuccess = () => {
       dbInitialized = true;
@@ -268,13 +271,14 @@ export async function updatePlace(id, patch) {
  * Save a photo blob to the photos store
  * @param {string} id - Unique photo ID (e.g., UUID)
  * @param {Blob} blob - Photo blob data
+ * @param {string} thumbnail - Thumbnail data URL
  * @param {number} itemId - ID of the item this photo belongs to
  * @returns {Promise<string>} Photo ID
  */
-export async function savePhoto(id, blob, itemId) {
+export async function savePhoto(id, blob, thumbnail, itemId) {
   const store = await tx('readwrite', PHOTOS_STORE);
   return new Promise((res, rej) => {
-    const r = store.put({ id, blob, itemId, createdAt: Date.now() });
+    const r = store.put({ id, blob, thumbnail, itemId, createdAt: Date.now() });
     r.onsuccess = () => res(id);
     r.onerror = () => rej(r.error);
   });
@@ -331,6 +335,72 @@ export async function deletePhotosByItemId(itemId) {
   const photos = await getPhotosByItemId(itemId);
   const promises = photos.map(photo => deletePhoto(photo.id));
   await Promise.all(promises);
+}
+
+/**
+ * Get photo metadata (without blob for performance)
+ * @param {string} id - Photo ID
+ * @returns {Promise<object|null>} Photo metadata or null
+ */
+export async function getPhotoMetadata(id) {
+  const store = await tx('readonly', PHOTOS_STORE);
+  return new Promise((res, rej) => {
+    const r = store.get(id);
+    r.onsuccess = () => {
+      if (r.result) {
+        const { id, thumbnail, itemId, createdAt } = r.result;
+        res({ id, thumbnail, itemId, createdAt });
+      } else {
+        res(null);
+      }
+    };
+    r.onerror = () => rej(r.error);
+  });
+}
+
+/**
+ * Get multiple photo thumbnails by IDs
+ * @param {Array<string>} photoIds - Array of photo IDs
+ * @returns {Promise<Array>} Array of photo metadata with thumbnails
+ */
+export async function getPhotoThumbnails(photoIds) {
+  if (!photoIds || photoIds.length === 0) return [];
+  const store = await tx('readonly', PHOTOS_STORE);
+  const promises = photoIds.map(id => {
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => {
+        if (r.result) {
+          res({ id: r.result.id, thumbnail: r.result.thumbnail });
+        } else {
+          res(null);
+        }
+      };
+      r.onerror = () => res(null);
+    });
+  });
+  const results = await Promise.all(promises);
+  return results.filter(r => r !== null);
+}
+
+/**
+ * Clean up orphaned photos (photos with no matching item)
+ * @returns {Promise<number>} Number of photos deleted
+ */
+export async function cleanupOrphanedPhotos() {
+  const allPhotos = await getAllFromStore(PHOTOS_STORE);
+  const allItems = await listAll();
+  const itemIds = new Set(allItems.map(item => item.id));
+
+  let deletedCount = 0;
+  for (const photo of allPhotos) {
+    if (photo.itemId && !itemIds.has(photo.itemId)) {
+      await deletePhoto(photo.id);
+      deletedCount++;
+    }
+  }
+
+  return deletedCount;
 }
 
 // Utility: Get all object store names

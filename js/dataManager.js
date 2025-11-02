@@ -124,7 +124,8 @@ export async function importData(fileOrContent) {
             if (photoFile) {
               const blob = await photoFile.async('blob');
               try {
-                await savePhoto(photo.id, blob);
+                // Save photo with thumbnail and itemId from metadata
+                await savePhoto(photo.id, blob, photo.thumbnail || '', photo.itemId || null);
               } catch (err) {
                 console.warn('Could not import photo', photo.id, err);
               }

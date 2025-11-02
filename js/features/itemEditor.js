@@ -3,10 +3,10 @@
    ============================= */
 
 import { escapeHtml, el, enhanceSelectInteractivity } from '../utils.js';
-import { addItem, updateItem, listAll, savePhoto, deletePhotosByItemId } from '../db.js';
+import { addItem, updateItem, listAll, savePhoto, deletePhotosByItemId, deletePhoto } from '../db.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { renderStars, setupStarRating } from '../components/rating.js';
-import { capturePhoto, selectPhoto, renderPhotoPreview, setPhotos, getPhotos, clearPhotos, processPhotoForEditing, dataURLToBlob } from '../components/photos.js';
+import { capturePhoto, selectPhoto, renderPhotoPreview, setPhotos, getPhotos, clearPhotos, processPhotoForEditing } from '../components/photos.js';
 import { getConfig, getTypeInfo } from '../config.js';
 import { addPairing, removePairing } from '../models/pairings.js';
 import { openPairingSelector, setCurrentPairings, getCurrentPairings } from './pairingSelector.js';
@@ -17,7 +17,7 @@ import { setCurrentPlaces, getCurrentPlaces, invalidatePlaceUsageCache } from '.
 let currentEditingId = null;
 let starRatingController = null;
 
-export function openEditor(item = null, onSave) {
+export async function openEditor(item = null, onSave) {
   const config = getConfig();
 
   if (item) {
@@ -27,13 +27,13 @@ export function openEditor(item = null, onSave) {
     setCurrentPairings(itemPairings);
     const itemPlaces = item.places ? [...item.places] : [];
     setCurrentPlaces(itemPlaces);
-    renderEditorFields(item.type || Object.keys(config)[0], item);
+    await renderEditorFields(item.type || Object.keys(config)[0], item);
   } else {
     el('editorTitle').textContent = 'Add Item';
     currentEditingId = null;
     setCurrentPairings({ good: [], bad: [] });
     setCurrentPlaces([]);
-    renderEditorFields(Object.keys(config)[0], {});
+    await renderEditorFields(Object.keys(config)[0], {});
   }
 
   openModal('editorModal');
@@ -60,7 +60,7 @@ export function closeEditor() {
   window.__editorOnSave = null;
 }
 
-function renderEditorFields(selectedType, itemData = {}) {
+async function renderEditorFields(selectedType, itemData = {}) {
   const editorFields = el('editorFields');
   const config = getConfig();
 
@@ -184,25 +184,25 @@ function renderEditorFields(selectedType, itemData = {}) {
   el('capturePhotoBtn').onclick = async () => {
     const dataURL = await capturePhoto();
     if (dataURL) {
-      const photoObj = await processPhotoForEditing(dataURL);
-      setPhotos([...getPhotos(), photoObj]);
-      renderPhotoPreview();
+      const photoId = await processPhotoForEditing(dataURL, currentEditingId);
+      setPhotos([...getPhotos(), photoId]);
+      await renderPhotoPreview();
     }
   };
 
   el('selectPhotoBtn').onclick = async () => {
     const dataURL = await selectPhoto();
     if (dataURL) {
-      const photoObj = await processPhotoForEditing(dataURL);
-      setPhotos([...getPhotos(), photoObj]);
-      renderPhotoPreview();
+      const photoId = await processPhotoForEditing(dataURL, currentEditingId);
+      setPhotos([...getPhotos(), photoId]);
+      await renderPhotoPreview();
     }
   };
 
   // Initial render of photos
   if (itemData.photos && Array.isArray(itemData.photos)) {
     setPhotos(itemData.photos);
-    renderPhotoPreview();
+    await renderPhotoPreview();
   }
 
   // Render places selector
@@ -341,51 +341,35 @@ export async function saveItem() {
   try {
     let itemId = currentEditingId;
 
-    // Process photos: save full blobs to photos store, keep only IDs and thumbnails on item
-    const photoMetadata = [];
-    const photos = payload.photos || [];
-
-    for (const photo of photos) {
-      // If photo has fullDataURL, it's new and needs to be saved to the photos store
-      if (photo.fullDataURL) {
-        const blob = dataURLToBlob(photo.fullDataURL);
-        // For new items, we'll save photos after getting the item ID
-        photoMetadata.push({
-          id: photo.id,
-          thumbnail: photo.thumbnail,
-          blob: blob,
-          isNew: true
-        });
-      } else {
-        // Photo already exists in the store (from editing), just keep metadata
-        photoMetadata.push({
-          id: photo.id,
-          thumbnail: photo.thumbnail,
-          isNew: false
-        });
-      }
-    }
-
-    // Store only photo IDs and thumbnails on the item
-    payload.photos = photoMetadata.map(p => ({ id: p.id, thumbnail: p.thumbnail }));
+    // Photos are already in DB, just store IDs (array of strings)
+    payload.photos = getPhotos();
 
     if (currentEditingId) {
-      // When updating, first delete old photos that are not in the new set
+      // When updating, delete removed photos
       const oldItem = await import('../db.js').then(m => m.getItem(currentEditingId));
       if (oldItem && oldItem.photos) {
-        const newPhotoIds = new Set(payload.photos.map(p => p.id));
-        const photosToDelete = oldItem.photos.filter(p => !newPhotoIds.has(p.id));
-        for (const photo of photosToDelete) {
-          await deletePhotosByItemId(currentEditingId).catch(e => console.error('Error deleting old photo:', e));
+        const oldPhotoIds = new Set(oldItem.photos);
+        const newPhotoIds = new Set(payload.photos);
+
+        for (const oldId of oldPhotoIds) {
+          if (!newPhotoIds.has(oldId)) {
+            await deletePhoto(oldId);
+          }
         }
       }
 
       await updateItem(currentEditingId, payload);
 
-      // Save new photo blobs
-      for (const photo of photoMetadata) {
-        if (photo.isNew) {
-          await savePhoto(photo.id, photo.blob, currentEditingId);
+      // Update itemId for all photos (in case they were added before item was saved)
+      const { getPhotoMetadata, getPhoto } = await import('../db.js');
+      for (const photoId of payload.photos) {
+        const photo = await getPhotoMetadata(photoId);
+        if (photo && photo.itemId !== currentEditingId) {
+          // Update itemId reference
+          const blob = await getPhoto(photoId);
+          if (blob) {
+            await savePhoto(photoId, blob, photo.thumbnail, currentEditingId);
+          }
         }
       }
 
@@ -394,10 +378,15 @@ export async function saveItem() {
       const newItemId = await addItem(payload);
       itemId = newItemId;
 
-      // Save photo blobs with the new item ID
-      for (const photo of photoMetadata) {
-        if (photo.isNew) {
-          await savePhoto(photo.id, photo.blob, newItemId);
+      // Update itemId for all photos
+      const { getPhotoMetadata, getPhoto } = await import('../db.js');
+      for (const photoId of payload.photos) {
+        const photo = await getPhotoMetadata(photoId);
+        if (photo) {
+          const blob = await getPhoto(photoId);
+          if (blob) {
+            await savePhoto(photoId, blob, photo.thumbnail, newItemId);
+          }
         }
       }
 
