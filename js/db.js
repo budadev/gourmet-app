@@ -27,6 +27,8 @@ function initDb() {
         store.createIndex('by_barcode', 'barcode', { unique: false });
         store.createIndex('by_name', 'name', { unique: false });
         store.createIndex('by_type', 'type', { unique: false });
+        store.createIndex('by_rating', 'rating', { unique: false });
+        store.createIndex('by_place', 'places', { unique: false });
       }
 
       // Version 2: places store
