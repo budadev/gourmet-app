@@ -3,7 +3,7 @@
    ============================= */
 
 import { loadConfig } from './config.js';
-import { el, enhanceSelectInteractivity } from './utils.js';
+import { el, enhanceSelectInteractivity, showBarcodeLookupLoading, hideBarcodeLookupLoading, updateBarcodeLookupStep } from './utils.js';
 import { findByBarcode, ensureDbReady, getItemsByIds } from './db.js';
 import { buildSearchIndex, searchIndex_fast } from './searchIndex.js';
 import { setupSearch, setSearchValue } from './features/search.js';
@@ -71,20 +71,34 @@ async function initApp() {
     barcodeScanBtn.setAttribute('aria-disabled','true');
     try {
       await startScan(async (code) => {
-        const items = await findByBarcode(code);
-        if (items && items.length === 1) {
-          showItemDetails(items[0].id, (item) => {
-            openEditor(item, refreshList);
-          }, refreshList);
-        } else if (items && items.length > 1) {
-          setSearchValue(code);
-          renderList(items, (id) => {
-            showItemDetails(id, (item) => {
+        // Show loading overlay immediately after barcode is detected
+        showBarcodeLookupLoading('🔍 Searching internal database...');
+
+        try {
+          // Step 1: Search internal database
+          const items = await findByBarcode(code);
+
+          if (items && items.length === 1) {
+            // Found exactly one item
+            hideBarcodeLookupLoading();
+            showItemDetails(items[0].id, (item) => {
               openEditor(item, refreshList);
             }, refreshList);
-          });
-        } else {
-          const fetched = await lookupByBarcode(code);
+          } else if (items && items.length > 1) {
+            // Found multiple items
+            hideBarcodeLookupLoading();
+            setSearchValue(code);
+            renderList(items, (id) => {
+              showItemDetails(id, (item) => {
+                openEditor(item, refreshList);
+              }, refreshList);
+            });
+          } else {
+            // Not found in internal DB - Step 2: Search external API
+            updateBarcodeLookupStep('🌐 Searching public database...');
+            const fetched = await lookupByBarcode(code);
+            hideBarcodeLookupLoading();
+
             if (fetched && confirm(`Barcode not found. Found "${fetched.name}" in Open Food Facts. Add it?`)) {
               openEditor({ ...fetched, barcode: code }, refreshList);
             } else if (!fetched) {
@@ -92,7 +106,14 @@ async function initApp() {
                 openEditor({ barcode: code }, refreshList);
               }
             }
-          await refreshList();
+            await refreshList();
+          }
+        } catch (error) {
+          hideBarcodeLookupLoading();
+          console.error('Barcode lookup error:', error);
+          if (confirm('Error during barcode lookup. Add new item?')) {
+            openEditor({ barcode: code }, refreshList);
+          }
         }
       });
     } finally {

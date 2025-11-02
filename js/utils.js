@@ -90,3 +90,30 @@ export function enhanceSelectInteractivity(root = document) {
     }, { passive: true });
   });
 }
+
+// Barcode Lookup Loading Overlay utilities
+export function showBarcodeLookupLoading(step = '') {
+  const overlay = el('barcodeLookupLoading');
+  const stepEl = el('barcodeLoadingStep');
+  if (overlay) {
+    overlay.classList.add('active');
+  }
+  if (stepEl && step) {
+    stepEl.textContent = step;
+  }
+}
+
+export function hideBarcodeLookupLoading() {
+  const overlay = el('barcodeLookupLoading');
+  if (overlay) {
+    overlay.classList.remove('active');
+  }
+}
+
+export function updateBarcodeLookupStep(step) {
+  const stepEl = el('barcodeLoadingStep');
+  if (stepEl) {
+    stepEl.textContent = step;
+  }
+}
+
