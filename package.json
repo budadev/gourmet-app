@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "cleanup:unused": "node cleanup-unused.cjs --fix",
+    "cleanup:preview": "node cleanup-unused.cjs --dry-run",
+    "cleanup:all": "npm run lint:fix && node cleanup-unused.cjs --fix && npm run lint"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

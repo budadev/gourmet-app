@@ -10,6 +10,8 @@ import { openInlinePlaceEditor, openCreatePlaceEditor } from '../components/plac
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
 
+
+
 export function initSideMenu() {
   const hamburgerBtn = el('hamburgerBtn');
   const overlay = el('sideMenuOverlay');

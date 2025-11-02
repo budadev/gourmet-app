@@ -9,9 +9,7 @@ let currentPhotos = []; // Array of photo IDs (strings), not objects
 let currentPhotoIndex = 0;
 let allPhotosInViewer = [];
 let controlsVisible = true;
-let touchStartY = 0;
-let touchStartX = 0;
-let isDragging = false;
+// Touch tracking removed - was unused
 
 // Convert Blob to data URL
 export function blobToDataURL(blob) {

@@ -535,7 +535,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     let userLocation = null;
     let areaCenter = null;
     let areaRadius = radiusSteps[6]; // default 1000m
-    let marker = null;
+    
 
     async function centerToUser() {
         if (navigator.geolocation) {
@@ -735,7 +735,7 @@ export async function renderPlaceMapFilterModal(containerEl, onPlaceSelect) {
     }
 
     // Also re-enable swipe gestures if modal is closed programmatically (e.g., after area select)
-    const originalInnerHTML = containerEl.innerHTML;
+    
     const observer = new MutationObserver(() => {
         if (containerEl.innerHTML === '' && window.enableSwipeGestures) window.enableSwipeGestures();
     });

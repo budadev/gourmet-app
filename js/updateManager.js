@@ -3,7 +3,7 @@
    Handles version checking and update notifications
    ============================= */
 
-const UPDATE_CHECK_KEY = 'gourmetapp_last_update_check';
+
 const SKIPPED_VERSION_KEY = 'gourmetapp_skipped_version';
 const CURRENT_VERSION_KEY = 'gourmetapp_current_version';
 

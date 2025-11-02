@@ -225,7 +225,7 @@ function setupInputFocusHandling() {
   const header = editorModal.querySelector('.modal-header');
   if (!scrollContainer || !header) return;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
 
   function ensureVisible(input){
     if (!input) return;
@@ -376,7 +376,7 @@ export async function saveItem() {
       setStatus('Item updated!');
     } else {
       const newItemId = await addItem(payload);
-      itemId = newItemId;
+      // itemId assignment removed - was unused
 
       // Update itemId for all photos
       const { getPhotoMetadata, getPhoto } = await import('../db.js');
