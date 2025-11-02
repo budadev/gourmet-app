@@ -4,7 +4,6 @@
 
 import { el, escapeHtml } from '../utils.js';
 import { checkUpdateStatus, showUpdateBannerManually } from '../updateManager.js';
-import { getAllPlaces, getPlacesUsageMap } from '../models/places.js';
 import { exportAllData, importData } from '../dataManager.js';
 import { openInlinePlaceEditor, openCreatePlaceEditor } from '../components/placeEditor.js';
 
@@ -366,44 +365,6 @@ async function showPlaces() {
     modal.classList.add('active');
   }
 }
-
-function closePlaces() {
-  const modal = el('placesModal');
-  modal.classList.remove('active');
-  document.documentElement.style.overflow = '';
-  document.body.style.overflow = '';
-  // Reset modal body padding to default to avoid affecting other modals
-  try {
-    const mb = modal.querySelector('.modal-body');
-    if (mb) mb.style.paddingBottom = '';
-  } catch (err) {}
-  // Clean up any moved menus and placeholders
-  const menus = document.querySelectorAll('.places-list-item-menu');
-  menus.forEach(m => {
-    try {
-      if (m._moved) {
-        // restore to placeholder location
-        if (m._placeholder && m._placeholder.parentNode) {
-          m._placeholder.parentNode.replaceChild(m, m._placeholder);
-        }
-        m.style.position = '';
-        m.style.left = '';
-        m.style.top = '';
-        m.style.zIndex = '';
-        m.style.display = 'none';
-        m._moved = false;
-      }
-      if (m._portal) {
-        m._portal.remove();
-        m._portal = null;
-      }
-    } catch (err) {
-      // ignore cleanup errors
-      console.warn('Error cleaning up place menu:', err);
-    }
-  });
-}
-
 
 function showNotification(message, type = 'info') {
   const toast = document.createElement('div');

@@ -69,17 +69,17 @@ async function renderSelectedPlaces(placeIds = getCurrentPlaces()) {
     const isLoading = place._loadingLocation === true;
 
     html += `<div class="place-tag ${isLoading ? 'loading-location' : ''}" data-place-id="${id}">`;
-    html += `<span class="place-tag-icon" data-action="edit">📍</span>`;
+    html += '<span class="place-tag-icon" data-action="edit">📍</span>';
     html += `<span class="place-tag-name" data-action="edit">${escapeHtml(place.name)}</span>`;
 
     if (isLoading) {
       // Show spinner instead of remove button while loading
-      html += `<span class="place-tag-spinner"></span>`;
+      html += '<span class="place-tag-spinner"></span>';
     } else {
       html += `<button class="place-tag-remove" data-place-id="${id}" type="button">×</button>`;
     }
 
-    html += `</div>`;
+    html += '</div>';
   }
   html += '</div>';
   container.innerHTML = html;
@@ -353,7 +353,7 @@ export function openInlinePlaceEditor(tagEl, placeId, options = {}) {
       }
     }
 
-    if (mapLoading) mapLoading.style.display = 'none'; if (mapEl) mapEl.style.display = 'block'; try { mapInstance.map.invalidateSize(); } catch (e) {};
+    if (mapLoading) mapLoading.style.display = 'none'; if (mapEl) mapEl.style.display = 'block'; try { mapInstance.map.invalidateSize(); } catch (e) {}
     setTimeout(() => { try { mapInstance.map.invalidateSize(); } catch (e) {} }, 250);
 
     // map search wiring
@@ -911,10 +911,10 @@ async function renderSearchResults(results, query) {
   for (const place of results) {
     const isSelected = getCurrentPlaces().includes(place.id);
     html += `<div class="place-search-item ${isSelected ? 'selected' : ''}" data-place-id="${place.id}">`;
-    html += `<span class="place-search-item-icon">📍</span>`;
+    html += '<span class="place-search-item-icon">📍</span>';
     html += `<span class="place-search-item-name">${escapeHtml(place.name)}</span>`;
-    if (isSelected) html += `<span class="place-search-item-check">✓</span>`;
-    html += `</div>`;
+    if (isSelected) html += '<span class="place-search-item-check">✓</span>';
+    html += '</div>';
   }
   resultsContainer.innerHTML = html; resultsContainer.classList.remove('hidden');
   resultsContainer.querySelectorAll('.place-search-item').forEach(item => {
@@ -939,9 +939,9 @@ export async function renderPlacesInDetails(placeIds) {
     if (!place) continue;
     // Render as a simple clickable badge, no remove button or edit actions
     html += `<div class="place-tag clickable" data-place-id="${placeId}">`;
-    html += `<span class="place-tag-icon">📍</span>`;
+    html += '<span class="place-tag-icon">📍</span>';
     html += `<span class="place-tag-name">${escapeHtml(place.name)}</span>`;
-    html += `</div>`;
+    html += '</div>';
   }
   html += '</div></div>';
   return html;

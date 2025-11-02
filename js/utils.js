@@ -109,11 +109,3 @@ export function hideBarcodeLookupLoading() {
     overlay.classList.remove('active');
   }
 }
-
-export function updateBarcodeLookupStep(step) {
-  const stepEl = el('barcodeLoadingStep');
-  if (stepEl) {
-    stepEl.textContent = step;
-  }
-}
-

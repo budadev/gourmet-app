@@ -3,7 +3,7 @@
    ============================= */
 
 import { escapeHtml, el, enhanceSelectInteractivity } from '../utils.js';
-import { addItem, updateItem, listAll, savePhoto, deletePhotosByItemId, deletePhoto } from '../db.js';
+import { addItem, updateItem, listAll, savePhoto, deletePhoto } from '../db.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { renderStars, setupStarRating } from '../components/rating.js';
 import { capturePhoto, selectPhoto, renderPhotoPreview, setPhotos, getPhotos, clearPhotos, processPhotoForEditing } from '../components/photos.js';
@@ -91,13 +91,13 @@ async function renderEditorFields(selectedType, itemData = {}) {
   html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating) || 0, true)}</div></div>`;
 
   // Dynamic fields container (will be populated separately)
-  html += `<div id="dynamicFieldsContainer" style="grid-column:1/-1"></div>`;
+  html += '<div id="dynamicFieldsContainer" style="grid-column:1/-1"></div>';
 
   // Notes (always) - full width
   html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes || '')}</textarea></div>`;
 
   // Places section - full width (moved before Photos)
-  html += `<div id="placesEditorContainer" style="grid-column:1/-1"></div>`;
+  html += '<div id="placesEditorContainer" style="grid-column:1/-1"></div>';
 
   // Photos (optional) - full width
   html += `<div class="field-group" style="grid-column:1/-1">
@@ -110,7 +110,7 @@ async function renderEditorFields(selectedType, itemData = {}) {
   </div>`;
 
   // Pairings section - full width
-  html += `<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>`;
+  html += '<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>';
 
   html += '</div>';
 

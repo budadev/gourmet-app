@@ -3,13 +3,13 @@
    ============================= */
 
 import { loadConfig } from './config.js';
-import { el, enhanceSelectInteractivity, showBarcodeLookupLoading, hideBarcodeLookupLoading, updateBarcodeLookupStep } from './utils.js';
+import { el, enhanceSelectInteractivity, showBarcodeLookupLoading, hideBarcodeLookupLoading } from './utils.js';
 import { findByBarcode, ensureDbReady, getItemsByIds } from './db.js';
 import { buildSearchIndex, searchIndex_fast } from './searchIndex.js';
 import { setupSearch, setSearchValue } from './features/search.js';
 import { renderList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
-import { openEditor, closeEditor, saveItem, renderPairingsInEditor } from './features/itemEditor.js';
+import { openEditor, closeEditor, renderPairingsInEditor } from './features/itemEditor.js';
 import { startScan, stopScan } from './features/scanner.js';
 import { initPhotoModal } from './components/photos.js';
 import { closePairingSelector, refreshPairingList, setupPairingListClickHandlers } from './features/pairingSelector.js';

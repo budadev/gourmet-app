@@ -15,14 +15,6 @@ let currentFilters = {
   maxRating: 5
 };
 
-export function getCurrentFilters() {
-  return { ...currentFilters };
-}
-
-export function setCurrentFilters(filters) {
-  currentFilters = { ...filters };
-}
-
 export function clearAllFilters() {
   currentFilters = {
     types: [],
@@ -524,10 +516,10 @@ function renderStarRating(container, rating, type) {
   const label = type === 'min' ? 'Minimum' : 'Maximum';
 
   let html = '<div class="filter-star-rating">';
-  html += `<div class="filter-range-label">`;
+  html += '<div class="filter-range-label">';
   html += `<span class="filter-range-label-text">${label}</span>`;
   html += `<span class="filter-range-value" id="filterRating${type}">${rating}</span>`;
-  html += `</div>`;
+  html += '</div>';
   html += '<div class="filter-star-container" id="filterStarContainer${type}">';
   html += renderStars(rating, true);
   html += '</div>';
@@ -635,17 +627,4 @@ function triggerFilterChange() {
   if (filterChangeCallback) {
     filterChangeCallback();
   }
-}
-
-// Helper to close all map modals and any inline backdrops (robust cleanup)
-function closeAllMapModals() {
-  document.querySelectorAll('.filter-place-map-modal, .inline-place-backdrop').forEach(modal => {
-    if (modal && modal.parentNode) {
-      modal.parentNode.removeChild(modal);
-    }
-  });
-  document.body.classList.remove('modal-open');
-  document.documentElement.classList.remove('modal-open');
-  // Debug log
-  console.log('[Modal] All overlays cleaned up');
 }

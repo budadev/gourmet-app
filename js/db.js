@@ -177,23 +177,6 @@ export async function getItemsByIds(ids) {
   return results.filter(item => item !== null); // Filter out nulls
 }
 
-/**
- * Legacy text search function - reads entire DB and filters
- * NOTE: This is kept for backward compatibility but the app now uses
- * the index-based approach (searchIndex.js + getItemsByIds) for better performance.
- * Consider using searchIndex_fast() + getItemsByIds() instead.
- */
-export async function searchByText(q) {
-  q = (q || '').toLowerCase();
-  const all = await listAll();
-  if (!q) return all;
-  return all.filter(it =>
-    (it.name || '').toLowerCase().includes(q) ||
-    (it.notes || '').toLowerCase().includes(q) ||
-    (it.barcode || '').includes(q)
-  );
-}
-
 /* =============================
    Places Store Functions
    ============================= */
@@ -383,26 +366,6 @@ export async function getPhotoThumbnails(photoIds) {
   });
   const results = await Promise.all(promises);
   return results.filter(r => r !== null);
-}
-
-/**
- * Clean up orphaned photos (photos with no matching item)
- * @returns {Promise<number>} Number of photos deleted
- */
-export async function cleanupOrphanedPhotos() {
-  const allPhotos = await getAllFromStore(PHOTOS_STORE);
-  const allItems = await listAll();
-  const itemIds = new Set(allItems.map(item => item.id));
-
-  let deletedCount = 0;
-  for (const photo of allPhotos) {
-    if (photo.itemId && !itemIds.has(photo.itemId)) {
-      await deletePhoto(photo.id);
-      deletedCount++;
-    }
-  }
-
-  return deletedCount;
 }
 
 // Utility: Get all object store names

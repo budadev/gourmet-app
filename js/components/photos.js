@@ -3,7 +3,7 @@
    ============================= */
 
 import { el } from '../utils.js';
-import { savePhoto, getPhoto, deletePhoto, getPhotoThumbnails } from '../db.js';
+import { savePhoto, deletePhoto, getPhotoThumbnails } from '../db.js';
 
 let currentPhotos = []; // Array of photo IDs (strings), not objects
 let currentPhotoIndex = 0;
@@ -13,19 +13,6 @@ let touchStartY = 0;
 let touchStartX = 0;
 let isDragging = false;
 
-// Convert data URL to Blob
-export function dataURLToBlob(dataURL) {
-  const parts = dataURL.split(',');
-  const mime = parts[0].match(/:(.*?);/)[1];
-  const bstr = atob(parts[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new Blob([u8arr], { type: mime });
-}
-
 // Convert Blob to data URL
 export function blobToDataURL(blob) {
   return new Promise((resolve, reject) => {
@@ -33,42 +20,6 @@ export function blobToDataURL(blob) {
     reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(blob);
-  });
-}
-
-// Create thumbnail from data URL
-export async function createThumbnail(dataURL, maxWidth = 150, maxHeight = 150) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      // Calculate new dimensions maintaining aspect ratio
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // Convert to data URL with compression
-      resolve(canvas.toDataURL('image/jpeg', 0.7));
-    };
-    img.onerror = reject;
-    img.src = dataURL;
   });
 }
 

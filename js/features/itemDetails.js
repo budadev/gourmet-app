@@ -271,7 +271,3 @@ async function renderPairingsHTML(item, onPairingClick) {
   html += '</div>';
   return html;
 }
-
-export function closeDetails() {
-  closeModal('detailsModal');
-}

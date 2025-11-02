@@ -226,9 +226,4 @@ export async function updatePlace(id, patch) {
   return res;
 }
 
-// Provide explicit export for usage counts if needed elsewhere (not used now)
-export async function getPlacesUsageMap() {
-  return await getPlaceUsageCounts();
-}
-
 export { dbListAllPlaces as listAllPlaces };

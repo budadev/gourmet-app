@@ -277,7 +277,7 @@ async function startCamera(onScanComplete) {
       const avgQuality = matchingDetections.reduce((sum, d) => sum + d.quality, 0) / matchingDetections.length;
 
       // Update status to show progress
-      el('scanStatus').textContent = `🔍 Reading barcode...`;
+      el('scanStatus').textContent = '🔍 Reading barcode...';
 
       // Check if we have consensus
       if (matchingDetections.length >= REQUIRED_DETECTIONS) {

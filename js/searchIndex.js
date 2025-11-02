@@ -88,33 +88,3 @@ export function searchIndex_fast(query) {
 
   return matchingIds;
 }
-
-/**
- * Get the search index entry for an item
- * Useful for filtering/sorting without hitting the database
- */
-export function getIndexEntry(id) {
-  return searchIndex.get(id);
-}
-
-/**
- * Get all index entries (for filtering operations)
- */
-export function getAllIndexEntries() {
-  return Array.from(searchIndex.values());
-}
-
-/**
- * Clear the entire search index
- */
-export function clearSearchIndex() {
-  searchIndex.clear();
-}
-
-/**
- * Get the size of the search index
- */
-export function getSearchIndexSize() {
-  return searchIndex.size;
-}
-

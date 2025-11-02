@@ -59,7 +59,3 @@ export function setSearchValue(value) {
     }
   }
 }
-
-export function getSearchValue() {
-  return el('searchInput').value.trim();
-}

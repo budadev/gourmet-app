@@ -6,7 +6,7 @@ import { escapeHtml, el } from '../utils.js';
 import { getItemsByIds } from '../db.js';
 import { searchIndex_fast } from '../searchIndex.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { addPairing, removePairing } from '../models/pairings.js';
+import { addPairing } from '../models/pairings.js';
 import { getTypeInfo } from '../config.js';
 
 let pairingMode = null; // 'good' or 'bad'

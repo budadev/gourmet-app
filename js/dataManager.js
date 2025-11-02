@@ -4,8 +4,7 @@
 
 const JSZip = window.JSZip;
 
-import { listAll, addItem, savePhoto, getPhoto, getAllStoreNames, getAllFromStore, bulkAddToStore } from './db.js';
-import { dataURLToBlob, createThumbnail, generatePhotoId, blobToDataURL } from './components/photos.js';
+import { savePhoto, getPhoto, getAllStoreNames, getAllFromStore, bulkAddToStore } from './db.js';
 
 /**
  * Export all data from IndexedDB to a ZIP file (JSON + photos)

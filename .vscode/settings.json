@@ -1,0 +1,11 @@
+{
+  "eslint.enable": true,
+  "eslint.validate": [
+    "javascript"
+  ],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.lintTask.enable": true
+}
+

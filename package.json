@@ -1,0 +1,15 @@
+{
+  "name": "gourmet-app",
+  "version": "1.0.0",
+  "description": "Gourmet tracking application",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-plugin-unused-imports": "^3.0.0"
+  }
+}
+
