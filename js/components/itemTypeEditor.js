@@ -314,5 +314,74 @@ export function initItemTypeEditor() {
       }
     });
   }
+
+  // Block browser extensions from analyzing input fields
+  const blockExtensions = (input) => {
+    if (!input) return;
+
+    // Comprehensive list of attributes to block various extensions
+    const attrs = {
+      'autocomplete': 'off',
+      'data-1p-ignore': 'true',
+      'data-lpignore': 'true',
+      'data-form-type': 'other',
+      'data-bwignore': 'true', // Bitwarden
+      'data-dashlane-ignore': 'true', // Dashlane
+      'data-kwimpalastatus': 'false', // Keeper
+      'data-lastpass-ignore': 'true', // LastPass
+      'data-np-checked': '1', // Norton
+      'data-ms-editor': 'false', // Microsoft Editor
+      'data-gramm': 'false', // Grammarly
+      'data-gramm_editor': 'false', // Grammarly
+      'spellcheck': 'false'
+    };
+
+    Object.entries(attrs).forEach(([key, value]) => {
+      input.setAttribute(key, value);
+    });
+
+    // Add to input element's dataset to prevent classification
+    input.dataset.noExtensions = 'true';
+
+    // Remove readonly to make it editable
+    input.removeAttribute('readonly');
+  };
+
+  // Apply blocking to item type editor inputs
+  const labelInput = el('itemTypeLabelInput');
+  const iconInput = el('itemTypeIconInput');
+
+  blockExtensions(labelInput);
+  blockExtensions(iconInput);
+
+  // Re-apply blocking when modal opens (in case extensions re-analyze)
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.target === modal && modal.classList.contains('active')) {
+        // Small delay to ensure inputs are rendered
+        setTimeout(() => {
+          const label = el('itemTypeLabelInput');
+          const icon = el('itemTypeIconInput');
+
+          // First set readonly to block extensions
+          if (label) label.setAttribute('readonly', 'true');
+          if (icon) icon.setAttribute('readonly', 'true');
+
+          // Then after a tiny delay, remove readonly and apply blocking
+          setTimeout(() => {
+            blockExtensions(label);
+            blockExtensions(icon);
+          }, 100);
+        }, 50);
+      }
+    });
+  });
+
+  if (modal) {
+    observer.observe(modal, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  }
 }
 
