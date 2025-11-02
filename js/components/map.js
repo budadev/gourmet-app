@@ -97,7 +97,7 @@ export async function createMap(container, opts = {}) {
   });
 
   // Provide an SVG icon similar to other maps
-  const svg = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns='http://www.w3.org/2000/svg' width='32' height='44' viewBox='0 0 32 44'>
     <defs>
       <linearGradient id='pinGradient' x1='0' x2='1' y1='0' y2='1'>
@@ -189,7 +189,7 @@ export async function createMap(container, opts = {}) {
         interactive: !!opts.interactive
       }).addTo(map);
       if (opts.interactive) {
-        circle.on('mousedown', function (e) {
+        circle.on('mousedown', function () {
           map.dragging.disable();
           map.on('mousemove', resizeCircle);
           map.once('mouseup', function () {

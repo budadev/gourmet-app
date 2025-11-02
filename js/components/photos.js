@@ -295,7 +295,7 @@ function setupPhotoGestures() {
     }
   }, { passive: true });
 
-  newImg.addEventListener('touchend', (e) => {
+  newImg.addEventListener('touchend', () => {
     if (!isSwiping) return;
 
     const deltaX = currentX - startX;

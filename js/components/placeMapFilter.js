@@ -154,7 +154,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
   `;
 
     // Assign DOM elements after setting innerHTML
-    mapWrapper = popup.querySelector('.inline-place-map-wrapper');
     mapLoading = popup.querySelector('.inline-place-map-loading');
     mapEl = popup.querySelector('.inline-place-map');
     centerBtn = document.createElement('button');
@@ -176,7 +175,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                 function updateIcon() {
                     const available = result.state === 'granted' || result.state === 'prompt';
                     const color = available ? '#007aff' : '#222';
-                    centerBtn.innerHTML = `<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"${color}\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"6\"/><line x1=\"12\" y1=\"18\" x2=\"12\" y2=\"22\"/><line x1=\"2\" y1=\"12\" x2=\"6\" y2=\"12\"/><line x1=\"18\" y1=\"12\" x2=\"22\" y2=\"12\"/></svg>`;
+                    centerBtn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
                 }
                 updateIcon();
                 result.onchange = updateIcon;
@@ -208,7 +207,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
     let geoRequested = false;
 
     const centerToUser = () => {
-        if (!geoAvailable) return Promise.reject(new Error('Geolocation unavailable'));
         return new Promise((resolve, reject) => {
             let handled = false;
             const success = pos => { handled = true; resolve(pos); };
@@ -372,7 +370,7 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                 centerBtn.classList.add('loading');
                 navigator.geolocation.getCurrentPosition((pos) => {
                     try { centerBtn.classList.remove('loading'); const lat = pos.coords.latitude; const lng = pos.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); } catch (e) {}
-                }, (err) => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
+                }, () => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
             } catch (e) { try { centerBtn.classList.remove('loading'); } catch (e) {} }
         }
     }
@@ -386,11 +384,10 @@ async function openInlinePlaceEditor(tagEl, placeId) {
         mapSearchInput.addEventListener('input', (ev) => {
             const q = (ev.target.value || '').trim();
             if (searchTimer) clearTimeout(searchTimer);
-            if (!q) { hideMapSearchResults(); if (mapSearchResults) mapSearchResults.innerHTML = ''; return; }
+            if (!q) { if (mapSearchResults) mapSearchResults.innerHTML = ''; return; }
             searchTimer = setTimeout(async () => {
                 if (!mapSearchResults) return;
                 mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">Searching...</div></div>';
-                showMapSearchResults();
                 const results = await doMapSearch(q);
                 if (!results || results.length === 0) { mapSearchResults.innerHTML = '<div class="result-item"><div class="ri-main">No results</div></div>'; return; }
                 mapSearchResults.innerHTML = results.map(r => `
@@ -415,7 +412,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                             if (coordsEl) { coordsEl.textContent = `Selected: ${selectedCoords.lat.toFixed(6)}, ${selectedCoords.lng.toFixed(6)}`; coordsEl.style.display = ''; }
                             setLastLocation(lat, lng);
                         }
-                        hideMapSearchResults();
                     };
                 });
             }, 350);
@@ -433,7 +429,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                 ev.preventDefault();
                 try { mapSearchInput.value = ''; } catch (e) {}
                 try { if (mapSearchResults) mapSearchResults.innerHTML = ''; } catch (e) {}
-                hideMapSearchResults();
                 programmaticFocus = true;
             });
         }
@@ -443,7 +438,6 @@ async function openInlinePlaceEditor(tagEl, placeId) {
                 const t = ev.target;
                 if (mapSearchInput && mapSearchInput.contains(t)) return;
                 if (mapSearchResults && mapSearchResults.contains(t)) return;
-                hideMapSearchResults();
             } catch (e) {}
         };
         document.addEventListener('click', outsideHandler);

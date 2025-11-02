@@ -348,7 +348,7 @@ export function openInlinePlaceEditor(tagEl, placeId, options = {}) {
           centerBtn.classList.add('loading');
           navigator.geolocation.getCurrentPosition((pos) => {
             try { centerBtn.classList.remove('loading'); const lat = pos.coords.latitude; const lng = pos.coords.longitude; try { mapInstance.map.setView([lat, lng], 13); } catch (e) {} setLastLocation(lat, lng); } catch (e) {}
-          }, (err) => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
+          }, () => { try { centerBtn.classList.remove('loading'); centerBtn.classList.add('disabled'); } catch (e) {} }, { enableHighAccuracy: true, timeout: 10000 });
         } catch (e) { try { centerBtn.classList.remove('loading'); } catch (e) {} }
       }
     }
@@ -620,7 +620,7 @@ export function openCreatePlaceEditor() {
     }
   };
 
-  const initMapIfNeeded = async (initialCoords) => {
+  const initMapIfNeeded = async () => {
     if (mapInstance) {
       return;
     }
