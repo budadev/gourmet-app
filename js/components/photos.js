@@ -21,7 +21,7 @@ export function blobToDataURL(blob) {
   });
 }
 
-async function createThumbnailBlob(dataURL, maxW=600, maxH=600) {
+async function createThumbnailBlob(dataURL, maxW=300, maxH=300) {
   // Create an Image from the dataURL
   const img = await new Promise((resolve, reject) => {
     const i = new Image();
