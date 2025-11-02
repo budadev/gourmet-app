@@ -449,6 +449,36 @@ export function clearPhotos() {
 }
 
 /**
+ * Downscale a photo to reduce storage size
+ * @param {string} dataURL - Original photo data URL
+ * @param {number} scale - Scale factor (e.g., 0.7 for 70% of original size)
+ * @param {number} quality - JPEG quality (0-1)
+ * @returns {Promise<Blob>} Downscaled photo as Blob
+ */
+async function downscalePhoto(dataURL, scale = 0.7, quality = 0.7) {
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataURL;
+  });
+
+  // Calculate target dimensions
+  const targetWidth = Math.round(img.width * scale);
+  const targetHeight = Math.round(img.height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+  // Convert to Blob with JPEG compression
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', quality));
+  return blob;
+}
+
+/**
  * Process a photo data URL and save to photos table immediately
  * Returns photo ID for referencing
  * @param {string} dataURL - Photo data URL
@@ -457,9 +487,12 @@ export function clearPhotos() {
  */
 export async function processPhotoForEditing(dataURL, itemId = null) {
   const id = generatePhotoId();
-  // Create thumbnail as Blob now
+
+  // Downscale the actual photo to 70% size with JPEG quality 0.7
+  const blob = await downscalePhoto(dataURL, 0.7, 0.7);
+
+  // Create thumbnail as Blob (smaller, for gallery view)
   const thumbnailBlob = await createThumbnailBlob(dataURL);
-  const blob = dataURLToBlob(dataURL);
 
   // Save to photos table immediately (itemId will be updated on item save)
   await savePhoto(id, blob, thumbnailBlob, itemId);
