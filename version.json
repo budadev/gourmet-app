@@ -1,8 +1,10 @@
 {
-  "version": "0.1.51",
-  "releaseDate": "2025-10-25",
+  "version": "0.1.52",
+  "releaseDate": "2025-11-02",
   "changes": [
-    "Beta version released with core features implemented - Ready for testing and feedback.",
-    "Database optimizations for improved performance."
+    "Major barcode scanning accuracy improvements - now requires 3 consistent reads with quality validation",
+    "Added checksum validation for EAN/UPC barcodes to prevent false positives",
+    "Optimized scanner settings for accuracy over speed (full resolution, larger patch size)",
+    "Scanner now shows real-time quality feedback during scanning"
   ]
 }

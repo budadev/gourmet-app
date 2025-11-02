@@ -67,7 +67,7 @@ async function startCamera(onScanComplete) {
     console.log('Error enumerating devices:', e);
   }
 
-  // Configure Quagga2
+  // Configure Quagga2 with enhanced accuracy settings
   const config = {
     inputStream: {
       name: 'Live',
@@ -94,11 +94,11 @@ async function startCamera(onScanComplete) {
       singleChannel: false // use color processing
     },
     locator: {
-      patchSize: 'medium',
-      halfSample: true, // Reduce processing for better performance
+      patchSize: 'large', // Changed from 'medium' to 'large' for better accuracy
+      halfSample: false, // Changed from true - use full resolution for accuracy
     },
-    numOfWorkers: 2, // Reduce workers for mobile
-    frequency: 10, // Scan 10 times per second
+    numOfWorkers: 4, // Increased from 2 for better processing
+    frequency: 5, // Reduced from 10 - slower but more accurate scans
     decoder: {
       readers: [
         'ean_reader',      // EAN-13, EAN-8 (most wine bottles)
@@ -109,7 +109,13 @@ async function startCamera(onScanComplete) {
         'code_39_reader',  // Code 39
         'code_93_reader'
       ],
-      multiple: false // Stop after first barcode found
+      multiple: false, // Stop after first barcode found
+      debug: {
+        drawBoundingBox: true,
+        showFrequency: false,
+        drawScanline: true,
+        showPattern: false
+      }
     },
     locate: true
   };
@@ -193,29 +199,93 @@ async function startCamera(onScanComplete) {
       }
     }
 
-    // Set up barcode detection handler
-    let lastCode = null;
-    let lastCodeTime = 0;
-    const DEBOUNCE_MS = 1000; // Prevent duplicate scans within 1 second
+    // Set up barcode detection handler with quality validation and consensus
+    let detectionHistory = []; // Track recent detections for consensus
+    const REQUIRED_DETECTIONS = 3; // Must see same code 3 times
+    const QUALITY_THRESHOLD = 75; // Minimum quality score (0-100)
+    const CONSENSUS_WINDOW_MS = 2000; // Time window for consensus
 
+    // Helper function to calculate EAN/UPC checksum
+    function validateBarcodeChecksum(code, format) {
+      if (!code || code.length < 8) return false;
+
+      // EAN-13, EAN-8, UPC-A, UPC-E validation
+      if (format.includes('ean') || format.includes('upc')) {
+        const digits = code.split('').map(Number);
+        if (digits.some(isNaN)) return false;
+
+        const checkDigit = digits[digits.length - 1];
+        const codeDigits = digits.slice(0, -1);
+
+        // Calculate checksum (alternating 1x and 3x multiplier)
+        let sum = 0;
+        for (let i = 0; i < codeDigits.length; i++) {
+          const multiplier = (codeDigits.length - i) % 2 === 0 ? 1 : 3;
+          sum += codeDigits[i] * multiplier;
+        }
+
+        const calculatedCheck = (10 - (sum % 10)) % 10;
+        return calculatedCheck === checkDigit;
+      }
+
+      return true; // For other formats, assume valid
+    }
 
     Quagga.onDetected((result) => {
       if (!isScanning) return;
 
       const code = result.codeResult.code;
+      const format = result.codeResult.format;
       const now = Date.now();
 
-      // Debounce: ignore if same code detected within debounce period
-      if (code === lastCode && (now - lastCodeTime) < DEBOUNCE_MS) {
+      // Calculate quality score from error rate
+      // Quagga provides error rate for each decoded character
+      let qualityScore = 0;
+      if (result.codeResult.decodedCodes) {
+        const decodedCodes = result.codeResult.decodedCodes.filter(c => c.error !== undefined);
+        if (decodedCodes.length > 0) {
+          const avgError = decodedCodes.reduce((sum, c) => sum + (c.error || 0), 0) / decodedCodes.length;
+          qualityScore = Math.max(0, 100 - (avgError * 100));
+        }
+      }
+
+      // Reject low quality scans immediately
+      if (qualityScore < QUALITY_THRESHOLD) {
+        console.log(`Rejected low quality scan: ${code} (quality: ${qualityScore.toFixed(1)})`);
         return;
       }
 
-      lastCode = code;
-      lastCodeTime = now;
+      // Validate checksum for EAN/UPC codes
+      if (!validateBarcodeChecksum(code, format)) {
+        console.log(`Rejected invalid checksum: ${code} (${format})`);
+        return;
+      }
 
-      el('scanStatus').textContent = `✅ ${code}`;
-      stopScan();
-      if (onScanComplete) onScanComplete(code);
+      // Add to detection history
+      detectionHistory.push({
+        code: code,
+        format: format,
+        quality: qualityScore,
+        timestamp: now
+      });
+
+      // Clean old detections outside consensus window
+      detectionHistory = detectionHistory.filter(d => now - d.timestamp < CONSENSUS_WINDOW_MS);
+
+      // Count detections of this code
+      const matchingDetections = detectionHistory.filter(d => d.code === code);
+      const avgQuality = matchingDetections.reduce((sum, d) => sum + d.quality, 0) / matchingDetections.length;
+
+      // Update status to show progress
+      el('scanStatus').textContent = `🔍 Reading... (${matchingDetections.length}/${REQUIRED_DETECTIONS}) Quality: ${avgQuality.toFixed(0)}%`;
+
+      // Check if we have consensus
+      if (matchingDetections.length >= REQUIRED_DETECTIONS) {
+        console.log(`Barcode confirmed: ${code} (${matchingDetections.length} detections, avg quality: ${avgQuality.toFixed(1)})`);
+        el('scanStatus').textContent = `✅ ${code}`;
+        stopScan();
+        if (onScanComplete) onScanComplete(code);
+      }
     });
 
     Quagga.start();
