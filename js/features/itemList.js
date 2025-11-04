@@ -42,10 +42,49 @@ export function renderList(items, onItemClick) {
     // Bind click events for new items
     resultsEl.querySelectorAll('.item').forEach(itemEl => {
       if (!itemEl._bound) {
-        itemEl.onclick = () => {
-          const id = Number(itemEl.getAttribute('data-id'));
-          if (onItemClick) onItemClick(id);
-        };
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        // Handle touch start
+        itemEl.addEventListener('touchstart', (e) => {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartTime = Date.now();
+        }, { passive: true });
+
+        // Handle touch end - trigger click if it's a tap (not a swipe/scroll)
+        itemEl.addEventListener('touchend', (e) => {
+          if (!touchStartX) return;
+
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const touchDuration = Date.now() - touchStartTime;
+
+          const deltaX = Math.abs(touchEndX - touchStartX);
+          const deltaY = Math.abs(touchEndY - touchStartY);
+
+          // If movement is small (< 10px) and duration is short (< 500ms), treat as tap
+          if (deltaX < 10 && deltaY < 10 && touchDuration < 500) {
+            e.preventDefault(); // Prevent ghost click
+            const id = Number(itemEl.getAttribute('data-id'));
+            if (onItemClick) onItemClick(id);
+          }
+
+          touchStartX = 0;
+          touchStartY = 0;
+          touchStartTime = 0;
+        }, { passive: false });
+
+        // Fallback for non-touch devices (desktop)
+        itemEl.addEventListener('click', (e) => {
+          // Only handle click if it's not from a touch device
+          if (e.detail === 0 || !('ontouchstart' in window)) {
+            const id = Number(itemEl.getAttribute('data-id'));
+            if (onItemClick) onItemClick(id);
+          }
+        });
+
         itemEl._bound = true;
       }
     });

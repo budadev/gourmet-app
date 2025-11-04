@@ -59,8 +59,9 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
     const deltaX = touchEndX - touchStartX;
     const deltaY = Math.abs(touchEndY - touchStartY);
 
-    // Mark as swiping if horizontal movement is significant
-    if (Math.abs(deltaX) > 10 && deltaY < VERTICAL_THRESHOLD) {
+    // Mark as swiping only if horizontal movement is significant AND vertical is minimal
+    // Increased threshold from 10px to 30px to avoid interfering with normal taps/scrolls
+    if (Math.abs(deltaX) > 30 && deltaY < VERTICAL_THRESHOLD) {
       isSwiping = true;
     }
   }
