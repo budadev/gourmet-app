@@ -7,6 +7,7 @@ import { checkUpdateStatus, showUpdateBannerManually } from '../updateManager.js
 import { exportAllData, importData } from '../dataManager.js';
 import { openInlinePlaceEditor, openCreatePlaceEditor } from '../components/placeEditor.js';
 import { openItemTypeEditor, openCreateItemTypeEditor } from '../components/itemTypeEditor.js';
+import { openModal, closeModal } from '../components/modal.js';
 
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
@@ -71,15 +72,13 @@ export function initSideMenu() {
   });
 
   // Click outside modal to close
-  if (el('placesModal')) [el('placesModal')].forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.classList.remove('active');
-        document.documentElement.style.overflow = '';
-        document.body.style.overflow = '';
+  if (el('placesModal')) {
+    el('placesModal').addEventListener('click', (e) => {
+      if (e.target === el('placesModal')) {
+        closeModal('placesModal');
       }
     });
-  });
+  }
 
   // Click outside modals to close - All Places and Places Without Coords
   [el('allPlacesModal'), el('placesNoCoordsModal')].forEach(modal => {
@@ -603,7 +602,7 @@ async function showPlaces() {
   // Only open the modal; do not try to render the list directly
   const modal = el('placesModal');
   if (modal) {
-    modal.classList.add('active');
+    openModal('placesModal');
   }
 }
 

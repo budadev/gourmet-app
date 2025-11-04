@@ -19,6 +19,7 @@ import { initFilters, applyFilters, setFilterChangeCallback, openFilterPanel, cl
 import { initSwipeGestures } from './features/swipeGestures.js';
 import { seedItemTypesFromConfig } from './models/itemTypes.js';
 import { initItemTypeEditor } from './components/itemTypeEditor.js';
+import { closeModal } from './components/modal.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -139,16 +140,15 @@ async function initApp() {
   // New back button handlers:
   el('backScanBtn')?.addEventListener('click', () => {
     stopScan();
-    el('scannerModal').classList.remove('active');
+    closeModal('scannerModal');
   });
   el('backDetailsBtn')?.addEventListener('click', () => {
-    el('detailsModal').classList.remove('active');
+    closeModal('detailsModal');
   });
   el('backEditorBtn')?.addEventListener('click', closeEditor);
   el('backPairingSelectorBtn')?.addEventListener('click', closePairingSelector);
   el('backPlacesBtn')?.addEventListener('click', () => {
-    el('placesModal').classList.remove('active');
-    // Optionally, restore scroll or focus if needed
+    closeModal('placesModal');
   });
 
   // Floating add button
@@ -197,14 +197,22 @@ async function initApp() {
   // Removed touchend listener (same reasoning as above)
 
   // Click outside modal to close (maintain existing behavior)
-  [el('scannerModal'), el('detailsModal'), el('editorModal')].forEach(modal => {
-    modal.onclick = (e) => {
-      if (e.target === modal) {
-        modal.classList.remove('active');
-        if (modal === el('scannerModal')) stopScan();
-      }
-    };
-  });
+  el('scannerModal').onclick = (e) => {
+    if (e.target === el('scannerModal')) {
+      stopScan();
+      closeModal('scannerModal');
+    }
+  };
+  el('detailsModal').onclick = (e) => {
+    if (e.target === el('detailsModal')) {
+      closeModal('detailsModal');
+    }
+  };
+  el('editorModal').onclick = (e) => {
+    if (e.target === el('editorModal')) {
+      closeEditor();
+    }
+  };
   el('pairingSelectorModal').onclick = (e) => {
     if (e.target === el('pairingSelectorModal')) {
       closePairingSelector();
