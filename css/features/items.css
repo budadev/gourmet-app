@@ -10,28 +10,42 @@
     box-shadow:var(--shadow-sm);
     position:relative;
     overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;
+    -moz-user-select:none;
+    -ms-user-select:none;
+    user-select:none;
 }
 
-.item::before{
-    content:'';
-    position:absolute;
-    inset:0;
-    border-radius:inherit;
-    pointer-events:none;
-    opacity:0;
-    transition:opacity var(--transition-fast) var(--ease);
-    background:linear-gradient(120deg,rgba(59,130,246,.15),rgba(16,185,129,.15));
+/* Only apply hover effects on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+    .item::before{
+        content:'';
+        position:absolute;
+        inset:0;
+        border-radius:inherit;
+        pointer-events:none;
+        opacity:0;
+        transition:opacity var(--transition-fast) var(--ease);
+        background:linear-gradient(120deg,rgba(59,130,246,.15),rgba(16,185,129,.15));
+    }
+
+    .item:hover{
+        border-color:var(--primary-light);
+        background:var(--card-hover);
+        transform:translateY(-3px);
+        box-shadow:var(--shadow-md);
+    }
+
+    .item:hover::before{
+        opacity:1;
+    }
 }
 
-.item:hover{
-    border-color:var(--primary-light);
-    background:var(--card-hover);
-    transform:translateY(-3px);
-    box-shadow:var(--shadow-md);
-}
-
-.item:hover::before{
-    opacity:1;
+.item:active,
+.item:focus{
+    outline:none;
 }
 
 .item.selected{
