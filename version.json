@@ -1,5 +1,5 @@
 {
-  "version": "0.1.63",
+  "version": "0.1.64",
   "releaseDate": "2025-11-02",
   "changes": [
     "Added configurable item types - users can now create, edit, and delete item types",

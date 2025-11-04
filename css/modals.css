@@ -92,7 +92,7 @@
     padding-top:4px; /* minimal spacing only */
     /* Remove extra space for fixed footer */
     padding-bottom:32px; /* keep footer breathing space */
-    overflow-y:auto;
+    /* Removed overflow-y:auto - scrolling is handled by modal-content */
     overflow-x:hidden;
     flex:1;
     min-height:0;

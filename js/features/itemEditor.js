@@ -16,6 +16,8 @@ import { setCurrentPlaces, getCurrentPlaces, invalidatePlaceUsageCache } from '.
 
 let currentEditingId = null;
 let starRatingController = null;
+let focusListenersCleanup = null;
+let visualViewportListener = null;
 
 export async function openEditor(item = null, onSave) {
   const config = getConfig();
@@ -58,6 +60,21 @@ export function closeEditor() {
   setCurrentPairings({ good: [], bad: [] });
   setCurrentPlaces([]);
   window.__editorOnSave = null;
+
+  // Cleanup focus listeners
+  if (focusListenersCleanup) {
+    focusListenersCleanup();
+    focusListenersCleanup = null;
+  }
+
+  // Cleanup visualViewport listener
+  if (visualViewportListener && window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', visualViewportListener);
+    visualViewportListener = null;
+  }
+
+  // Clear global scroll function
+  window.__scrollEditorFieldIntoView = null;
 }
 
 async function renderEditorFields(selectedType, itemData = {}) {
@@ -225,7 +242,16 @@ function setupInputFocusHandling() {
   const header = editorModal.querySelector('.modal-header');
   if (!scrollContainer || !header) return;
 
-  
+  // Clean up existing listeners before setting up new ones
+  if (focusListenersCleanup) {
+    focusListenersCleanup();
+    focusListenersCleanup = null;
+  }
+
+  if (visualViewportListener && window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', visualViewportListener);
+    visualViewportListener = null;
+  }
 
   function ensureVisible(input){
     if (!input) return;
@@ -255,17 +281,34 @@ function setupInputFocusHandling() {
 
   window.__scrollEditorFieldIntoView = ensureVisible;
 
+  // Store focus handlers for cleanup
+  const focusHandlers = new Map();
   const inputs = editorModal.querySelectorAll('input[type="text"], input[type="number"], textarea');
-  inputs.forEach(inp => inp.addEventListener('focus', () => ensureVisible(inp)));
 
-  if (window.visualViewport){
-    window.visualViewport.addEventListener('resize', () => {
+  inputs.forEach(inp => {
+    const handler = () => ensureVisible(inp);
+    focusHandlers.set(inp, handler);
+    inp.addEventListener('focus', handler);
+  });
+
+  // Setup visualViewport listener only once
+  if (window.visualViewport && !visualViewportListener){
+    visualViewportListener = () => {
       const active = document.activeElement;
       if (active && editorModal.contains(active) && /INPUT|TEXTAREA/.test(active.tagName)) {
         ensureVisible(active);
       }
-    });
+    };
+    window.visualViewport.addEventListener('resize', visualViewportListener);
   }
+
+  // Return cleanup function
+  focusListenersCleanup = () => {
+    focusHandlers.forEach((handler, inp) => {
+      inp.removeEventListener('focus', handler);
+    });
+    focusHandlers.clear();
+  };
 }
 
 /**
