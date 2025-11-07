@@ -1,5 +1,5 @@
 {
-  "version": "0.1.68",
+  "version": "0.1.69",
   "releaseDate": "2025-11-07",
   "changes": [
     "Added sub-type support for all item types with configurable enable/disable toggle",

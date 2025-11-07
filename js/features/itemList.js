@@ -27,12 +27,14 @@ export function renderList(items, onItemClick) {
     const nextItems = sorted.slice(renderedCount, renderedCount + BATCH_SIZE);
     const html = nextItems.map(it => {
       const typeInfo = getTypeInfo(it.type);
+      // If the type supports sub-types and the item has one set, show it after the type label
+      const subtypeText = (typeInfo.subTypeEnabled && it.sub_type) ? ` · ${escapeHtml(it.sub_type)}` : '';
       return `
       <div class="item" data-id="${it.id}">
         <div class="row" style="justify-content:space-between;align-items:center">
           <div style="flex:1">
             <div style="font-weight:700;font-size:16px">${typeInfo.icon} ${escapeHtml(it.name || 'Unnamed')}</div>
-            <div class="muted" style="font-size:12px;margin-top:4px">${typeInfo.label}</div>
+            <div class="muted" style="font-size:12px;margin-top:4px">${escapeHtml(typeInfo.label)}${subtypeText}</div>
           </div>
           <div>${renderStars(Number(it.rating) || 0, false)}</div>
         </div>
