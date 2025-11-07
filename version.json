@@ -1,12 +1,12 @@
 {
-  "version": "0.1.67",
-  "releaseDate": "2025-11-02",
+  "version": "0.1.68",
+  "releaseDate": "2025-11-07",
   "changes": [
-    "Added configurable item types - users can now create, edit, and delete item types",
-    "Item types support custom fields with text, number, and dropdown types",
-    "Drag-and-drop reordering of item types with touch support for mobile",
-    "Auto-generated keys from display names for easier configuration",
-    "Item types stored in database with rank-based sorting",
-    "Enhanced browser extension blocking to prevent console warnings"
+    "Added sub-type support for all item types with configurable enable/disable toggle",
+    "Sub-types are searchable and included in search index",
+    "Added sub-type filter in filter panel with cascading behavior based on type selection",
+    "Sub-type filter displays as 'Type → Sub-type' format (e.g., 'Wine → Red')",
+    "Sub-type filter automatically updates when type filters change",
+    "Improved toggle styling to match Places screen design"
   ]
 }

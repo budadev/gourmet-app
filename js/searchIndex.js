@@ -23,6 +23,7 @@ export async function buildSearchIndex() {
       notes_lc: (item.notes || '').toLowerCase(),
       barcode: item.barcode || '',
       type: item.type || '',
+      sub_type_lc: (item.sub_type || '').toLowerCase(),
       place: item.place || '',
       rating: item.rating || 0,
       // Keep a reference to commonly accessed fields for sorting/filtering
@@ -47,6 +48,7 @@ export function updateSearchIndex(item) {
     notes_lc: (item.notes || '').toLowerCase(),
     barcode: item.barcode || '',
     type: item.type || '',
+    sub_type_lc: (item.sub_type || '').toLowerCase(),
     place: item.place || '',
     rating: item.rating || 0,
     createdAt: item.createdAt,
@@ -80,7 +82,8 @@ export function searchIndex_fast(query) {
     if (
       entry.name_lc.includes(q) ||
       entry.notes_lc.includes(q) ||
-      entry.barcode.includes(q)
+      entry.barcode.includes(q) ||
+      entry.sub_type_lc.includes(q)
     ) {
       matchingIds.push(id);
     }

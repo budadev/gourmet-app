@@ -10,6 +10,7 @@ import { renderStars, setupStarRating } from '../components/rating.js';
 // Current filter state
 let currentFilters = {
   types: [], // Array of selected type strings
+  subTypes: [], // Array of selected sub-type strings (format: "type:subtype")
   places: [], // Array of selected place IDs
   minRating: 0,
   maxRating: 5
@@ -18,6 +19,7 @@ let currentFilters = {
 export function clearAllFilters() {
   currentFilters = {
     types: [],
+    subTypes: [],
     places: [],
     minRating: 0,
     maxRating: 5
@@ -51,6 +53,16 @@ export function applyFilters(items) {
   // Filter by type
   if (currentFilters.types.length > 0) {
     filtered = filtered.filter(item => currentFilters.types.includes(item.type));
+  }
+
+  // Filter by sub-type
+  if (currentFilters.subTypes.length > 0) {
+    filtered = filtered.filter(item => {
+      if (!item.sub_type) return false;
+      // Check if the item's type:subtype combination is selected
+      const itemSubTypeKey = `${item.type}:${item.sub_type}`;
+      return currentFilters.subTypes.includes(itemSubTypeKey);
+    });
   }
 
   // Filter by places
@@ -147,6 +159,7 @@ export async function updateFilterButtonBadge() {
   let count = 0;
 
   if (currentFilters.types.length > 0) count++;
+  if (currentFilters.subTypes.length > 0) count++;
   if (currentFilters.places.length > 0) count++;
   if (currentFilters.minRating !== 0 || currentFilters.maxRating !== 5) count++;
 
@@ -165,12 +178,16 @@ export async function updateFilterButtonBadge() {
  */
 async function renderFilterPanel() {
   const typeDropdownContainer = el('typeDropdownContainer');
+  const subTypeDropdownContainer = el('subTypeDropdownContainer');
   const placeSearchContainer = el('placeSearchContainer');
   const minRatingContainer = el('minRatingContainer');
   const maxRatingContainer = el('maxRatingContainer');
 
   // Render type multi-select dropdown
   await renderTypeMultiSelect(typeDropdownContainer);
+
+  // Render sub-type multi-select dropdown
+  await renderSubTypeMultiSelect(subTypeDropdownContainer);
 
   // Render place search/select
   await renderPlaceSearch(placeSearchContainer);
@@ -253,8 +270,132 @@ async function renderTypeMultiSelect(container) {
         }
       } else {
         currentFilters.types = currentFilters.types.filter(t => t !== type);
+        // Remove sub-types for this type when type is unchecked
+        currentFilters.subTypes = currentFilters.subTypes.filter(st => !st.startsWith(type + ':'));
       }
+
+      // If types are selected, remove sub-types that don't belong to selected types
+      if (currentFilters.types.length > 0) {
+        currentFilters.subTypes = currentFilters.subTypes.filter(subType => {
+          const subTypeParent = subType.split(':')[0];
+          return currentFilters.types.includes(subTypeParent);
+        });
+      }
+
       renderTypeMultiSelect(container);
+      // Re-render sub-type dropdown to reflect type filter changes
+      const subTypeContainer = el('subTypeDropdownContainer');
+      if (subTypeContainer) {
+        renderSubTypeMultiSelect(subTypeContainer);
+      }
+      triggerFilterChange();
+    };
+  });
+}
+
+/**
+ * Render sub-type multi-select dropdown
+ */
+async function renderSubTypeMultiSelect(container) {
+  if (!container) return;
+
+  const typeConfig = getConfig();
+
+  // Collect all available sub-types based on selected types
+  const subTypeOptions = []; // Array of { key: "type:subtype", label: "Wine -> Red", type }
+
+  // Determine which types to show sub-types for
+  const typesToShow = currentFilters.types.length > 0
+    ? currentFilters.types
+    : Object.keys(typeConfig);
+
+  typesToShow.forEach(typeKey => {
+    const typeInfo = typeConfig[typeKey];
+    if (typeInfo.subTypeEnabled && typeInfo.subTypeOptions && typeInfo.subTypeOptions.length > 0) {
+      typeInfo.subTypeOptions.forEach(subType => {
+        subTypeOptions.push({
+          key: `${typeKey}:${subType}`,
+          label: `${typeInfo.icon} ${typeInfo.label} → ${subType}`,
+          type: typeKey
+        });
+      });
+    }
+  });
+
+  // If no sub-types available, show empty state
+  if (subTypeOptions.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding: 12px; font-size: 13px; color: var(--text-muted);">No sub-types available</div>';
+    return;
+  }
+
+  let html = '<div class="filter-multiselect">';
+  html += '<div class="filter-multiselect-dropdown" id="subTypeMultiselectDropdown">';
+
+  subTypeOptions.forEach(option => {
+    const checked = currentFilters.subTypes.includes(option.key) ? 'checked' : '';
+    html += `
+      <label class="filter-multiselect-option">
+        <input type="checkbox" value="${option.key}" ${checked} data-filter-type="subtype">
+        <span class="filter-multiselect-option-label">${option.label}</span>
+      </label>
+    `;
+  });
+
+  html += '</div>';
+
+  html += '<div class="filter-multiselect-trigger" id="subTypeMultiselectTrigger">';
+  html += '<span class="filter-multiselect-label">';
+
+  if (currentFilters.subTypes.length === 0) {
+    html += 'All Sub-types';
+  } else if (currentFilters.subTypes.length === 1) {
+    const selectedOption = subTypeOptions.find(opt => opt.key === currentFilters.subTypes[0]);
+    if (selectedOption) {
+      html += selectedOption.label;
+    } else {
+      html += '1 sub-type selected';
+    }
+  } else {
+    html += currentFilters.subTypes.length + ' sub-types selected';
+  }
+
+  html += '</span>';
+  html += '<span class="filter-multiselect-arrow">▼</span>';
+  html += '</div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+
+  // Setup dropdown toggle
+  const trigger = el('subTypeMultiselectTrigger');
+  const dropdown = el('subTypeMultiselectDropdown');
+
+  if (trigger && dropdown) {
+    trigger.onclick = (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('active');
+    };
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!container.contains(e.target)) {
+        dropdown.classList.remove('active');
+      }
+    });
+  }
+
+  // Handle checkbox changes
+  container.querySelectorAll('[data-filter-type="subtype"]').forEach(checkbox => {
+    checkbox.onchange = (e) => {
+      const subTypeKey = e.target.value;
+      if (e.target.checked) {
+        if (!currentFilters.subTypes.includes(subTypeKey)) {
+          currentFilters.subTypes.push(subTypeKey);
+        }
+      } else {
+        currentFilters.subTypes = currentFilters.subTypes.filter(st => st !== subTypeKey);
+      }
+      renderSubTypeMultiSelect(container);
       triggerFilterChange();
     };
   });
