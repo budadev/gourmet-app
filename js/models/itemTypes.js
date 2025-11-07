@@ -48,7 +48,9 @@ export async function seedItemTypesFromConfig() {
         label: value.label,
         icon: value.icon,
         fields: value.fields || [],
-        rank: value.rank || 999
+        rank: value.rank || 999,
+        subTypeEnabled: value.subTypeEnabled !== undefined ? value.subTypeEnabled : false,
+        subTypeOptions: value.subTypeOptions || []
       });
     });
 
@@ -82,7 +84,9 @@ export async function getAllItemTypes() {
       label: type.label,
       icon: type.icon,
       fields: type.fields || [],
-      rank: type.rank || 999
+      rank: type.rank || 999,
+      subTypeEnabled: type.subTypeEnabled !== undefined ? type.subTypeEnabled : false,
+      subTypeOptions: type.subTypeOptions || []
     };
   });
 
@@ -100,7 +104,9 @@ export async function getItemTypeByKey(key) {
   return {
     label: type.label,
     icon: type.icon,
-    fields: type.fields || []
+    fields: type.fields || [],
+    subTypeEnabled: type.subTypeEnabled !== undefined ? type.subTypeEnabled : false,
+    subTypeOptions: type.subTypeOptions || []
   };
 }
 

@@ -3,8 +3,9 @@
     "rank": 1,
     "label": "Wine",
     "icon": "🍷",
+    "subTypeEnabled": true,
+    "subTypeOptions": ["Red", "White", "Rosé", "Sparkling", "Dessert"],
     "fields": [
-      { "name": "color", "label": "Color", "type": "enum", "options": ["Red", "White", "Rosé", "Sparkling", "Dessert"] },
       { "name": "year", "label": "Vintage (Year)", "type": "number" },
       { "name": "country", "label": "Country", "type": "string" },
       { "name": "region", "label": "Region", "type": "string" }
@@ -15,8 +16,9 @@
     "rank": 2,
     "label": "Beer",
     "icon": "🍺",
+    "subTypeEnabled": true,
+    "subTypeOptions": ["Wheat","Lager","Pilsner","IPA","Pale Ale","Stout","Porter","Sour","Belgian","Brown Ale","Amber/Red","Other"],
     "fields": [
-      { "name": "style", "label": "Style", "type": "enum", "options": ["Wheat","Lager","Pilsner","IPA","Pale Ale","Stout","Porter","Sour","Belgian","Brown Ale","Amber/Red","Other"] },
       { "name": "abv", "label": "ABV (%)", "type": "number" },
       { "name": "color", "label": "Color", "type": "enum", "options": ["Pale","Golden","Amber","Brown","Dark"] },
       { "name": "filtered", "label": "Filtering", "type": "enum", "options": ["Filtered","Unfiltered"] },
@@ -29,6 +31,8 @@
     "rank": 3,
     "label": "Cheese",
     "icon": "🧀",
+    "subTypeEnabled": true,
+    "subTypeOptions": ["Cheddar","Brie","Camembert","Gouda","Parmesan","Mozzarella","Blue Cheese","Feta","Swiss","Goat Cheese","Other"],
     "fields": [
       { "name": "milk", "label": "Milk", "type": "enum", "options": ["Cow","Goat","Sheep","Buffalo","Mixed", "Other"] },
       { "name": "texture", "label": "Texture", "type": "enum", "options": ["Fresh","Soft","Semi-Soft","Semi-Hard","Hard","Blue"] },
@@ -41,8 +45,9 @@
     "rank": 4,
     "label": "Olives",
     "icon": "🫒",
+    "subTypeEnabled": true,
+    "subTypeOptions": ["Green","Black","Purple","Mixed"],
     "fields": [
-      { "name": "color", "label": "Color", "type": "enum", "options": ["Green","Black","Purple","Mixed"] },
       { "name": "country", "label": "Country", "type": "string" },
       { "name": "pit", "label": "Pit", "type": "enum", "options": ["Whole (with pit)","Pitted","Stuffed"] },
       { "name": "stuffing", "label": "Stuffing", "type": "string" },
@@ -55,8 +60,9 @@
     "rank": 5,
     "label": "Ham",
     "icon": "🍖",
+    "subTypeEnabled": true,
+    "subTypeOptions": ["Prosciutto crudo", "Prosciutto cotto", "Jamón serrano", "Jamón ibérico", "Speck", "Jambon de Bayonne", "Parma (Prosciutto di Parma)", "San Daniele", "Culatello", "Other"],
     "fields": [
-      { "name": "subtype", "label": "Subtype", "type": "enum", "options": ["Prosciutto crudo", "Prosciutto cotto", "Jamón serrano", "Jamón ibérico", "Speck", "Jambon de Bayonne", "Parma (Prosciutto di Parma)", "San Daniele", "Culatello", "Other"]},
       { "name": "country", "label": "Country", "type": "string" },
       { "name": "region", "label": "Region", "type": "string" }
     ]

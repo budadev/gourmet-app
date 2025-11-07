@@ -32,6 +32,10 @@ export async function showItemDetails(id, onEdit, onDelete) {
       <div class="detail-label">Type</div>
       <div class="detail-value">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div>
     </div>
+    ${(typeInfo.subTypeEnabled && item.sub_type) ? `<div class="detail-row">
+      <div class="detail-label">Sub-type</div>
+      <div class="detail-value">${escapeHtml(item.sub_type)}</div>
+    </div>` : ''}
     <div class="detail-row">
       <div class="detail-label">Rating</div>
       <div class="detail-value">${renderStars(Number(item.rating) || 0, false)}</div>

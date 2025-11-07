@@ -36,6 +36,20 @@ export async function openItemTypeEditor(itemElement, typeKey) {
   el('itemTypeLabelInput').value = itemType.label || '';
   el('itemTypeIconInput').value = itemType.icon || '';
 
+  // Set sub-type toggle
+  const subTypeToggle = el('itemTypeSubTypeToggle');
+  if (subTypeToggle) {
+    subTypeToggle.checked = itemType.subTypeEnabled || false;
+  }
+
+  // Set sub-type options
+  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
+  if (subTypeOptionsInput) {
+    subTypeOptionsInput.value = (itemType.subTypeOptions || []).join(', ');
+  }
+
+  // Update sub-type options visibility
+  updateSubTypeOptionsVisibility();
 
   // Render fields
   renderFieldsEditor(itemType.fields || []);
@@ -73,6 +87,20 @@ export function openCreateItemTypeEditor() {
   el('itemTypeLabelInput').value = '';
   el('itemTypeIconInput').value = '';
 
+  // Clear sub-type toggle
+  const subTypeToggle = el('itemTypeSubTypeToggle');
+  if (subTypeToggle) {
+    subTypeToggle.checked = false;
+  }
+
+  // Clear sub-type options
+  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
+  if (subTypeOptionsInput) {
+    subTypeOptionsInput.value = '';
+  }
+
+  // Update sub-type options visibility
+  updateSubTypeOptionsVisibility();
 
   // Render empty fields editor
   renderFieldsEditor([]);
@@ -98,6 +126,18 @@ export function closeItemTypeEditor() {
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
   currentEditingKey = null;
+}
+
+/**
+ * Update the visibility of sub-type options based on toggle
+ */
+function updateSubTypeOptionsVisibility() {
+  const subTypeToggle = el('itemTypeSubTypeToggle');
+  const subTypeOptionsContainer = el('itemTypeSubTypeOptionsContainer');
+
+  if (subTypeToggle && subTypeOptionsContainer) {
+    subTypeOptionsContainer.style.display = subTypeToggle.checked ? 'block' : 'none';
+  }
 }
 
 /**
@@ -197,6 +237,12 @@ function createFieldRow(field, index) {
 export async function saveItemType() {
   const label = el('itemTypeLabelInput').value.trim();
   const icon = el('itemTypeIconInput').value.trim();
+  const subTypeToggle = el('itemTypeSubTypeToggle');
+  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
+
+  const subTypeEnabled = subTypeToggle ? subTypeToggle.checked : false;
+  const subTypeOptionsStr = subTypeOptionsInput ? subTypeOptionsInput.value.trim() : '';
+  const subTypeOptions = subTypeOptionsStr ? subTypeOptionsStr.split(',').map(o => o.trim()).filter(o => o) : [];
 
   if (!label) {
     alert('Please provide a label for the item type.');
@@ -234,7 +280,7 @@ export async function saveItemType() {
   try {
     if (currentEditingKey) {
       // Update existing
-      await updateItemTypeData(currentEditingKey, { label, icon, fields });
+      await updateItemTypeData(currentEditingKey, { label, icon, fields, subTypeEnabled, subTypeOptions });
     } else {
       // Create new - generate key from label
       const key = generateKey(label);
@@ -251,9 +297,9 @@ export async function saveItemType() {
       const maxRank = ranks.length > 0 ? Math.max(...ranks) : 0;
 
       await createItemType(key, label, icon, fields);
-      // Update rank to be at the end
+      // Update rank and sub-type settings to be at the end
       const { updateItemType } = await import('../db.js');
-      await updateItemType(key, { rank: maxRank + 1 });
+      await updateItemType(key, { rank: maxRank + 1, subTypeEnabled, subTypeOptions });
     }
 
     // Reload config to update the app
@@ -313,6 +359,12 @@ export function initItemTypeEditor() {
         closeItemTypeEditor();
       }
     });
+  }
+
+  // Setup sub-type toggle event listener
+  const subTypeToggle = el('itemTypeSubTypeToggle');
+  if (subTypeToggle) {
+    subTypeToggle.addEventListener('change', updateSubTypeOptionsVisibility);
   }
 
   // Block browser extensions from analyzing input fields

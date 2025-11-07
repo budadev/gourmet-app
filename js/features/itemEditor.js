@@ -91,6 +91,9 @@ async function renderEditorFields(selectedType, itemData = {}) {
   });
   html += '</select></div>';
 
+  // Sub-type container (will be populated separately)
+  html += '<div id="subTypeFieldContainer"></div>';
+
   // Name (always)
   html += `<div class="field-group"><label>Name *</label><input id="nameInput" placeholder="e.g., Cabernet Sauvignon" value="${escapeHtml(itemData.name || '')}"/></div>`;
 
@@ -315,10 +318,35 @@ function setupInputFocusHandling() {
  * Update only dynamic fields section to avoid full form rebuild
  */
 function updateDynamicFields(selectedType, itemData = {}) {
+  const typeInfo = getTypeInfo(selectedType);
+
+  // Update sub-type field container
+  const subTypeContainer = document.getElementById('subTypeFieldContainer');
+  if (subTypeContainer) {
+    if (typeInfo.subTypeEnabled && typeInfo.subTypeOptions && typeInfo.subTypeOptions.length > 0) {
+      let subTypeHtml = '<div class="field-group">';
+      subTypeHtml += `<label>Sub-type</label>`;
+      subTypeHtml += `<select id="field_sub_type">`;
+      subTypeHtml += '<option value="">-- Select --</option>';
+      typeInfo.subTypeOptions.forEach(opt => {
+        const selected = itemData.sub_type === opt ? 'selected' : '';
+        subTypeHtml += `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
+      });
+      subTypeHtml += '</select>';
+      subTypeHtml += '</div>';
+      subTypeContainer.innerHTML = subTypeHtml;
+      enhanceSelectInteractivity(subTypeContainer);
+    } else {
+      subTypeContainer.innerHTML = '';
+    }
+  }
+
+  // Update dynamic fields container (other custom fields)
   const container = document.getElementById('dynamicFieldsContainer');
   if (!container) return;
-  const typeInfo = getTypeInfo(selectedType);
+
   let html = '<div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">';
+
   typeInfo.fields.forEach(field => {
     html += '<div class="field-group">';
     html += `<label>${escapeHtml(field.label)}</label>`;
@@ -359,6 +387,15 @@ function collectFormData() {
     rating: starRatingController?.getValue() || 0,
     notes: el('notesInput')?.value?.trim() || ''
   };
+
+  // Collect sub_type if enabled
+  if (typeInfo.subTypeEnabled) {
+    const subTypeEl = el('field_sub_type');
+    if (subTypeEl && subTypeEl.value) {
+      data.sub_type = subTypeEl.value;
+    }
+  }
+
   typeInfo.fields.forEach(field => {
     const fieldEl = el(`field_${field.name}`);
     if (fieldEl && fieldEl.value) {

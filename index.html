@@ -433,6 +433,21 @@ How to use:
                         <input id="itemTypeIconInput" type="text" placeholder="e.g., 🍷" autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore="true" readonly />
                         <small class="field-hint">Emoji or symbol to represent this type</small>
                     </div>
+                    <div class="field-group" style="margin-top: 24px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="flex: 1;">
+                            <span>Enable Sub-types</span>
+                            <small class="field-hint" style="display: block; margin-top: 4px;">If enabled, items of this type can have a sub-type field</small>
+                        </div>
+                        <label class="checkbox-label switch" style="margin-bottom: 0;">
+                            <input type="checkbox" id="itemTypeSubTypeToggle" />
+                            <span class="switch-slider" aria-hidden="true"></span>
+                        </label>
+                    </div>
+                    <div id="itemTypeSubTypeOptionsContainer" class="field-group" style="display: none;">
+                        <label>Sub-type Options</label>
+                        <input id="itemTypeSubTypeOptions" type="text" placeholder="e.g., Red, White, Rosé" autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore="true" />
+                        <small class="field-hint">Comma-separated list of sub-type options</small>
+                    </div>
                     <div class="field-group" style="margin-top: 24px;">
                         <label>Fields</label>
                         <small class="field-hint" style="margin-bottom: 12px; display: block;">
