@@ -100,24 +100,55 @@ How to use:
 </div>
 
 <header>
-    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
-        <span class="hamburger-line"></span>
-        <span class="hamburger-line"></span>
-        <span class="hamburger-line"></span>
-    </button>
-    <button class="filter-btn" id="filterBtn" title="Filter items">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
-        <span>Filter</span>
-        <span class="filter-badge" id="filterBadge">0</span>
-    </button>
-    <div class="search-wrapper">
-        <label for="searchInput" class="visually-hidden">Search items</label>
-        <input id="searchInput" type="text" placeholder="Search…"/>
-        <button class="clear-btn" id="clearSearchBtn" aria-label="Clear search">×</button>
-        <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">
-            <img src="icons/barcode.png" alt="Scan barcode" />
+    <div class="header-top">
+        <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+        <button class="filter-btn" id="filterBtn" title="Filter items">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <span>Filter</span>
+            <span class="filter-badge" id="filterBadge">0</span>
+        </button>
+        <div class="search-wrapper">
+            <label for="searchInput" class="visually-hidden">Search items</label>
+            <input id="searchInput" type="text" placeholder="Search…"/>
+            <button class="clear-btn" id="clearSearchBtn" aria-label="Clear search">×</button>
+            <button class="barcode-btn" id="barcodeScanBtn" title="Scan barcode">
+                <img src="icons/barcode.png" alt="Scan barcode" />
+            </button>
+        </div>
+    </div>
+    <div class="view-selector">
+        <button class="view-selector-btn active" id="viewAll" data-view="all">
+            <svg class="view-selector-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            <span>All</span>
+        </button>
+        <button class="view-selector-btn" id="viewNearby" data-view="nearby">
+            <svg class="view-selector-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <span>Nearby picks</span>
+        </button>
+        <button class="view-selector-btn" id="viewMemory" data-view="memory">
+            <svg class="view-selector-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+                <polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8" fill="currentColor" stroke="none" opacity="0.9" transform="translate(6, -3) scale(0.5)"></polygon>
+            </svg>
+            <span>Memory lane</span>
         </button>
     </div>
 </header>

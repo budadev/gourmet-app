@@ -20,6 +20,7 @@ import { initSwipeGestures } from './features/swipeGestures.js';
 import { seedItemTypesFromConfig } from './models/itemTypes.js';
 import { initItemTypeEditor } from './components/itemTypeEditor.js';
 import { closeModal } from './components/modal.js';
+import { initViewSelector } from './features/viewSelector.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -63,6 +64,13 @@ async function initApp() {
   setFilterChangeCallback(async () => {
     await refreshList();
   });
+  // Initialize view selector
+  initViewSelector((view) => {
+    console.log('View changed to:', view);
+    // Future: Add different filtering logic based on view
+    // For now, just log the view change
+  });
+
 
   // Barcode scan from header - with improved direct triggering (remove delayed debounce to keep user gesture)
   let isScanning = false;

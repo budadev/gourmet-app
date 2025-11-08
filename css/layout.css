@@ -8,7 +8,7 @@ header{
     background:rgba(255, 255, 255, 0.95);
     backdrop-filter:blur(12px);
     /* Vertical padding reduced further (html no longer adds safe-area) */
-    padding:10px 20px;
+    padding:10px 20px 0 20px;
     border-bottom:1px solid var(--border);
     z-index:100;
     box-shadow:var(--shadow);
@@ -17,8 +17,17 @@ header{
     padding-left:calc(20px + env(safe-area-inset-left));
     padding-right:calc(20px + env(safe-area-inset-right));
     display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.header-top {
+    display: flex;
     align-items: center;
     gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 10px;
 }
 
 .hamburger-btn {
@@ -33,6 +42,62 @@ header{
 .search-wrapper {
     order: 2;
     flex: 1;
+}
+
+/* View selector buttons */
+.view-selector {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.view-selector::-webkit-scrollbar {
+    display: none;
+}
+
+.view-selector-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.view-selector-btn:hover {
+    background: var(--bg-secondary);
+}
+
+.view-selector-btn:active {
+    transform: scale(0.96);
+}
+
+.view-selector-btn.active {
+    background: var(--gradient-primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.view-selector-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5;
+}
+
+.view-selector-btn.active .view-selector-icon {
+    stroke: #ffffff;
 }
 
 h1{
