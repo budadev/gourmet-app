@@ -74,6 +74,14 @@ export async function showMemoryLane() {
 
   // Randomly select up to 10 items
   currentItems = shuffleArray(eligibleItems).slice(0, 10);
+
+  // Pre-select a random photo for each item (will be reused on rewatch)
+  currentItems.forEach(item => {
+    if (item.photos && item.photos.length > 0 && item.selectedPhotoIndex === undefined) {
+      item.selectedPhotoIndex = Math.floor(Math.random() * item.photos.length);
+    }
+  });
+
   currentIndex = 0;
 
   // Render the UI
@@ -119,8 +127,9 @@ function renderMemoryLane() {
   `).join('');
 
   const itemsHtml = currentItems.map((item, index) => {
-    // Pick a random photo
-    const photo = item.photos[Math.floor(Math.random() * item.photos.length)];
+    // Use the pre-selected photo index (selected when memory lane was created)
+    const photoIndex = item.selectedPhotoIndex !== undefined ? item.selectedPhotoIndex : 0;
+    const photo = item.photos[photoIndex];
     const photoUrl = photo ? URL.createObjectURL(photo.blob) : null;
 
     // Check if notes exist (field is 'notes' not 'note')

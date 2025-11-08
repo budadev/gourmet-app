@@ -1,9 +1,10 @@
 {
-  "version": "0.1.77",
+  "version": "0.1.78",
   "releaseDate": "2025-11-08",
   "changes": [
-    "Fixed Memory Lane end screen: Rewatch and New Memory Lane buttons now work correctly",
-    "Added end screen and empty state to tap-to-details exclusion list",
-    "Buttons on end screen no longer trigger item details navigation"
+    "Fixed Memory Lane: Photos now remain consistent when rewatching",
+    "Photo for each item is randomly selected when memory lane is created",
+    "Same photo is shown on rewatch - no re-randomization",
+    "New memory lane still generates new random photo selections"
   ]
 }
