@@ -7,7 +7,16 @@ import { renderStars } from '../components/rating.js';
 import { getTypeInfo } from '../config.js';
 
 export function sortByRating(items) {
-  return items.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+  return items.sort((a, b) => {
+    const ratingDiff = (Number(b.rating) || 0) - (Number(a.rating) || 0);
+    if (ratingDiff !== 0) {
+      return ratingDiff;
+    }
+    // If ratings are equal, sort alphabetically by name
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
 }
 
 export function renderList(items, onItemClick) {
