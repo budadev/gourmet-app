@@ -279,6 +279,7 @@ function attachEventListeners() {
   let touchStartTarget = null;
 
   const touchStartHandler = (e) => {
+    if (!e.touches || !e.touches[0]) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
     touchStartTime = Date.now();
@@ -286,6 +287,8 @@ function attachEventListeners() {
   };
 
   const touchEndHandler = (e) => {
+    if (!e.changedTouches || !e.changedTouches[0]) return;
+
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
     const touchDuration = Date.now() - touchStartTime;
@@ -298,15 +301,18 @@ function attachEventListeners() {
       // Check if tap was on UI elements that should not trigger details
       const target = touchStartTarget;
       if (target) {
-        // Ignore taps on close button, progress bars, or touch zones
+        // Ignore taps on UI elements (buttons, controls, end screen)
         if (target.closest('.memory-lane-close') ||
             target.closest('.memory-lane-progress') ||
-            target.closest('.memory-lane-touch-zone')) {
+            target.closest('.memory-lane-touch-zone') ||
+            target.closest('.memory-lane-end') ||
+            target.closest('.memory-lane-empty')) {
           return;
         }
       }
 
       // This is a tap on the content - open item details
+      e.preventDefault(); // Prevent ghost clicks on iOS
       openCurrentItemDetails();
       return;
     }
@@ -323,12 +329,33 @@ function attachEventListeners() {
     }
   };
 
+  // Click event fallback for iOS PWA and desktop
+  const clickHandler = (e) => {
+    // Only handle click if no touch handlers fired (fallback for iOS PWA issues)
+    const target = e.target;
+    if (target) {
+      // Ignore clicks on UI elements (buttons, controls, end screen)
+      if (target.closest('.memory-lane-close') ||
+          target.closest('.memory-lane-progress') ||
+          target.closest('.memory-lane-touch-zone') ||
+          target.closest('.memory-lane-end') ||
+          target.closest('.memory-lane-empty')) {
+        return;
+      }
+    }
+
+    // Open item details
+    openCurrentItemDetails();
+  };
+
   memoryLaneContainer.addEventListener('touchstart', touchStartHandler, { passive: true });
-  memoryLaneContainer.addEventListener('touchend', touchEndHandler, { passive: true });
+  memoryLaneContainer.addEventListener('touchend', touchEndHandler, { passive: false });
+  memoryLaneContainer.addEventListener('click', clickHandler);
 
   // Store references for cleanup
   memoryLaneContainer._touchStartHandler = touchStartHandler;
   memoryLaneContainer._touchEndHandler = touchEndHandler;
+  memoryLaneContainer._clickHandler = clickHandler;
 
   // Keyboard navigation
   const handleKeyboard = (e) => {
@@ -369,6 +396,12 @@ function cleanupEventListeners() {
     if (memoryLaneContainer._touchEndHandler) {
       memoryLaneContainer.removeEventListener('touchend', memoryLaneContainer._touchEndHandler);
       delete memoryLaneContainer._touchEndHandler;
+    }
+
+    // Remove click handler
+    if (memoryLaneContainer._clickHandler) {
+      memoryLaneContainer.removeEventListener('click', memoryLaneContainer._clickHandler);
+      delete memoryLaneContainer._clickHandler;
     }
   }
 }

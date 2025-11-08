@@ -41,10 +41,10 @@ async function refreshList() {
 
   // Handle different views
   if (view === 'nearby') {
+    await renderNearbyView(items);
   } else if (view === 'memory') {
     // Memory lane view - show Instagram-style story viewer
     await showMemoryLane();
-    await renderNearbyView(items);
   } else {
     // Default "All" view
     renderList(items, (id) => {

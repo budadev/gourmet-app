@@ -1,9 +1,9 @@
 {
-  "version": "0.1.76",
+  "version": "0.1.77",
   "releaseDate": "2025-11-08",
   "changes": [
-    "Fixed Memory Lane: Close button (X) now works correctly and doesn't open item details",
-    "Enhanced tap detection to ignore UI elements (close button, progress bars, touch zones)",
-    "Only taps on the main content area (photo/name/rating) open item details"
+    "Fixed Memory Lane end screen: Rewatch and New Memory Lane buttons now work correctly",
+    "Added end screen and empty state to tap-to-details exclusion list",
+    "Buttons on end screen no longer trigger item details navigation"
   ]
 }
