@@ -1,10 +1,9 @@
 {
-  "version": "0.1.78",
+  "version": "0.1.79",
   "releaseDate": "2025-11-08",
   "changes": [
-    "Fixed Memory Lane: Photos now remain consistent when rewatching",
-    "Photo for each item is randomly selected when memory lane is created",
-    "Same photo is shown on rewatch - no re-randomization",
-    "New memory lane still generates new random photo selections"
+    "Fixed: Filters now apply immediately in All and Nearby picks views",
+    "Fixed: Undefined view variable in filter callback that prevented instant filter application",
+    "Filters now work correctly without needing to switch views first"
   ]
 }

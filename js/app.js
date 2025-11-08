@@ -132,6 +132,8 @@ async function initApp() {
   // Initialize filters
   await initFilters();
   setFilterChangeCallback(async () => {
+    const view = getCurrentView();
+
     // Hide memory lane when switching away from it
     if (view !== 'memory' && isMemoryLaneActive()) {
       hideMemoryLane();
