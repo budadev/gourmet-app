@@ -137,3 +137,136 @@ export function renderList(items, onItemClick) {
     window.addEventListener('scroll', onWindowScroll);
   }
 }
+
+/**
+ * Render items grouped by distance ranges
+ * @param {Array} itemsWithDistance - Array of items with distance property (in meters)
+ * @param {Function} onItemClick - Click handler for items
+ */
+export function renderGroupedList(itemsWithDistance, onItemClick) {
+  const resultsEl = el('results');
+
+  if (itemsWithDistance.length === 0) {
+    resultsEl.innerHTML = '<div class="empty-state">No items found. Tap the + button to add your first item!</div>';
+    return;
+  }
+
+  // Define distance groups (in meters)
+  const distanceGroups = [
+    { max: 100, label: 'Within 100 meters' },
+    { max: 500, label: 'Within 500 meters' },
+    { max: 1000, label: 'Within 1 km' },
+    { max: 2000, label: 'Within 2 km' },
+    { max: 5000, label: 'Within 5 km' },
+    { max: 10000, label: 'Within 10 km' },
+    { max: 25000, label: 'Within 25 km' },
+    { max: Infinity, label: 'More than 25 km or no location' }
+  ];
+
+  // Group items by distance
+  const groupedItems = {};
+  distanceGroups.forEach(group => {
+    groupedItems[group.label] = [];
+  });
+
+  itemsWithDistance.forEach(item => {
+    // Find the appropriate group
+    for (const group of distanceGroups) {
+      if (item.distance < group.max) {
+        groupedItems[group.label].push(item);
+        break;
+      }
+    }
+  });
+
+  // Sort items within each group by rating
+  Object.keys(groupedItems).forEach(groupLabel => {
+    groupedItems[groupLabel] = sortByRating(groupedItems[groupLabel]);
+  });
+
+  // Render groups
+  resultsEl.innerHTML = '';
+
+  distanceGroups.forEach(group => {
+    const items = groupedItems[group.label];
+
+    // Skip empty groups
+    if (items.length === 0) return;
+
+    // Create group header
+    const groupHeader = document.createElement('div');
+    groupHeader.className = 'distance-group-header';
+    groupHeader.innerHTML = `
+      <h3 class="distance-group-title">${escapeHtml(group.label)}</h3>
+      <span class="distance-group-count">${items.length} item${items.length !== 1 ? 's' : ''}</span>
+    `;
+    resultsEl.appendChild(groupHeader);
+
+    // Create group container
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'distance-group-items';
+
+    // Render items in this group
+    items.forEach(it => {
+      const typeInfo = getTypeInfo(it.type);
+      const subtypeText = (typeInfo.subTypeEnabled && it.sub_type) ? ` · ${escapeHtml(it.sub_type)}` : '';
+
+      const itemEl = document.createElement('div');
+      itemEl.className = 'item';
+      itemEl.setAttribute('data-id', it.id);
+      itemEl.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:16px">${typeInfo.icon} ${escapeHtml(it.name || 'Unnamed')}</div>
+            <div class="muted" style="font-size:12px;margin-top:4px">${escapeHtml(typeInfo.label)}${subtypeText}</div>
+          </div>
+          <div>${renderStars(Number(it.rating) || 0, false)}</div>
+        </div>
+      `;
+
+      // Bind click events
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+
+      itemEl.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+      }, { passive: true });
+
+      itemEl.addEventListener('touchend', (e) => {
+        if (!touchStartX) return;
+
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const touchDuration = Date.now() - touchStartTime;
+
+        const deltaX = Math.abs(touchEndX - touchStartX);
+        const deltaY = Math.abs(touchEndY - touchStartY);
+
+        if (deltaX < 10 && deltaY < 10 && touchDuration < 500) {
+          e.preventDefault();
+          const id = Number(itemEl.getAttribute('data-id'));
+          if (onItemClick) onItemClick(id);
+        }
+
+        touchStartX = 0;
+        touchStartY = 0;
+        touchStartTime = 0;
+      }, { passive: false });
+
+      itemEl.addEventListener('click', (e) => {
+        if (e.detail === 0 || !('ontouchstart' in window)) {
+          const id = Number(itemEl.getAttribute('data-id'));
+          if (onItemClick) onItemClick(id);
+        }
+      });
+
+      groupContainer.appendChild(itemEl);
+    });
+
+    resultsEl.appendChild(groupContainer);
+  });
+}
+

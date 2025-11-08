@@ -7,7 +7,7 @@ import { el, enhanceSelectInteractivity, showBarcodeLookupLoading, hideBarcodeLo
 import { findByBarcode, ensureDbReady, getItemsByIds } from './db.js';
 import { buildSearchIndex, searchIndex_fast } from './searchIndex.js';
 import { setupSearch, setSearchValue } from './features/search.js';
-import { renderList } from './features/itemList.js';
+import { renderList, renderGroupedList } from './features/itemList.js';
 import { showItemDetails } from './features/itemDetails.js';
 import { openEditor, closeEditor, renderPairingsInEditor } from './features/itemEditor.js';
 import { startScan, stopScan } from './features/scanner.js';
@@ -20,7 +20,8 @@ import { initSwipeGestures } from './features/swipeGestures.js';
 import { seedItemTypesFromConfig } from './models/itemTypes.js';
 import { initItemTypeEditor } from './components/itemTypeEditor.js';
 import { closeModal } from './components/modal.js';
-import { initViewSelector } from './features/viewSelector.js';
+import { initViewSelector, getCurrentView, getCachedUserLocation, calculateDistance } from './features/viewSelector.js';
+import { getPlaceById } from './models/places.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -34,7 +35,72 @@ async function refreshList() {
   // Apply filters to the search results
   items = applyFilters(items);
 
-  renderList(items, (id) => {
+  // Get current view
+  const view = getCurrentView();
+
+  // Handle different views
+  if (view === 'nearby') {
+    await renderNearbyView(items);
+  } else {
+    // Default "All" view
+    renderList(items, (id) => {
+      showItemDetails(
+        id,
+        (item) => openEditor(item, refreshList), // onEdit opens editor
+        refreshList // onDelete refreshes list
+      );
+    });
+  }
+}
+
+async function renderNearbyView(items) {
+  const resultsEl = el('results');
+
+  // Get user location (already fetched in viewSelector, but check)
+  const userLocation = getCachedUserLocation();
+
+  if (!userLocation) {
+    resultsEl.innerHTML = '<div class="empty-state">📍 Location access is needed to show nearby picks.<br><br>Please enable the location services and try again.</div>';
+    return;
+  }
+
+  // Show calculating distances state
+  resultsEl.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Calculating distances...</p></div>';
+
+  // Calculate distances for all items
+  const itemsWithDistance = [];
+
+  for (const item of items) {
+    let minDistance = Infinity;
+
+    // Check if item has places with coordinates
+    if (item.places && Array.isArray(item.places) && item.places.length > 0) {
+      for (const placeId of item.places) {
+        const place = await getPlaceById(placeId);
+
+        if (place && place.coordinates && place.coordinates.lat && place.coordinates.lng) {
+          const distance = calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            place.coordinates.lat,
+            place.coordinates.lng
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+          }
+        }
+      }
+    }
+
+    itemsWithDistance.push({
+      ...item,
+      distance: minDistance
+    });
+  }
+
+  // Render grouped list
+  renderGroupedList(itemsWithDistance, (id) => {
     showItemDetails(
       id,
       (item) => openEditor(item, refreshList), // onEdit opens editor
@@ -65,10 +131,8 @@ async function initApp() {
     await refreshList();
   });
   // Initialize view selector
-  initViewSelector((view) => {
-    console.log('View changed to:', view);
-    // Future: Add different filtering logic based on view
-    // For now, just log the view change
+  initViewSelector(async (view) => {
+    await refreshList();
   });
 
 
