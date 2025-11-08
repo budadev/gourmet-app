@@ -1,0 +1,357 @@
+/* =============================
+   Memory Lane Feature
+   Instagram-style story viewer for items
+   ============================= */
+
+.memory-lane-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.memory-lane-container.active {
+    display: flex;
+}
+
+/* Progress bars at the top */
+.memory-lane-progress {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
+    position: relative;
+    z-index: 10;
+}
+
+.memory-lane-progress-bar {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.memory-lane-progress-fill {
+    height: 100%;
+    background: white;
+    width: 0%;
+    border-radius: 2px;
+    transition: width 100ms linear;
+}
+
+.memory-lane-progress-bar.completed .memory-lane-progress-fill {
+    width: 100%;
+}
+
+.memory-lane-progress-bar.active .memory-lane-progress-fill {
+    animation: progressAnimation 5s linear forwards;
+}
+
+@keyframes progressAnimation {
+    from { width: 0%; }
+    to { width: 100%; }
+}
+
+/* Content area */
+.memory-lane-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.memory-lane-item {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+
+.memory-lane-item.active {
+    display: flex;
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Item header - name and rating */
+.memory-lane-header {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.memory-lane-item-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 12px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    line-height: 1.2;
+}
+
+.memory-lane-rating {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    font-size: 24px;
+}
+
+/* Photo container */
+.memory-lane-photo-container {
+    width: 100%;
+    max-width: 500px;
+    aspect-ratio: 4/5;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.memory-lane-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.memory-lane-no-photo {
+    font-size: 60px;
+    opacity: 0.3;
+}
+
+/* Note section */
+.memory-lane-note {
+    width: 100%;
+    max-width: 500px;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin-top: 8px;
+}
+
+.memory-lane-note-text {
+    color: white;
+    font-size: 16px;
+    line-height: 1.6;
+    font-style: italic;
+    text-align: center;
+}
+
+.memory-lane-note-text::before {
+    content: '"';
+    font-size: 24px;
+    line-height: 0;
+    opacity: 0.5;
+    margin-right: 4px;
+}
+
+.memory-lane-note-text::after {
+    content: '"';
+    font-size: 24px;
+    line-height: 0;
+    opacity: 0.5;
+    margin-left: 4px;
+}
+
+/* Close button */
+.memory-lane-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    transition: background 0.2s var(--ease-out);
+}
+
+.memory-lane-close:active {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* Empty state */
+.memory-lane-empty {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+    text-align: center;
+    padding: 40px;
+}
+
+.memory-lane-empty.active {
+    display: flex;
+}
+
+.memory-lane-empty-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+.memory-lane-empty-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.memory-lane-empty-text {
+    font-size: 16px;
+    opacity: 0.7;
+    line-height: 1.6;
+}
+
+/* Touch zones for navigation */
+.memory-lane-touch-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30%;
+    z-index: 5;
+    cursor: pointer;
+}
+
+.memory-lane-touch-zone.left {
+    left: 0;
+}
+
+.memory-lane-touch-zone.right {
+    right: 0;
+}
+
+/* Loading state */
+.memory-lane-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+}
+
+.memory-lane-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+.memory-lane-loading-text {
+    font-size: 16px;
+    opacity: 0.7;
+}
+
+/* End screen */
+.memory-lane-end {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+    text-align: center;
+    padding: 40px;
+}
+
+.memory-lane-end.active {
+    display: flex;
+}
+
+.memory-lane-end-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+}
+
+.memory-lane-end-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.memory-lane-end-text {
+    font-size: 16px;
+    opacity: 0.7;
+    line-height: 1.6;
+    margin-bottom: 40px;
+}
+
+.memory-lane-end-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 300px;
+}
+
+.memory-lane-end-btn {
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-out), opacity 0.2s var(--ease-out);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.memory-lane-end-btn:active {
+    transform: scale(0.95);
+}
+
+.memory-lane-end-btn.primary {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.memory-lane-end-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.memory-lane-end-btn:hover {
+    opacity: 0.9;
+}
+

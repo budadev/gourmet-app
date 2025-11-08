@@ -1,12 +1,10 @@
 {
-  "version": "0.1.73",
-  "releaseDate": "2025-11-07",
+  "version": "0.1.74",
+  "releaseDate": "2025-11-08",
   "changes": [
-    "Added sub-type support for all item types with configurable enable/disable toggle",
-    "Sub-types are searchable and included in search index",
-    "Added sub-type filter in filter panel with cascading behavior based on type selection",
-    "Sub-type filter displays as 'Type → Sub-type' format (e.g., 'Wine → Red')",
-    "Sub-type filter automatically updates when type filters change",
-    "Improved toggle styling to match Places screen design"
+    "Fixed critical Memory Lane bug: Duplicate event listeners causing swipe to skip to end screen",
+    "Added cleanupEventListeners() function to properly remove old handlers before re-attaching",
+    "Event handlers now properly stored and removed to prevent multiple calls on single swipe",
+    "Swipe navigation now works correctly after rewatching or generating new memories"
   ]
 }

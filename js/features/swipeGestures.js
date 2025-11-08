@@ -2,6 +2,8 @@
    Swipe Gesture Handler
    ============================= */
 
+import { isMemoryLaneActive } from './memoryLane.js';
+
 /**
  * Swipe gesture handler for opening/closing side menu and filter panel
  */
@@ -19,9 +21,9 @@ export function initSwipeGestures(openSideMenuFn, closeSideMenuFn, openFilterPan
   const EDGE_THRESHOLD = 50; // Distance from edge to trigger swipe
   const VERTICAL_THRESHOLD = 50; // Maximum vertical movement allowed
 
-  // Helper: disable gestures when any modal is active (user not on home screen)
+  // Helper: disable gestures when any modal is active (user not on home screen) or memory lane is active
   function gesturesDisabled() {
-    return !!document.querySelector('.modal.active');
+    return !!document.querySelector('.modal.active') || isMemoryLaneActive();
   }
 
   // Helper: check if event target is inside map popup or backdrop

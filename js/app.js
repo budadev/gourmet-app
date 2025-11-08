@@ -22,6 +22,7 @@ import { initItemTypeEditor } from './components/itemTypeEditor.js';
 import { closeModal } from './components/modal.js';
 import { initViewSelector, getCurrentView, getCachedUserLocation, calculateDistance } from './features/viewSelector.js';
 import { getPlaceById } from './models/places.js';
+import { initMemoryLane, showMemoryLane, hideMemoryLane, isMemoryLaneActive } from './features/memoryLane.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -40,6 +41,9 @@ async function refreshList() {
 
   // Handle different views
   if (view === 'nearby') {
+  } else if (view === 'memory') {
+    // Memory lane view - show Instagram-style story viewer
+    await showMemoryLane();
     await renderNearbyView(items);
   } else {
     // Default "All" view
@@ -128,9 +132,27 @@ async function initApp() {
   // Initialize filters
   await initFilters();
   setFilterChangeCallback(async () => {
+    // Hide memory lane when switching away from it
+    if (view !== 'memory' && isMemoryLaneActive()) {
+      hideMemoryLane();
+    }
+
+    // Toggle FAB visibility based on view
+    const fabBtn = el('fabBtn');
+    if (fabBtn) {
+      if (view === 'memory') {
+        fabBtn.style.display = 'none';
+      } else {
+        fabBtn.style.display = '';
+      }
+    }
+
     await refreshList();
   });
   // Initialize view selector
+  // Initialize memory lane
+  initMemoryLane();
+
   initViewSelector(async (view) => {
     await refreshList();
   });
