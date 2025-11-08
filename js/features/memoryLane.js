@@ -120,6 +120,9 @@ function renderMemoryLane() {
     const photo = item.photos[Math.floor(Math.random() * item.photos.length)];
     const photoUrl = photo ? URL.createObjectURL(photo.blob) : null;
 
+    // Check if notes exist (field is 'notes' not 'note')
+    const hasNote = item.notes && typeof item.notes === 'string' && item.notes.trim().length > 0;
+
     return `
       <div class="memory-lane-item" data-index="${index}">
         <div class="memory-lane-header">
@@ -131,12 +134,12 @@ function renderMemoryLane() {
             ? `<img src="${photoUrl}" alt="${escapeHtml(item.name || 'Item photo')}" class="memory-lane-photo" />`
             : `<div class="memory-lane-no-photo">📷</div>`
           }
+          ${hasNote ? `
+            <div class="memory-lane-note">
+              <div class="memory-lane-note-text">${escapeHtml(item.notes.trim())}</div>
+            </div>
+          ` : ''}
         </div>
-        ${item.note && item.note.trim() ? `
-          <div class="memory-lane-note">
-            <div class="memory-lane-note-text">${escapeHtml(item.note.trim())}</div>
-          </div>
-        ` : ''}
       </div>
     `;
   }).join('');

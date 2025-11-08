@@ -1,10 +1,12 @@
 {
-  "version": "0.1.74",
+  "version": "0.1.75",
   "releaseDate": "2025-11-08",
   "changes": [
-    "Fixed critical Memory Lane bug: Duplicate event listeners causing swipe to skip to end screen",
-    "Added cleanupEventListeners() function to properly remove old handlers before re-attaching",
-    "Event handlers now properly stored and removed to prevent multiple calls on single swipe",
-    "Swipe navigation now works correctly after rewatching or generating new memories"
+    "Repositioned Memory Lane notes as overlay at bottom of photo",
+    "Notes now appear with semi-transparent dark gradient background over image",
+    "Maximum 30% of photo height reserved for notes, keeping 70% always visible",
+    "Added automatic text truncation with ellipsis (...) for long notes",
+    "Limited notes to 3 lines maximum to ensure proper fit",
+    "Notes now have better contrast with darker background and stronger shadows"
   ]
 }
