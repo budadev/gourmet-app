@@ -12,9 +12,16 @@ import { cleanupPairingsOnDelete } from '../models/pairings.js';
 import { renderPlacesInDetails } from '../components/placeEditor.js';
 import { invalidatePlaceUsageCache } from '../models/places.js';
 
-export async function showItemDetails(id, onEdit, onDelete) {
+export async function showItemDetails(id, onEdit, onDelete, onBack) {
   const item = await getItem(id);
   if (!item) return;
+
+  // Store onBack callback for later use
+  if (onBack) {
+    el('detailsModal')._onBackCallback = onBack;
+  } else {
+    delete el('detailsModal')._onBackCallback;
+  }
 
   const typeInfo = getTypeInfo(item.type);
   const detailsContent = el('detailsContent');
@@ -161,7 +168,7 @@ export async function showItemDetails(id, onEdit, onDelete) {
   detailsContent.querySelectorAll('[data-view-item-id]').forEach(pairingEl => {
     pairingEl.onclick = () => {
       const pairedItemId = Number(pairingEl.getAttribute('data-view-item-id'));
-      showItemDetails(pairedItemId, onEdit, onDelete);
+      showItemDetails(pairedItemId, onEdit, onDelete, onBack);
     };
   });
 

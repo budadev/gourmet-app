@@ -237,7 +237,16 @@ async function initApp() {
     closeModal('scannerModal');
   });
   el('backDetailsBtn')?.addEventListener('click', () => {
-    closeModal('detailsModal');
+    const detailsModal = el('detailsModal');
+    // Check if there's a custom back callback (e.g., from Memory Lane)
+    if (detailsModal && detailsModal._onBackCallback) {
+      const callback = detailsModal._onBackCallback;
+      delete detailsModal._onBackCallback;
+      closeModal('detailsModal');
+      callback();
+    } else {
+      closeModal('detailsModal');
+    }
   });
   el('backEditorBtn')?.addEventListener('click', closeEditor);
   el('backPairingSelectorBtn')?.addEventListener('click', closePairingSelector);

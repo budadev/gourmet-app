@@ -1,12 +1,9 @@
 {
-  "version": "0.1.75",
+  "version": "0.1.76",
   "releaseDate": "2025-11-08",
   "changes": [
-    "Repositioned Memory Lane notes as overlay at bottom of photo",
-    "Notes now appear with semi-transparent dark gradient background over image",
-    "Maximum 30% of photo height reserved for notes, keeping 70% always visible",
-    "Added automatic text truncation with ellipsis (...) for long notes",
-    "Limited notes to 3 lines maximum to ensure proper fit",
-    "Notes now have better contrast with darker background and stronger shadows"
+    "Fixed Memory Lane: Close button (X) now works correctly and doesn't open item details",
+    "Enhanced tap detection to ignore UI elements (close button, progress bars, touch zones)",
+    "Only taps on the main content area (photo/name/rating) open item details"
   ]
 }

@@ -6,6 +6,7 @@
 import { listAll, getPhotosByItemId } from '../db.js';
 import { escapeHtml } from '../utils.js';
 import { renderStars } from '../components/rating.js';
+import { showItemDetails } from './itemDetails.js';
 
 let memoryLaneContainer = null;
 let currentItems = [];
@@ -13,6 +14,8 @@ let currentIndex = 0;
 let progressInterval = null;
 let progressStartTime = 0;
 let isPaused = false;
+let isNavigatedToDetails = false;
+let onItemDetailsBack = null;
 const ITEM_DURATION = 5000; // 5 seconds per item
 
 /**
@@ -272,18 +275,41 @@ function attachEventListeners() {
   // Swipe gestures - store handlers so we can remove them later
   let touchStartX = 0;
   let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchStartTarget = null;
 
   const touchStartHandler = (e) => {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+    touchStartTarget = e.target;
   };
 
   const touchEndHandler = (e) => {
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
+    const touchDuration = Date.now() - touchStartTime;
 
     const deltaX = touchEndX - touchStartX;
     const deltaY = Math.abs(touchEndY - touchStartY);
+
+    // Check if this is a tap (minimal movement and quick)
+    if (Math.abs(deltaX) < 10 && deltaY < 10 && touchDuration < 300) {
+      // Check if tap was on UI elements that should not trigger details
+      const target = touchStartTarget;
+      if (target) {
+        // Ignore taps on close button, progress bars, or touch zones
+        if (target.closest('.memory-lane-close') ||
+            target.closest('.memory-lane-progress') ||
+            target.closest('.memory-lane-touch-zone')) {
+          return;
+        }
+      }
+
+      // This is a tap on the content - open item details
+      openCurrentItemDetails();
+      return;
+    }
 
     // Only handle horizontal swipes (vertical < 50px threshold)
     if (deltaY < 50 && Math.abs(deltaX) > 50) {
@@ -460,6 +486,61 @@ function nextItem() {
 function previousItem() {
   stopProgress();
   showItem(Math.max(0, currentIndex - 1));
+}
+
+/**
+ * Open item details for the current item
+ */
+function openCurrentItemDetails() {
+  if (!currentItems || currentItems.length === 0 || currentIndex >= currentItems.length) {
+    return;
+  }
+
+  const currentItem = currentItems[currentIndex];
+  if (!currentItem || !currentItem.id) {
+    return;
+  }
+
+  // Pause the progress animation
+  stopProgress();
+
+  // Mark that we navigated to details
+  isNavigatedToDetails = true;
+
+  // Hide memory lane (but keep state)
+  if (memoryLaneContainer) {
+    memoryLaneContainer.classList.remove('active');
+  }
+
+  // Show item details with a custom back handler
+  showItemDetails(
+    currentItem.id,
+    null, // onEdit - not used from memory lane
+    null, // onDelete - not used from memory lane
+    () => {
+      // onBack callback - resume memory lane
+      resumeMemoryLane();
+    }
+  );
+}
+
+/**
+ * Resume memory lane after returning from item details
+ */
+function resumeMemoryLane() {
+  if (!isNavigatedToDetails) {
+    return;
+  }
+
+  isNavigatedToDetails = false;
+
+  // Show memory lane again
+  if (memoryLaneContainer) {
+    memoryLaneContainer.classList.add('active');
+  }
+
+  // Resume from the same item
+  showItem(currentIndex);
 }
 
 /**
