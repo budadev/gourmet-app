@@ -47,9 +47,9 @@ export async function showItemDetails(id, onEdit, onDelete, onBack) {
       <div class="detail-label">Rating</div>
       <div class="detail-value">${renderStars(Number(item.rating) || 0, false)}</div>
     </div>
-    ${item.barcode ? `<div class="detail-row">
-      <div class="detail-label">Barcode</div>
-      <div class="detail-value">${escapeHtml(item.barcode)}</div>
+    ${item.barcodes && item.barcodes.length > 0 ? `<div class="detail-row">
+      <div class="detail-label">Barcode${item.barcodes.length > 1 ? 's' : ''}</div>
+      <div class="detail-value">${item.barcodes.map(bc => escapeHtml(bc)).join(', ')}</div>
     </div>` : ''}
   `;
 

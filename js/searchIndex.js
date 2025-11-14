@@ -21,7 +21,7 @@ export async function buildSearchIndex() {
       id: item.id,
       name_lc: (item.name || '').toLowerCase(),
       notes_lc: (item.notes || '').toLowerCase(),
-      barcode: item.barcode || '',
+      barcodes: item.barcodes || [],
       type: item.type || '',
       sub_type_lc: (item.sub_type || '').toLowerCase(),
       place: item.place || '',
@@ -46,7 +46,7 @@ export function updateSearchIndex(item) {
     id: item.id,
     name_lc: (item.name || '').toLowerCase(),
     notes_lc: (item.notes || '').toLowerCase(),
-    barcode: item.barcode || '',
+    barcodes: item.barcodes || [],
     type: item.type || '',
     sub_type_lc: (item.sub_type || '').toLowerCase(),
     place: item.place || '',
@@ -82,7 +82,7 @@ export function searchIndex_fast(query) {
     if (
       entry.name_lc.includes(q) ||
       entry.notes_lc.includes(q) ||
-      entry.barcode.includes(q) ||
+      entry.barcodes.some(barcode => barcode.includes(q)) ||
       entry.sub_type_lc.includes(q)
     ) {
       matchingIds.push(id);

@@ -1,9 +1,12 @@
 {
-  "version": "0.1.79",
-  "releaseDate": "2025-11-08",
+  "version": "0.1.80",
+  "releaseDate": "2025-11-14",
   "changes": [
-    "Fixed: Filters now apply immediately in All and Nearby picks views",
-    "Fixed: Undefined view variable in filter callback that prevented instant filter application",
-    "Filters now work correctly without needing to switch views first"
+    "Feature: Multiple barcodes support - items can now have multiple barcodes",
+    "UI: Barcode list displays inline with wrapping (similar to locations)",
+    "UI: Green '+' button appears when typing a barcode to add it to the list",
+    "Scanner: Scanned barcodes are immediately added to the list",
+    "Search: Items can be found by any of their barcodes",
+    "Migration: Existing single barcodes automatically converted to array format"
   ]
 }

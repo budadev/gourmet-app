@@ -17,7 +17,7 @@ function initDb() {
   if (dbp) return dbp;
 
   dbp = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 5);
+    const req = indexedDB.open(DB_NAME, 6);
     req.onupgradeneeded = (event) => {
       const db = req.result;
       const oldVersion = event.oldVersion;
@@ -30,6 +30,35 @@ function initDb() {
         store.createIndex('by_type', 'type', { unique: false });
         store.createIndex('by_rating', 'rating', { unique: false });
         store.createIndex('by_place', 'places', { unique: false });
+      }
+
+      // Version 6: Migrate single barcode to barcodes array and add index
+      if (oldVersion < 6 && oldVersion >= 1) {
+        const transaction = event.target.transaction;
+        const store = transaction.objectStore(STORE);
+
+        // Add new index for barcodes array
+        if (!store.indexNames.contains('by_barcodes')) {
+          store.createIndex('by_barcodes', 'barcodes', { unique: false, multiEntry: true });
+        }
+
+        // Migrate existing items from barcode to barcodes
+        store.openCursor().onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const item = cursor.value;
+            if (item.barcode && !item.barcodes) {
+              item.barcodes = [item.barcode];
+              delete item.barcode;
+              cursor.update(item);
+            } else if (!item.barcodes) {
+              item.barcodes = [];
+              if (item.barcode) delete item.barcode;
+              cursor.update(item);
+            }
+            cursor.continue();
+          }
+        };
       }
 
       // Version 2: places store
@@ -159,7 +188,8 @@ export async function listAll() {
 export async function findByBarcode(code) {
   const store = await tx('readonly');
   return new Promise((res) => {
-    const idx = store.index('by_barcode');
+    // Use the new by_barcodes index with multiEntry support
+    const idx = store.index('by_barcodes');
     const r = idx.getAll(code);
     r.onsuccess = () => res(r.result || []);
   });

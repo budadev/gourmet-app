@@ -18,6 +18,7 @@ let currentEditingId = null;
 let starRatingController = null;
 let focusListenersCleanup = null;
 let visualViewportListener = null;
+let currentBarcodes = []; // Track barcodes being edited
 
 export async function openEditor(item = null, onSave) {
   const config = getConfig();
@@ -29,12 +30,14 @@ export async function openEditor(item = null, onSave) {
     setCurrentPairings(itemPairings);
     const itemPlaces = item.places ? [...item.places] : [];
     setCurrentPlaces(itemPlaces);
+    currentBarcodes = item.barcodes ? [...item.barcodes] : (item.barcode ? [item.barcode] : []);
     await renderEditorFields(item.type || Object.keys(config)[0], item);
   } else {
     el('editorTitle').textContent = 'Add Item';
     currentEditingId = null;
     setCurrentPairings({ good: [], bad: [] });
     setCurrentPlaces([]);
+    currentBarcodes = [];
     await renderEditorFields(Object.keys(config)[0], {});
   }
 
@@ -59,6 +62,7 @@ export function closeEditor() {
   clearPhotos();
   setCurrentPairings({ good: [], bad: [] });
   setCurrentPlaces([]);
+  currentBarcodes = [];
   window.__editorOnSave = null;
 
   // Cleanup focus listeners
@@ -97,14 +101,17 @@ async function renderEditorFields(selectedType, itemData = {}) {
   // Name (always)
   html += `<div class="field-group"><label>Name *</label><input id="nameInput" placeholder="e.g., Cabernet Sauvignon" value="${escapeHtml(itemData.name || '')}"/></div>`;
 
-  // Barcode (always) with scan button
-  html += `<div class="field-group"><label>Barcode (optional)</label>
-    <div class="input-with-barcode">
-      <input id="barcodeInput" placeholder="e.g., 5991234567890" value="${escapeHtml(itemData.barcode || '')}"/>
+  // Barcode section (always) - similar to places UI
+  html += `<div class="field-group" style="grid-column:1/-1">
+    <label>Barcodes (optional)</label>
+    <div class="barcode-input-wrapper">
+      <input type="text" id="barcodeInput" class="barcode-input" placeholder="Enter or scan a barcode..." autocomplete="off" />
+      <button class="place-add-btn hidden" id="barcodeAddBtn" type="button" title="Add barcode">+</button>
       <button class="barcode-btn" id="barcodeInputScanBtn" type="button" title="Scan barcode">
         <img src="icons/barcode.png" alt="Scan barcode" />
       </button>
     </div>
+    <div class="selected-barcodes" id="selectedBarcodes"></div>
   </div>`;
 
   // Rating (always) - full width
@@ -146,49 +153,11 @@ async function renderEditorFields(selectedType, itemData = {}) {
   const ratingContainer = el('ratingContainer');
   starRatingController = setupStarRating(ratingContainer, Number(itemData.rating) || 0);
 
-  // Setup barcode input scan button
-  const barcodeInputScanBtn = el('barcodeInputScanBtn');
-  if (barcodeInputScanBtn) {
-    let editorBarcodeScanning = false;
-    const triggerEditorScan = async () => {
-      if (editorBarcodeScanning) return;
-      editorBarcodeScanning = true;
-      barcodeInputScanBtn.classList.add('scanning');
-      barcodeInputScanBtn.setAttribute('aria-disabled','true');
-      try {
-        startScanForInput(async (code) => {
-          const barcodeInput = el('barcodeInput');
-          if (!barcodeInput) return;
+  // Render initial barcode list
+  renderBarcodeList();
 
-          const { findByBarcode } = await import('../db.js');
-          const existingItems = await findByBarcode(code);
-          const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
-
-            if (duplicates.length > 0) {
-              const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
-              const message = duplicates.length === 1
-                ? `This barcode already exists for ${itemNames}. Are you sure you want to use it?`
-                : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to use it?`;
-              if (confirm(message)) {
-                barcodeInput.value = code;
-              }
-            } else {
-              barcodeInput.value = code;
-            }
-        });
-      } finally {
-        setTimeout(() => {
-          editorBarcodeScanning = false;
-          barcodeInputScanBtn.classList.remove('scanning');
-          barcodeInputScanBtn.removeAttribute('aria-disabled');
-        }, 400);
-      }
-    };
-    // Fast gesture capture
-    barcodeInputScanBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); triggerEditorScan(); }, { passive: false });
-    // Fallback for keyboard / non-pointer
-    barcodeInputScanBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); triggerEditorScan(); };
-  }
+  // Setup barcode input handlers
+  setupBarcodeInputHandlers();
 
   // Handle type change - update only dynamic fields instead of full re-render
   const typeSelect = el('typeSelect');
@@ -374,6 +343,172 @@ function updateDynamicFields(selectedType, itemData = {}) {
 }
 
 /**
+ * Render the list of barcodes
+ */
+function renderBarcodeList() {
+  const container = el('selectedBarcodes');
+  if (!container) return;
+
+  if (!currentBarcodes || currentBarcodes.length === 0) {
+    container.innerHTML = '<div class="empty-places">No barcodes added yet</div>';
+    return;
+  }
+
+  let html = '<div class="place-list">';
+  currentBarcodes.forEach((barcode, index) => {
+    html += `<div class="place-tag" data-barcode-index="${index}">`;
+    html += '<span class="place-tag-icon">🏷️</span>';
+    html += `<span class="place-tag-name">${escapeHtml(barcode)}</span>`;
+    html += `<button class="place-tag-remove" data-barcode-index="${index}" type="button">×</button>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Add remove handlers
+  container.querySelectorAll('.place-tag-remove').forEach(btn => {
+    btn.onclick = () => {
+      const index = Number(btn.getAttribute('data-barcode-index'));
+      currentBarcodes.splice(index, 1);
+      renderBarcodeList();
+      // Trigger input event to update add button visibility
+      const barcodeInput = el('barcodeInput');
+      if (barcodeInput) {
+        barcodeInput.dispatchEvent(new Event('input'));
+      }
+    };
+  });
+}
+
+/**
+ * Setup barcode input handlers (add button, scan button, input events)
+ */
+function setupBarcodeInputHandlers() {
+  const barcodeInput = el('barcodeInput');
+  const barcodeAddBtn = el('barcodeAddBtn');
+  const barcodeInputScanBtn = el('barcodeInputScanBtn');
+
+  if (!barcodeInput || !barcodeAddBtn || !barcodeInputScanBtn) return;
+
+  // Show/hide add button based on input value
+  const updateBarcodeAddButton = () => {
+    const value = barcodeInput.value.trim();
+    if (value && !currentBarcodes.includes(value)) {
+      barcodeAddBtn.classList.remove('hidden');
+    } else {
+      barcodeAddBtn.classList.add('hidden');
+    }
+  };
+
+  // Add barcode from input
+  const addBarcodeFromInput = async () => {
+    const value = barcodeInput.value.trim();
+    if (!value) return;
+
+    if (currentBarcodes.includes(value)) {
+      alert('This barcode is already added.');
+      return;
+    }
+
+    // Check if barcode exists in other items
+    const { findByBarcode } = await import('../db.js');
+    const existingItems = await findByBarcode(value);
+    const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
+
+    if (duplicates.length > 0) {
+      const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
+      const message = duplicates.length === 1
+        ? `This barcode already exists for ${itemNames}. Are you sure you want to add it?`
+        : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to add it?`;
+      if (!confirm(message)) {
+        return;
+      }
+    }
+
+    currentBarcodes.push(value);
+    barcodeInput.value = '';
+    renderBarcodeList();
+    updateBarcodeAddButton();
+  };
+
+  // Input event to show/hide add button
+  barcodeInput.oninput = updateBarcodeAddButton;
+
+  // Add button click
+  barcodeAddBtn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addBarcodeFromInput();
+  };
+
+  // Enter key to add barcode
+  barcodeInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addBarcodeFromInput();
+    }
+  };
+
+  // Setup barcode scan button
+  let editorBarcodeScanning = false;
+  const triggerEditorScan = async () => {
+    if (editorBarcodeScanning) return;
+    editorBarcodeScanning = true;
+    barcodeInputScanBtn.classList.add('scanning');
+    barcodeInputScanBtn.setAttribute('aria-disabled', 'true');
+    try {
+      startScanForInput(async (code) => {
+        // After scan, immediately add to list without requiring user to click add button
+        if (currentBarcodes.includes(code)) {
+          alert('This barcode is already added.');
+          return;
+        }
+
+        // Check if barcode exists in other items
+        const { findByBarcode } = await import('../db.js');
+        const existingItems = await findByBarcode(code);
+        const duplicates = existingItems ? existingItems.filter(item => item.id !== currentEditingId) : [];
+
+        if (duplicates.length > 0) {
+          const itemNames = duplicates.map(item => `"${item.name}"`).join(', ');
+          const message = duplicates.length === 1
+            ? `This barcode already exists for ${itemNames}. Are you sure you want to add it?`
+            : `This barcode already exists for ${duplicates.length} items: ${itemNames}. Are you sure you want to add it?`;
+          if (!confirm(message)) {
+            return;
+          }
+        }
+
+        currentBarcodes.push(code);
+        barcodeInput.value = '';
+        renderBarcodeList();
+        updateBarcodeAddButton();
+      });
+    } finally {
+      setTimeout(() => {
+        editorBarcodeScanning = false;
+        barcodeInputScanBtn.classList.remove('scanning');
+        barcodeInputScanBtn.removeAttribute('aria-disabled');
+      }, 400);
+    }
+  };
+
+  // Fast gesture capture
+  barcodeInputScanBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    triggerEditorScan();
+  }, { passive: false });
+
+  // Fallback for keyboard / non-pointer
+  barcodeInputScanBtn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    triggerEditorScan();
+  };
+}
+
+/**
  * Collect form data from the editor
  */
 function collectFormData() {
@@ -383,7 +518,7 @@ function collectFormData() {
   const data = {
     type: selectedType,
     name: el('nameInput')?.value?.trim() || '',
-    barcode: el('barcodeInput')?.value?.trim() || '',
+    barcodes: [...currentBarcodes],
     rating: starRatingController?.getValue() || 0,
     notes: el('notesInput')?.value?.trim() || ''
   };

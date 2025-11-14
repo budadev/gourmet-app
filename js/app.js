@@ -199,7 +199,7 @@ async function initApp() {
             hideBarcodeLookupLoading();
 
             if (confirm('Barcode not found. Add new item?')) {
-              openEditor({ barcode: code }, refreshList);
+              openEditor({ barcodes: [code] }, refreshList);
             }
             await refreshList();
           }
@@ -207,7 +207,7 @@ async function initApp() {
           hideBarcodeLookupLoading();
           console.error('Barcode lookup error:', error);
           if (confirm('Error during barcode lookup. Add new item?')) {
-            openEditor({ barcode: code }, refreshList);
+            openEditor({ barcodes: [code] }, refreshList);
           }
         }
       });
