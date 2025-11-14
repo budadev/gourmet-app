@@ -47,7 +47,7 @@ header{
 /* View selector buttons */
 .view-selector {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     padding-bottom: 10px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -62,7 +62,7 @@ header{
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: 8px 12px;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 20px;

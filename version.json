@@ -1,5 +1,5 @@
 {
-  "version": "0.1.82",
+  "version": "0.1.83",
   "releaseDate": "2025-11-14",
   "changes": [
     "UI: Item type editor - sub-type options and field dropdown options now use add-one-by-one interface with '+' button",
