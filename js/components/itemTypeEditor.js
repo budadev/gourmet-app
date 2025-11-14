@@ -13,6 +13,7 @@ import {
 import { reloadConfig } from '../config.js';
 
 let currentEditingKey = null;
+let currentSubTypeOptions = []; // Track sub-type options being edited
 
 /**
  * Open the item type editor for an existing type
@@ -43,13 +44,17 @@ export async function openItemTypeEditor(itemElement, typeKey) {
   }
 
   // Set sub-type options
-  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
-  if (subTypeOptionsInput) {
-    subTypeOptionsInput.value = (itemType.subTypeOptions || []).join(', ');
+  currentSubTypeOptions = itemType.subTypeOptions ? [...itemType.subTypeOptions] : [];
+
+  // Reset input initialization flag
+  const subTypeInput = el('itemTypeSubTypeOptions');
+  if (subTypeInput) {
+    subTypeInput.dataset.initialized = 'false';
   }
 
-  // Update sub-type options visibility
+  // Update sub-type options visibility and render list
   updateSubTypeOptionsVisibility();
+  renderSubTypeOptionsList();
 
   // Render fields
   renderFieldsEditor(itemType.fields || []);
@@ -94,13 +99,17 @@ export function openCreateItemTypeEditor() {
   }
 
   // Clear sub-type options
-  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
-  if (subTypeOptionsInput) {
-    subTypeOptionsInput.value = '';
+  currentSubTypeOptions = [];
+
+  // Reset input initialization flag
+  const subTypeInput = el('itemTypeSubTypeOptions');
+  if (subTypeInput) {
+    subTypeInput.dataset.initialized = 'false';
   }
 
-  // Update sub-type options visibility
+  // Update sub-type options visibility and render list
   updateSubTypeOptionsVisibility();
+  renderSubTypeOptionsList();
 
   // Render empty fields editor
   renderFieldsEditor([]);
@@ -126,6 +135,7 @@ export function closeItemTypeEditor() {
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
   currentEditingKey = null;
+  currentSubTypeOptions = [];
 }
 
 /**
@@ -136,8 +146,109 @@ function updateSubTypeOptionsVisibility() {
   const subTypeOptionsContainer = el('itemTypeSubTypeOptionsContainer');
 
   if (subTypeToggle && subTypeOptionsContainer) {
-    subTypeOptionsContainer.style.display = subTypeToggle.checked ? 'block' : 'none';
+    const isEnabled = subTypeToggle.checked;
+    subTypeOptionsContainer.style.display = isEnabled ? 'block' : 'none';
+
+    // Setup input handlers when container becomes visible
+    if (isEnabled) {
+      setupSubTypeInputHandlers();
+    }
   }
+}
+
+/**
+ * Render the list of sub-type options
+ */
+function renderSubTypeOptionsList() {
+  const container = el('selectedSubTypeOptions');
+  if (!container) return;
+
+  if (!currentSubTypeOptions || currentSubTypeOptions.length === 0) {
+    container.innerHTML = '<div class="empty-places">No sub-types added yet</div>';
+    return;
+  }
+
+  let html = '<div class="place-list">';
+  currentSubTypeOptions.forEach((option, index) => {
+    html += `<div class="place-tag" data-option-index="${index}">`;
+    html += `<span class="place-tag-name">${escapeHtml(option)}</span>`;
+    html += `<button class="place-tag-remove" data-option-index="${index}" type="button">×</button>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Add remove handlers
+  container.querySelectorAll('.place-tag-remove').forEach(btn => {
+    btn.onclick = () => {
+      const index = Number(btn.getAttribute('data-option-index'));
+      currentSubTypeOptions.splice(index, 1);
+      renderSubTypeOptionsList();
+      // Trigger input event to update add button visibility
+      const input = el('itemTypeSubTypeOptions');
+      if (input) {
+        input.dispatchEvent(new Event('input'));
+      }
+    };
+  });
+}
+
+/**
+ * Setup sub-type input handlers (add button, input events)
+ */
+function setupSubTypeInputHandlers() {
+  const input = el('itemTypeSubTypeOptions');
+  const addBtn = el('subTypeAddBtn');
+
+  if (!input || !addBtn) return;
+
+  // Check if already initialized to prevent duplicate listeners
+  if (input.dataset.initialized === 'true') return;
+  input.dataset.initialized = 'true';
+
+  // Show/hide add button based on input value
+  const updateAddButton = () => {
+    const value = input.value.trim();
+    if (value && !currentSubTypeOptions.includes(value)) {
+      addBtn.classList.remove('hidden');
+    } else {
+      addBtn.classList.add('hidden');
+    }
+  };
+
+  // Add option from input
+  const addOptionFromInput = () => {
+    const value = input.value.trim();
+    if (!value) return;
+
+    if (currentSubTypeOptions.includes(value)) {
+      alert('This sub-type option is already added.');
+      return;
+    }
+
+    currentSubTypeOptions.push(value);
+    input.value = '';
+    renderSubTypeOptionsList();
+    updateAddButton();
+  };
+
+  // Input event to show/hide add button
+  input.oninput = updateAddButton;
+
+  // Add button click
+  addBtn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addOptionFromInput();
+  };
+
+  // Enter key to add option
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addOptionFromInput();
+    }
+  };
 }
 
 /**
@@ -176,6 +287,9 @@ function createFieldRow(field, index) {
   fieldDiv.className = 'item-type-field-row';
   fieldDiv.setAttribute('data-index', index);
 
+  // Store options in a data attribute
+  fieldDiv._fieldOptions = field.options ? [...field.options] : [];
+
   // Line 1: Label input (name will be auto-generated)
   const labelInput = document.createElement('input');
   labelInput.type = 'text';
@@ -192,17 +306,108 @@ function createFieldRow(field, index) {
     <option value="enum" ${field.type === 'enum' ? 'selected' : ''}>Dropdown</option>
   `;
 
-  // Line 3: Options input (only visible for enum)
+  // Line 3: Options input container (only visible for enum)
   const optionsContainer = document.createElement('div');
   optionsContainer.className = 'field-options-container';
   optionsContainer.style.display = field.type === 'enum' ? 'block' : 'none';
 
+  // Create input wrapper similar to barcode input
+  const optionsInputWrapper = document.createElement('div');
+  optionsInputWrapper.className = 'barcode-input-wrapper';
+  optionsInputWrapper.style.marginBottom = '8px';
+
   const optionsInput = document.createElement('input');
   optionsInput.type = 'text';
-  optionsInput.placeholder = 'Options (comma-separated, e.g., Red, White, Rosé)';
-  optionsInput.value = field.options ? field.options.join(', ') : '';
-  optionsInput.className = 'field-options-input';
-  optionsContainer.appendChild(optionsInput);
+  optionsInput.placeholder = 'Enter an option...';
+  optionsInput.className = 'field-options-input barcode-input';
+
+  const optionsAddBtn = document.createElement('button');
+  optionsAddBtn.className = 'place-add-btn hidden';
+  optionsAddBtn.type = 'button';
+  optionsAddBtn.title = 'Add option';
+  optionsAddBtn.textContent = '+';
+
+  optionsInputWrapper.appendChild(optionsInput);
+  optionsInputWrapper.appendChild(optionsAddBtn);
+
+  // Create list container for options
+  const optionsList = document.createElement('div');
+  optionsList.className = 'selected-barcodes';
+
+  optionsContainer.appendChild(optionsInputWrapper);
+  optionsContainer.appendChild(optionsList);
+
+  // Function to render options list
+  const renderOptionsList = () => {
+    if (!fieldDiv._fieldOptions || fieldDiv._fieldOptions.length === 0) {
+      optionsList.innerHTML = '<div class="empty-places">No options added yet</div>';
+      return;
+    }
+
+    let html = '<div class="place-list">';
+    fieldDiv._fieldOptions.forEach((option, optIndex) => {
+      html += `<div class="place-tag" data-option-index="${optIndex}">`;
+      html += `<span class="place-tag-name">${escapeHtml(option)}</span>`;
+      html += `<button class="place-tag-remove" data-option-index="${optIndex}" type="button">×</button>`;
+      html += '</div>';
+    });
+    html += '</div>';
+    optionsList.innerHTML = html;
+
+    // Add remove handlers
+    optionsList.querySelectorAll('.place-tag-remove').forEach(btn => {
+      btn.onclick = () => {
+        const optIndex = Number(btn.getAttribute('data-option-index'));
+        fieldDiv._fieldOptions.splice(optIndex, 1);
+        renderOptionsList();
+        // Trigger input event to update add button visibility
+        optionsInput.dispatchEvent(new Event('input'));
+      };
+    });
+  };
+
+  // Setup input handlers for options
+  const updateAddButton = () => {
+    const value = optionsInput.value.trim();
+    if (value && !fieldDiv._fieldOptions.includes(value)) {
+      optionsAddBtn.classList.remove('hidden');
+    } else {
+      optionsAddBtn.classList.add('hidden');
+    }
+  };
+
+  const addOptionFromInput = () => {
+    const value = optionsInput.value.trim();
+    if (!value) return;
+
+    if (fieldDiv._fieldOptions.includes(value)) {
+      alert('This option is already added.');
+      return;
+    }
+
+    fieldDiv._fieldOptions.push(value);
+    optionsInput.value = '';
+    renderOptionsList();
+    updateAddButton();
+  };
+
+  optionsInput.oninput = updateAddButton;
+
+  optionsAddBtn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addOptionFromInput();
+  };
+
+  optionsInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addOptionFromInput();
+    }
+  };
+
+  // Initial render of options list
+  renderOptionsList();
 
   typeSelect.addEventListener('change', () => {
     optionsContainer.style.display = typeSelect.value === 'enum' ? 'block' : 'none';
@@ -238,11 +443,9 @@ export async function saveItemType() {
   const label = el('itemTypeLabelInput').value.trim();
   const icon = el('itemTypeIconInput').value.trim();
   const subTypeToggle = el('itemTypeSubTypeToggle');
-  const subTypeOptionsInput = el('itemTypeSubTypeOptions');
 
   const subTypeEnabled = subTypeToggle ? subTypeToggle.checked : false;
-  const subTypeOptionsStr = subTypeOptionsInput ? subTypeOptionsInput.value.trim() : '';
-  const subTypeOptions = subTypeOptionsStr ? subTypeOptionsStr.split(',').map(o => o.trim()).filter(o => o) : [];
+  const subTypeOptions = [...currentSubTypeOptions];
 
   if (!label) {
     alert('Please provide a label for the item type.');
@@ -257,7 +460,6 @@ export async function saveItemType() {
   fieldRows.forEach(row => {
     const labelInput = row.querySelector('.field-label-input');
     const typeSelect = row.querySelector('.field-type-select');
-    const optionsInput = row.querySelector('.field-options-input');
 
     const fieldLabel = labelInput ? labelInput.value.trim() : '';
     const type = typeSelect ? typeSelect.value : 'string';
@@ -268,9 +470,9 @@ export async function saveItemType() {
 
       const field = { name: fieldName, label: fieldLabel, type };
 
-      if (type === 'enum' && optionsInput) {
-        const optionsStr = optionsInput.value.trim();
-        field.options = optionsStr ? optionsStr.split(',').map(o => o.trim()).filter(o => o) : [];
+      if (type === 'enum') {
+        // Get options from the stored _fieldOptions array
+        field.options = row._fieldOptions ? [...row._fieldOptions] : [];
       }
 
       fields.push(field);

@@ -56,6 +56,25 @@
   margin-top: 0;
 }
 
+/* Field options input wrapper (reuse barcode input wrapper styles) */
+.field-options-container .barcode-input-wrapper {
+  margin-bottom: 8px;
+}
+
+.field-options-container .place-add-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  z-index: 1;
+}
+
+.field-options-container .barcode-input {
+  padding-right: 48px;
+}
+
 .field-delete-btn {
   padding: 6px 10px;
   font-size: 18px;

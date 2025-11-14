@@ -477,8 +477,12 @@ How to use:
                     </div>
                     <div id="itemTypeSubTypeOptionsContainer" class="field-group" style="display: none;">
                         <label>Sub-type Options</label>
-                        <input id="itemTypeSubTypeOptions" type="text" placeholder="e.g., Red, White, Rosé" autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore="true" />
-                        <small class="field-hint">Comma-separated list of sub-type options</small>
+                        <div class="barcode-input-wrapper">
+                            <input id="itemTypeSubTypeOptions" type="text" class="barcode-input" placeholder="Enter a sub-type option..." autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore="true" />
+                            <button class="place-add-btn hidden" id="subTypeAddBtn" type="button" title="Add sub-type option">+</button>
+                        </div>
+                        <div class="selected-barcodes" id="selectedSubTypeOptions"></div>
+                        <small class="field-hint">Add sub-type options one by one</small>
                     </div>
                     <div class="field-group" style="margin-top: 24px;">
                         <label>Fields</label>

@@ -1,12 +1,11 @@
 {
-  "version": "0.1.81",
+  "version": "0.1.82",
   "releaseDate": "2025-11-14",
   "changes": [
-    "Feature: Multiple barcodes support - items can now have multiple barcodes",
-    "UI: Barcode list displays inline with wrapping (similar to locations)",
-    "UI: Green '+' button appears when typing a barcode to add it to the list",
-    "Scanner: Scanned barcodes are immediately added to the list",
-    "Search: Items can be found by any of their barcodes",
-    "Migration: Existing single barcodes automatically converted to array format"
+    "UI: Item type editor - sub-type options and field dropdown options now use add-one-by-one interface with '+' button",
+    "UI: Replaced comma-separated inputs with individual item addition (matching barcode/location patterns)",
+    "UX: Each option displays as a tag with 'X' button for easy removal (icons removed for cleaner display)",
+    "UX: '+' button appears when typing to add the option to the list",
+    "UI: Simplified option tags in type editor - removed icons, keeping just text and remove button"
   ]
 }
