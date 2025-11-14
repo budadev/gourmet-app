@@ -4,7 +4,7 @@
 
 /* Star rating */
 .star-rating{
-    display:flex;
+    display:inline-flex; /* Changed from flex to inline-flex to fit content width */
     gap:6px;
     align-items:center;
     padding:8px 0;

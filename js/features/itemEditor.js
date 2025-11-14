@@ -101,6 +101,9 @@ async function renderEditorFields(selectedType, itemData = {}) {
   // Name (always)
   html += `<div class="field-group"><label>Name *</label><input id="nameInput" placeholder="e.g., Cabernet Sauvignon" value="${escapeHtml(itemData.name || '')}"/></div>`;
 
+  // Rating (always) - full width
+  html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating) || 0, true)}</div></div>`;
+
   // Barcode section (always) - similar to places UI
   html += `<div class="field-group" style="grid-column:1/-1">
     <label>Barcodes (optional)</label>
@@ -114,17 +117,11 @@ async function renderEditorFields(selectedType, itemData = {}) {
     <div class="selected-barcodes" id="selectedBarcodes"></div>
   </div>`;
 
-  // Rating (always) - full width
-  html += `<div class="field-group" style="grid-column:1/-1"><label>Rating *</label><div id="ratingContainer">${renderStars(Number(itemData.rating) || 0, true)}</div></div>`;
-
-  // Dynamic fields container (will be populated separately)
-  html += '<div id="dynamicFieldsContainer" style="grid-column:1/-1"></div>';
-
   // Notes (always) - full width
   html += `<div class="field-group" style="grid-column:1/-1"><label>Notes</label><textarea id="notesInput" rows="4" placeholder="Tasting notes, where you had it, etc.">${escapeHtml(itemData.notes || '')}</textarea></div>`;
 
-  // Places section - full width (moved before Photos)
-  html += '<div id="placesEditorContainer" style="grid-column:1/-1"></div>';
+  // Dynamic fields container (will be populated separately)
+  html += '<div id="dynamicFieldsContainer" style="grid-column:1/-1"></div>';
 
   // Photos (optional) - full width
   html += `<div class="field-group" style="grid-column:1/-1">
@@ -135,6 +132,9 @@ async function renderEditorFields(selectedType, itemData = {}) {
       <button class="btn" id="selectPhotoBtn" type="button">🖼️ Choose Photo</button>
     </div>
   </div>`;
+
+  // Places section - full width
+  html += '<div id="placesEditorContainer" style="grid-column:1/-1"></div>';
 
   // Pairings section - full width
   html += '<div id="pairingsEditorContainer" style="grid-column:1/-1"></div>';
