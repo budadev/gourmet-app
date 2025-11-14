@@ -328,7 +328,7 @@ function updateDynamicFields(selectedType, itemData = {}) {
       });
       html += '</select>';
     } else if (field.type === 'number') {
-      html += `<input type="number" id="field_${field.name}" value="${itemData[field.name] || ''}" placeholder="Enter a number"/>`;
+      html += `<input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" id="field_${field.name}" value="${itemData[field.name] || ''}" placeholder="Enter a number"/>`;
     } else {
       html += `<input type="text" id="field_${field.name}" value="${escapeHtml(itemData[field.name] || '')}" placeholder="Enter ${field.label.toLowerCase()}"/>`;
     }

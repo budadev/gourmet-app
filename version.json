@@ -1,11 +1,9 @@
 {
-  "version": "0.1.83",
+  "version": "0.1.84",
   "releaseDate": "2025-11-14",
   "changes": [
-    "UI: Item type editor - sub-type options and field dropdown options now use add-one-by-one interface with '+' button",
-    "UI: Replaced comma-separated inputs with individual item addition (matching barcode/location patterns)",
-    "UX: Each option displays as a tag with 'X' button for easy removal (icons removed for cleaner display)",
-    "UX: '+' button appears when typing to add the option to the list",
-    "UI: Simplified option tags in type editor - removed icons, keeping just text and remove button"
+    "UI: Reduced spacing between quick filter buttons (All, Nearby picks, Memory lane) to prevent trimming on iPhone",
+    "UX: Number fields in Add/Edit item screen now show numeric keypad on iPhone and mobile devices",
+    "Mobile: Improved input experience with proper keyboard types for different field types"
   ]
 }
