@@ -2,7 +2,7 @@
    Item Details Modal
    ============================= */
 
-import { escapeHtml, el, formatDate } from '../utils.js';
+import { escapeHtml, el } from '../utils.js';
 import { getItem, deleteItem, listAll, getPhoto, deletePhotosByItemId, getPhotoThumbnails } from '../db.js';
 import { renderStars } from '../components/rating.js';
 import { openModal, closeModal } from '../components/modal.js';
@@ -33,25 +33,28 @@ export async function showItemDetails(id, onEdit, onDelete, onBack) {
     detailsHeader.textContent = item.name || 'Item Details';
   }
 
-  // Remove the name row from details - start with Type instead
+  // Build details in the specified order: Type (with sub-type), Rating, Notes, Places, Dynamic fields, Photos, Pairings, Barcodes
+  const subtypeText = (typeInfo.subTypeEnabled && item.sub_type) ? ` · ${escapeHtml(item.sub_type)}` : '';
+
   let fieldsHTML = `
     <div class="detail-row">
       <div class="detail-label">Type</div>
-      <div class="detail-value">${typeInfo.icon} ${escapeHtml(typeInfo.label)}</div>
+      <div class="detail-value">${typeInfo.icon} ${escapeHtml(typeInfo.label)}${subtypeText}</div>
     </div>
-    ${(typeInfo.subTypeEnabled && item.sub_type) ? `<div class="detail-row">
-      <div class="detail-label">Sub-type</div>
-      <div class="detail-value">${escapeHtml(item.sub_type)}</div>
-    </div>` : ''}
     <div class="detail-row">
       <div class="detail-label">Rating</div>
       <div class="detail-value">${renderStars(Number(item.rating) || 0, false)}</div>
     </div>
-    ${item.barcodes && item.barcodes.length > 0 ? `<div class="detail-row">
-      <div class="detail-label">Barcode${item.barcodes.length > 1 ? 's' : ''}</div>
-      <div class="detail-value">${item.barcodes.map(bc => escapeHtml(bc)).join(', ')}</div>
+    ${item.notes ? `<div class="detail-row">
+      <div class="detail-label">Notes</div>
+      <div class="detail-value">${escapeHtml(item.notes)}</div>
     </div>` : ''}
   `;
+
+  // Add places if available
+  if (item.places && item.places.length > 0) {
+    fieldsHTML += await renderPlacesInDetails(item.places);
+  }
 
   // Add dynamic fields
   typeInfo.fields.forEach(field => {
@@ -64,25 +67,6 @@ export async function showItemDetails(id, onEdit, onDelete, onBack) {
       `;
     }
   });
-
-  fieldsHTML += `
-    ${item.notes ? `<div class="detail-row">
-      <div class="detail-label">Notes</div>
-      <div class="detail-value">${escapeHtml(item.notes)}</div>
-    </div>` : ''}
-  `;
-
-  // Add places if available
-  if (item.places && item.places.length > 0) {
-    fieldsHTML += await renderPlacesInDetails(item.places);
-  }
-
-  fieldsHTML += `
-    <div class="detail-row">
-      <div class="detail-label">Last Updated</div>
-      <div class="detail-value">${formatDate(item.updatedAt)}</div>
-    </div>
-  `;
 
   // Add photos if available
   let photosHTML = '';
@@ -120,10 +104,22 @@ export async function showItemDetails(id, onEdit, onDelete, onBack) {
   // Render pairings
   const pairingsHTML = await renderPairingsHTML(item, showItemDetails);
 
+  // Render barcodes section (after pairings)
+  let barcodesHTML = '';
+  if (item.barcodes && item.barcodes.length > 0) {
+    barcodesHTML = `
+      <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border-light)">
+        <label>Barcode${item.barcodes.length > 1 ? 's' : ''}</label>
+        <div style="margin-top:8px;font-weight:600;color:var(--text)">${item.barcodes.map(bc => escapeHtml(bc)).join(', ')}</div>
+      </div>
+    `;
+  }
+
   detailsContent.innerHTML = `
     <div class="detail-section">${fieldsHTML}</div>
     ${photosHTML}
     ${pairingsHTML}
+    ${barcodesHTML}
   `;
 
   // Set buttons in footer

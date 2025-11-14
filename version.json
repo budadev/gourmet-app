@@ -1,9 +1,9 @@
 {
-  "version": "0.1.84",
+  "version": "0.1.85",
   "releaseDate": "2025-11-14",
   "changes": [
-    "UI: Reduced spacing between quick filter buttons (All, Nearby picks, Memory lane) to prevent trimming on iPhone",
-    "UX: Number fields in Add/Edit item screen now show numeric keypad on iPhone and mobile devices",
-    "Mobile: Improved input experience with proper keyboard types for different field types"
+    "UI: Item details page reorganized - Type and Sub-type merged into one row (matching home screen format)",
+    "UI: Item details sections reordered: Type, Rating, Notes, Places, Dynamic fields, Photos, Pairings, Barcodes",
+    "UI: Removed 'Last Updated' field from item details page for cleaner interface"
   ]
 }
