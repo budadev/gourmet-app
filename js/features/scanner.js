@@ -202,7 +202,7 @@ async function startCamera(onScanComplete) {
     // Set up barcode detection handler with quality validation and consensus
     let detectionHistory = []; // Track recent detections for consensus
     const REQUIRED_DETECTIONS = 2; // Must see same code 2 times
-    const QUALITY_THRESHOLD = 75; // Minimum quality score (0-100)
+    const QUALITY_THRESHOLD = 60; // Minimum quality score (0-100)
     const CONSENSUS_WINDOW_MS = 1000; // Time window for consensus
 
     // Helper function to calculate EAN/UPC checksum
