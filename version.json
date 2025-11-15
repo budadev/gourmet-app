@@ -1,5 +1,5 @@
 {
-  "version": "0.1.88",
+  "version": "0.1.87",
   "releaseDate": "2025-11-14",
   "changes": [
     "UI: Item details page reorganized - Type and Sub-type merged into one row (matching home screen format)",

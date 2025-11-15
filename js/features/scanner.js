@@ -67,7 +67,7 @@ async function startCamera(onScanComplete) {
     console.log('Error enumerating devices:', e);
   }
 
-  // Configure Quagga2 with enhanced accuracy settings and rotation support
+  // Configure Quagga2 with enhanced accuracy settings
   const config = {
     inputStream: {
       name: 'Live',
@@ -94,40 +94,15 @@ async function startCamera(onScanComplete) {
       singleChannel: false // use color processing
     },
     locator: {
-      patchSize: 'x-large', // Larger patches for better rotated barcode detection
-      halfSample: false, // Use full resolution for accuracy
-      willReadFrequently: true, // Optimize for continuous reading
-      debug: {
-        showCanvas: false,
-        showPatches: false,
-        showFoundPatches: false,
-        showSkeleton: false,
-        showLabels: false,
-        showPatchLabels: false,
-        showRemainingPatchLabels: false,
-        boxFromPatches: {
-          showTransformed: false,
-          showTransformedBox: false,
-          showBB: false
-        }
-      }
+      patchSize: 'large', // Changed from 'medium' to 'large' for better accuracy
+      halfSample: false, // Changed from true - use full resolution for accuracy
     },
-    numOfWorkers: navigator.hardwareConcurrency || 4, // Use all available CPU cores
-    frequency: 10, // Increased from 5 - more frequent scans to catch rotated barcodes
+    numOfWorkers: 4, // Increased from 2 for better processing
+    frequency: 5, // Reduced from 10 - slower but more accurate scans
     decoder: {
       readers: [
-        {
-          format: 'ean_reader',
-          config: {
-            supplements: []
-          }
-        },
-        {
-          format: 'ean_8_reader',
-          config: {
-            supplements: []
-          }
-        },
+        'ean_reader',      // EAN-13, EAN-8 (most wine bottles)
+        'ean_8_reader',
         'upc_reader',      // UPC-A, UPC-E
         'upc_e_reader',
         'code_128_reader', // Code 128
@@ -227,8 +202,8 @@ async function startCamera(onScanComplete) {
     // Set up barcode detection handler with quality validation and consensus
     let detectionHistory = []; // Track recent detections for consensus
     const REQUIRED_DETECTIONS = 2; // Must see same code 2 times
-    const QUALITY_THRESHOLD = 60; // Minimum quality score (0-100) - lowered for rotated barcodes
-    const CONSENSUS_WINDOW_MS = 1500; // Time window for consensus - increased for rotated barcodes
+    const QUALITY_THRESHOLD = 75; // Minimum quality score (0-100)
+    const CONSENSUS_WINDOW_MS = 1000; // Time window for consensus
 
     // Helper function to calculate EAN/UPC checksum
     function validateBarcodeChecksum(code, format) {
