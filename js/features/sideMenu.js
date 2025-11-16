@@ -8,6 +8,7 @@ import { exportAllData, importData } from '../dataManager.js';
 import { openInlinePlaceEditor, openCreatePlaceEditor } from '../components/placeEditor.js';
 import { openItemTypeEditor, openCreateItemTypeEditor } from '../components/itemTypeEditor.js';
 import { openModal, closeModal } from '../components/modal.js';
+import { openCameraConfig } from './cameraConfig.js';
 
 let sideMenuOpen = false;
 let aboutDialogOpen = false;
@@ -58,6 +59,11 @@ export function initSideMenu() {
   if (el('itemTypesBtn')) el('itemTypesBtn').addEventListener('click', () => {
     closeSideMenu();
     showItemTypes();
+  });
+
+  if (el('cameraConfigBtn')) el('cameraConfigBtn').addEventListener('click', () => {
+    closeSideMenu();
+    showCameraConfig();
   });
 
   // About dialog
@@ -500,6 +506,10 @@ export function closeSideMenu() {
   el('hamburgerBtn').classList.remove('active');
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
+}
+
+function showCameraConfig() {
+  openCameraConfig();
 }
 
 async function exportData() {

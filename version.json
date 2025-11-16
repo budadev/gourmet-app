@@ -1,9 +1,14 @@
 {
-  "version": "0.1.87",
-  "releaseDate": "2025-11-14",
+  "version": "0.1.91",
+  "releaseDate": "2025-11-16",
   "changes": [
-    "UI: Item details page reorganized - Type and Sub-type merged into one row (matching home screen format)",
-    "UI: Item details sections reordered: Type, Rating, Notes, Places, Dynamic fields, Photos, Pairings, Barcodes",
-    "UI: Removed 'Last Updated' field from item details page for cleaner interface"
+    "Feature: Added Camera Settings configuration screen for barcode scanner fine-tuning",
+    "Feature: Added 3 quick presets for scanner: Fast Scan, Most Accurate, and Rotated Codes (90° barcodes)",
+    "Feature: Configurable scanner parameters: detection validation, performance, resolution, and debug options",
+    "Feature: Scanner settings persist in localStorage for consistent behavior across sessions",
+    "Improvement: Enhanced barcode scanner to handle rotated (90-degree) barcodes with optimized settings",
+    "Fix: Resolved scanner.js syntax errors (duplicate constant declarations)",
+    "Fix: Populated empty manifest.webmanifest file for proper PWA functionality",
+    "UI: Added Camera Settings button to side menu with camera icon"
   ]
 }
