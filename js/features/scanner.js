@@ -3,7 +3,6 @@
    ============================= */
 
 import { el } from '../utils.js';
-import { getCameraConfig } from './cameraConfig.js';
 
 // Quagga2 will be loaded via script tag in HTML and available as window.Quagga
 let Quagga = null;
@@ -29,9 +28,6 @@ async function startCamera(onScanComplete) {
   opening = true;
   isScanning = true;
   el('scanStatus').textContent = '📷 Initializing camera…';
-  // Load camera configuration
-  const cameraConfig = getCameraConfig();
-
 
   // Initialize Quagga reference
   if (!initQuagga()) {
@@ -78,8 +74,8 @@ async function startCamera(onScanComplete) {
       type: 'LiveStream',
       target: document.querySelector('#interactive'), // Use the interactive container
       constraints: {
-        width: { min: 640, ideal: cameraConfig.resolutionWidth, max: 1920 },
-        height: { min: 480, ideal: cameraConfig.resolutionHeight, max: 1080 },
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
         facingMode: selectedDeviceId ? undefined : 'environment',
         deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
         aspectRatio: { ideal: 16/9 },
@@ -98,11 +94,11 @@ async function startCamera(onScanComplete) {
       singleChannel: false // use color processing
     },
     locator: {
-      patchSize: cameraConfig.patchSize,
-      halfSample: cameraConfig.halfSample,
+      patchSize: 'large', // Changed from 'medium' to 'large' for better accuracy
+      halfSample: false, // Changed from true - use full resolution for accuracy
     },
-    numOfWorkers: cameraConfig.numOfWorkers,
-    frequency: cameraConfig.frequency,
+    numOfWorkers: 4, // Increased from 2 for better processing
+    frequency: 5, // Reduced from 10 - slower but more accurate scans
     decoder: {
       readers: [
         'ean_reader',      // EAN-13, EAN-8 (most wine bottles)
@@ -115,9 +111,9 @@ async function startCamera(onScanComplete) {
       ],
       multiple: false, // Stop after first barcode found
       debug: {
-        drawBoundingBox: cameraConfig.drawBoundingBox,
+        drawBoundingBox: true,
         showFrequency: false,
-        drawScanline: cameraConfig.drawScanline,
+        drawScanline: true,
         showPattern: false
       }
     },
@@ -205,9 +201,9 @@ async function startCamera(onScanComplete) {
 
     // Set up barcode detection handler with quality validation and consensus
     let detectionHistory = []; // Track recent detections for consensus
-    const REQUIRED_DETECTIONS = cameraConfig.requiredDetections;
-    const QUALITY_THRESHOLD = cameraConfig.qualityThreshold;
-    const CONSENSUS_WINDOW_MS = cameraConfig.consensusWindowMs;
+    const REQUIRED_DETECTIONS = 2; // Must see same code 2 times
+    const QUALITY_THRESHOLD = 75; // Minimum quality score (0-100)
+    const CONSENSUS_WINDOW_MS = 1000; // Time window for consensus
 
     // Helper function to calculate EAN/UPC checksum
     function validateBarcodeChecksum(code, format) {

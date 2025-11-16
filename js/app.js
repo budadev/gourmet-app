@@ -23,7 +23,6 @@ import { closeModal } from './components/modal.js';
 import { initViewSelector, getCurrentView, getCachedUserLocation, calculateDistance } from './features/viewSelector.js';
 import { getPlaceById } from './models/places.js';
 import { initMemoryLane, showMemoryLane, hideMemoryLane, isMemoryLaneActive } from './features/memoryLane.js';
-import { initCameraConfig, loadCameraConfig } from './features/cameraConfig.js';
 
 async function refreshList() {
   const query = el('searchInput').value.trim();
@@ -350,10 +349,6 @@ async function initApp() {
 
   // Initialize side menu
   initSideMenu();
-  // Initialize camera config
-  loadCameraConfig();
-  initCameraConfig();
-
 
   // Initialize item type editor
   initItemTypeEditor();
